@@ -59,5 +59,9 @@ int main(int argc, char** argv)
 
     pc_runtime_init();
     pc_dvd_init(pc_config.iso);
+    if (extract_dir != NULL) {
+        pc_dvd_extract(extract_dir);
+        return 0;
+    }
     return melee_main();
 }

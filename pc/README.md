@@ -62,6 +62,12 @@ build\pc\melee.exe [--iso PATH] [--frames N] [--realtime] [--autoplay] [--quiet-
 - `--autoplay`: tap Start and A on port 1 every 150 frames, which pushes a
   headless run through prompts and menus.
 - `--quiet-stubs`: don't log the first call of each SDK stub.
+- `--extract DIR`: write every file of the disc to `DIR/files`, in the
+  disc's own folder layout, and the boot header, FST, apploader and
+  `main.dol` to `DIR/sys` (the same layout the decomp's `orig/` uses), then
+  exit. This is the starting point for modding: a later milestone adds a
+  loose-file override so files in such a folder take precedence over the
+  image.
 
 Exit status: 0 frame limit, 3 game assertion/`OSPanic`, 4 spin on an
 unimplemented SDK function (a stub called two million times), 5 unsupported
