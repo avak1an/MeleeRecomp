@@ -42,6 +42,8 @@ static u32 be32(const u8* p)
     return ((u32) p[0] << 24) | ((u32) p[1] << 16) | ((u32) p[2] << 8) | p[3];
 }
 
+extern void pc_gx_texture_changed(const void* addr, u32 bytes);
+
 static void disc_read(u64 offset, void* dst, u32 length)
 {
     if (_fseeki64(disc, (long long) offset, SEEK_SET) != 0 || fread(dst, 1, length, disc) != length) {
@@ -49,6 +51,9 @@ static void disc_read(u64 offset, void* dst, u32 length)
                 length);
         pc_exit(6);
     }
+    /* the game reloads some textures into the same buffer (character
+     * portraits on the select screens): drop cached uploads of them */
+    pc_gx_texture_changed(dst, length);
 }
 
 static const char* find_default_iso(void)

@@ -497,12 +497,25 @@ static void texgen(const Vertex* v, const float vpos[3], const float vnrm[3], in
     m = (const float(*)[4]) gx.mtx[g->mtx];
     s = m[0][0] * in[0] + m[0][1] * in[1] + m[0][2] * in[2] + m[0][3] * in[3];
     t = m[1][0] * in[0] + m[1][1] * in[1] + m[1][2] * in[2] + m[1][3] * in[3];
+    q = 1.0f;
     if (g->type == GX_TG_MTX3x4) {
         q = m[2][0] * in[0] + m[2][1] * in[1] + m[2][2] * in[2] + m[2][3] * in[3];
-        if (q != 0.0f) {
-            s /= q;
-            t /= q;
-        }
+    }
+    /* dual transform: the post-transform matrix (GX_PTTEXMTX0..19) is applied
+     * to the generated (s, t, q). HSD loads every texture's own matrix
+     * (animation translate/scale/rotate, reflection maps) there. */
+    if (g->pt_mtx != GX_PTIDENTITY && g->pt_mtx + 3 <= MTX_ROWS) {
+        const float(*pm)[4] = (const float(*)[4]) gx.mtx[g->pt_mtx];
+        float ps = pm[0][0] * s + pm[0][1] * t + pm[0][2] * q + pm[0][3];
+        float pt = pm[1][0] * s + pm[1][1] * t + pm[1][2] * q + pm[1][3];
+        float pq = pm[2][0] * s + pm[2][1] * t + pm[2][2] * q + pm[2][3];
+        s = ps;
+        t = pt;
+        q = pq;
+    }
+    if (q != 0.0f && q != 1.0f) {
+        s /= q;
+        t /= q;
     }
     out[0] = s;
     out[1] = t;
@@ -561,12 +574,25 @@ typedef struct TexEntry {
     u8 format;
     u32 tlut_name;
     const void* lut;
+    u32 lut_hash; /* palettes are rewritten in place (player colours, ...) */
     GLuint tex;
     u32 last_frame;
 } TexEntry;
 
+static u32 hash_bytes(const void* p, size_t n)
+{
+    const u8* b = (const u8*) p;
+    u32 h = 2166136261u;
+    size_t i;
+    for (i = 0; i < n; i++) {
+        h = (h ^ b[i]) * 16777619u;
+    }
+    return h;
+}
+
 #define TEX_CACHE 1024
 static TexEntry tex_cache[TEX_CACHE];
+static int debug_nocache = -1;
 
 /* EFB copies: a destination pointer that GXCopyTex wrote maps to a GL
  * texture holding the copied pixels. */
@@ -821,6 +847,44 @@ static u32* decode_texture(const PCTexObj* t, u32* out_w, u32* out_h)
     return out;
 }
 
+/* MELEE_GX_DUMP_TEX=DIR writes every decoded texture as RGB and alpha PGM/PPM
+ * files named by image address, size and format. */
+static void dump_texture(const PCTexObj* t, const u32* pixels, u32 w, u32 h)
+{
+    static const char* dir;
+    static int checked;
+    char path[512];
+    FILE* f;
+    u32 i;
+    if (!checked) {
+        checked = 1;
+        dir = getenv("MELEE_GX_DUMP_TEX");
+    }
+    if (dir == NULL) {
+        return;
+    }
+    snprintf(path, sizeof(path), "%s/tex_%p_%ux%u_f%u.ppm", dir, t->image, w, h, t->format);
+    f = fopen(path, "wb");
+    if (f != NULL) {
+        fprintf(f, "P6 %u %u 255 ", w, h);
+        for (i = 0; i < w * h; i++) {
+            fputc(pixels[i] & 0xFF, f);
+            fputc((pixels[i] >> 8) & 0xFF, f);
+            fputc((pixels[i] >> 16) & 0xFF, f);
+        }
+        fclose(f);
+    }
+    snprintf(path, sizeof(path), "%s/tex_%p_%ux%u_f%u_alpha.pgm", dir, t->image, w, h, t->format);
+    f = fopen(path, "wb");
+    if (f != NULL) {
+        fprintf(f, "P5 %u %u 255 ", w, h);
+        for (i = 0; i < w * h; i++) {
+            fputc(pixels[i] >> 24, f);
+        }
+        fclose(f);
+    }
+}
+
 static GLenum gl_wrap(u8 w)
 {
     return w == GX_CLAMP ? GL_CLAMP_TO_EDGE : w == GX_MIRROR ? GL_MIRRORED_REPEAT : GL_REPEAT;
@@ -829,8 +893,12 @@ static GLenum gl_wrap(u8 w)
 static GLuint bind_texture(const PCTexObj* t)
 {
     u32 i, free_slot = TEX_CACHE;
+    if (debug_nocache < 0) {
+        debug_nocache = getenv("MELEE_GX_NOCACHE") != NULL;
+    }
     const PCTlutObj* tlut = t->tlut_name < 20 ? &gx.tlut[t->tlut_name] : NULL;
     const void* lut = tlut ? tlut->lut : NULL;
+    u32 lut_hash = lut != NULL ? hash_bytes(lut, (size_t) tlut->n_entries * 2) : 0;
     TexEntry* e = NULL;
 
     for (i = 0; i < COPY_CACHE; i++) {
@@ -848,7 +916,15 @@ static GLuint bind_texture(const PCTexObj* t)
         }
         if (tex_cache[i].image == t->image && tex_cache[i].width == t->width &&
             tex_cache[i].height == t->height && tex_cache[i].format == t->format &&
-            tex_cache[i].tlut_name == t->tlut_name && tex_cache[i].lut == lut) {
+            tex_cache[i].tlut_name == t->tlut_name && tex_cache[i].lut == lut &&
+            tex_cache[i].lut_hash == lut_hash) {
+            if (debug_nocache) {
+                /* MELEE_GX_NOCACHE=1: decode every texture on every use */
+                glDeleteTextures(1, &tex_cache[i].tex);
+                memset(&tex_cache[i], 0, sizeof(TexEntry));
+                free_slot = i;
+                continue;
+            }
             e = &tex_cache[i];
             break;
         }
@@ -870,12 +946,14 @@ static GLuint bind_texture(const PCTexObj* t)
         }
         e = &tex_cache[free_slot];
         pixels = decode_texture(t, &w, &h);
+        dump_texture(t, pixels, w, h);
         e->image = t->image;
         e->width = t->width;
         e->height = t->height;
         e->format = t->format;
         e->tlut_name = t->tlut_name;
         e->lut = lut;
+        e->lut_hash = lut_hash;
         glGenTextures(1, &e->tex);
         glBindTexture(GL_TEXTURE_2D, e->tex);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -1356,11 +1434,14 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
         float cw = gx.proj[3][0] * x + gx.proj[3][1] * y + gx.proj[3][2] * z + gx.proj[3][3];
         fprintf(stderr,
                 "[gx] draw prim=%02x vat=%u n=%u big=%d v0=(%.2f %.2f %.2f) clip=(%.2f %.2f %.2f w=%.2f) "
-                "col0=(%.2f %.2f %.2f %.2f) tex0=(%.2f %.2f) tev=%u map0=%p chans=%u texgen=%u "
+                "col0=(%.2f %.2f %.2f %.2f) tex0=(%.2f %.2f) tev=%u map0=%p fmt=%u %ux%u tlut=%u/%p/%u/%u chans=%u texgen=%u "
                 "vp=(%.0f %.0f %.0f %.0f) cull=%u z=%u/%u/%u blend=%u alpha=%u/%u/%u/%u proj=%u\n",
                 prim, vat, nverts, big, x, y, z, cx, cy, cz, cw, g->col[0][0], g->col[0][1],
                 g->col[0][2], g->col[0][3], g->tex[0][0], g->tex[0][1], gx.num_tev, gx.texmap[0].image,
-                gx.num_chans, gx.num_texgen, gx.vp[0], gx.vp[1], gx.vp[2], gx.vp[3], gx.cull,
+                gx.texmap[0].format, gx.texmap[0].width, gx.texmap[0].height, gx.texmap[0].tlut_name,
+                gx.texmap[0].tlut_name < 20 ? gx.tlut[gx.texmap[0].tlut_name].lut : NULL,
+                gx.texmap[0].tlut_name < 20 ? gx.tlut[gx.texmap[0].tlut_name].fmt : 0,
+                gx.texmap[0].tlut_name < 20 ? gx.tlut[gx.texmap[0].tlut_name].n_entries : 0, gx.num_chans, gx.num_texgen, gx.vp[0], gx.vp[1], gx.vp[2], gx.vp[3], gx.cull,
                 gx.z_enable, gx.z_func, gx.z_update, gx.blend_mode, gx.alpha_comp0, gx.alpha_ref0,
                 gx.alpha_op, gx.alpha_comp1, gx.proj_type);
         {

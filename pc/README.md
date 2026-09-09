@@ -76,10 +76,13 @@ trips DMA-alignment asserts sooner or later.
 ## Running
 
 ```
-build\pc\melee.exe [--iso PATH] [--realtime] [--fullscreen] [--scale N] [--keymap FILE]
-                    [--volume N] [--no-audio] [--saves DIR] [--frames N] [--autoplay]
-                    [--input FILE] [--seed N] [--quiet-stubs] [--headless] [--screenshots DIR]
+build\pc\melee.exe [--iso PATH] [--fullscreen] [--scale N] [--keymap FILE] [--volume N]
+                    [--no-audio] [--saves DIR] [--fast] [--frames N] [--autoplay] [--input FILE]
+                    [--seed N] [--quiet-stubs] [--headless] [--screenshots DIR]
 ```
+
+Run from anywhere; with the disc image next to `melee.exe` (or in the
+current or parent directory) no option is needed.
 
 A typical check that a change did not break the match:
 
@@ -95,8 +98,10 @@ backtrace and a hang is reported by the watchdog (status 8).
   directory. Only the game's own files are read; nothing is extracted or
   written.
 - `--frames N`: stop after N video frames (status 0).
-- `--realtime`: pace the loop to 60 Hz (default: as fast as possible).
-  Audio is mixed either way, but only sounds right when paced.
+- `--fast`: do not hold the game to 60 frames per second. Windowed runs
+  are paced by default (`--realtime` is accepted and means the same);
+  headless runs are never paced. Audio is mixed either way, but only
+  sounds right when paced.
 - `--fullscreen`: start in a borderless window covering the monitor. F11
   or Alt+Enter toggles at any time.
 - `--scale N`: start with an N x 640x480 window (1-8).
@@ -129,8 +134,11 @@ backtrace and a hang is reported by the watchdog (status 8).
 
 The window starts at 640x480 (or `--scale` times that) and can be resized
 or made full screen: the frame keeps its 4:3 shape, centred with black
-bars. Escape or closing the window ends the run. Rendering is as fast as
-the machine allows unless `--realtime` is given, which also enables vsync.
+bars. Escape or closing the window ends the run. The game runs at 60
+frames per second: on a 60, 120, 180 or 240 Hz display the swap chain is
+synchronized to every first, second, third or fourth refresh, on other
+rates a 1 ms timer paces the loop (the startup log's `display:` line says
+which). `--fast` removes the limit.
 
 Audio: a 32 kHz stereo mix of every voice the game's sound engine starts
 (sound effects from ARAM, music streamed from the disc), 5 ms at a time,
@@ -155,12 +163,14 @@ big-endian). Vertices are decoded with the current vertex descriptor,
 attribute formats and index arrays, then transformed on the CPU as the
 console's XF unit would: position/normal matrices from the matrix memory,
 per-vertex lighting from the channel controls, texture-coordinate
-generation. The fragment side is a GLSL shader generated from the TEV
+generation (source, texture matrix and the post-transform matrix HSD
+uses for every texture's own translate/scale/rotate). The fragment side is a GLSL shader generated from the TEV
 stage configuration (all inputs, compare ops, bias/scale, swap tables,
 konstants, alpha compare). Textures are decoded from the console formats
 (I4/I8/IA4/IA8/RGB565/RGB5A3/RGBA8/CMPR and the C4/C8/C14X2 palette
-formats) into a cache keyed by image pointer. EFB-to-texture copies use a
-framebuffer copy. GX clip-space depth [-w, 0] is remapped to GL's [-w, w]
+formats) into a cache keyed by image pointer and palette contents, which
+disc reads, ARAM transfers and cache flushes invalidate. EFB-to-texture
+copies use a framebuffer copy. GX clip-space depth [-w, 0] is remapped to GL's [-w, w]
 in the vertex shader; viewport and scissor are flipped from the console's
 top-left origin.
 
@@ -220,6 +230,11 @@ BACKSLASH RBRACKET QUOTE`. Actions not mentioned keep their default.
 - `MELEE_AUDIO_DUMP=FILE` writes the mixed audio of the run as a 32 kHz
   stereo WAV; `MELEE_THP_DUMP=DIR` writes every decoded movie frame's luma
   plane as a PGM image and logs its mean brightness.
+- `MELEE_GX_DUMP_TEX=DIR` writes every texture the renderer decodes as a
+  PPM (colour) and PGM (alpha) pair named by image address, size and
+  format; `MELEE_GX_NOCACHE=1` decodes textures on every use, to tell a
+  stale cached upload from a decoding problem. The draw log names each
+  draw's texture format, size and palette.
 - A build configured with `-DMELEE_TRACE_FUNCS=ON` (clang only) records every
   function entry in a ring buffer and prints the last 96 on a crash, and
   verifies each function's return address as it returns, naming the frame
@@ -310,7 +325,9 @@ stores each 8x8 block straight into the 8x4 tiles of the GX I8 textures
 the movie player binds. The player's work area holds the decoder state.
 Because the planes are rewritten in place, the renderer drops its cached
 upload of any texture inside a range the game flushes (`DCStoreRange`,
-`DCFlushRange`) or the decoder wrote.
+`DCFlushRange`), reads from the disc or transfers from ARAM, or that the
+decoder wrote; palettes are hashed into the cache key because the game
+rewrites them in place (player colours).
 
 **The memory card is a directory.** Files are held in memory while the
 card is mounted and written through to disk on every create, write, status

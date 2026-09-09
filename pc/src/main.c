@@ -26,7 +26,9 @@ static void usage(void)
             "                  or GALE01.iso in the current or parent directory\n"
             "  --frames N      exit after N video frames (default 0 = run until a\n"
             "                  fatal error or Ctrl-C)\n"
-            "  --realtime      pace the main loop to 60 Hz\n"
+            "  --fast          do not pace to 60 Hz (windowed runs are paced by default;\n"
+            "                  headless runs never are). --realtime is accepted and is\n"
+            "                  the default\n"
             "  --autoplay      press Start and A on port 1 every couple of seconds\n"
             "                  (pushes headless runs through prompts)\n"
             "  --input FILE    scripted port-1 input: lines of\n"
@@ -63,6 +65,8 @@ int main(int argc, char** argv)
             extract_dir = argv[++i];
         } else if (strcmp(argv[i], "--realtime") == 0) {
             pc_config.realtime = true;
+        } else if (strcmp(argv[i], "--fast") == 0) {
+            pc_config.fast = true;
         } else if (strcmp(argv[i], "--autoplay") == 0) {
             pc_config.autoplay = true;
         } else if (strcmp(argv[i], "--input") == 0 && i + 1 < argc) {
@@ -115,6 +119,9 @@ int main(int argc, char** argv)
     if (!pc_config.headless) {
         if (pc_config.keymap != NULL) {
             pc_pad_load_keymap(pc_config.keymap);
+        }
+        if (!pc_config.fast) {
+            pc_config.realtime = true; /* a window runs at the game's speed */
         }
         if (!pc_window_open(640, 480, "Super Smash Bros. Melee")) {
             fprintf(stderr, "[pc] continuing without rendering\n");

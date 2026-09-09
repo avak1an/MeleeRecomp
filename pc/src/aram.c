@@ -89,6 +89,8 @@ u32 ARFree(u32* length)
     return stack_pointer;
 }
 
+extern void pc_gx_texture_changed(const void* addr, u32 bytes);
+
 static void ar_copy(u32 type, u32 mainmem, u32 aram_addr, u32 length)
 {
     if (aram_addr + length > ARAM_SIZE) {
@@ -99,6 +101,7 @@ static void ar_copy(u32 type, u32 mainmem, u32 aram_addr, u32 length)
         memcpy(aram + aram_addr, (void*) (uintptr_t) mainmem, length);
     } else {
         memcpy((void*) (uintptr_t) mainmem, aram + aram_addr, length);
+        pc_gx_texture_changed((void*) (uintptr_t) mainmem, length);
     }
 }
 

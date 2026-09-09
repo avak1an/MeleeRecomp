@@ -40,6 +40,12 @@ static int ready;
 static int closed;
 static int win_w, win_h;
 static int fullscreen;
+static int vsync_hz; /* frame rate the swap chain enforces, 0 = none */
+
+int pc_window_vsync_hz(void)
+{
+    return vsync_hz;
+}
 static RECT windowed_rect; /* window rectangle to restore after full screen */
 
 /// Switches between the bordered window and a borderless window covering
@@ -208,7 +214,18 @@ int pc_window_open(int width, int height, const char* title)
     }
     swap_interval = (PFN_wglSwapIntervalEXT) wglGetProcAddress("wglSwapIntervalEXT");
     if (swap_interval != NULL) {
-        swap_interval(pc_config.realtime ? 1 : 0);
+        /* vsync only when the refresh rate divides into 60 Hz frames
+         * exactly (60, 120, 180, 240 Hz); other rates are paced by a
+         * timer in VIWaitForRetrace instead */
+        int hz = GetDeviceCaps(hdc, VREFRESH);
+        int interval = 0;
+        if (pc_config.realtime && hz >= 60 && hz % 60 == 0) {
+            interval = hz / 60;
+            vsync_hz = 60;
+        }
+        swap_interval(interval);
+        fprintf(stderr, "[pc] display: %d Hz, %s\n", hz,
+                interval ? "vsync" : pc_config.realtime ? "timer paced" : "unpaced");
     }
     fprintf(stderr, "[pc] GL: %s / %s\n", (const char*) glGetString(GL_RENDERER),
             (const char*) glGetString(GL_VERSION));

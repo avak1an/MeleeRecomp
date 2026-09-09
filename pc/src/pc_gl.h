@@ -96,6 +96,8 @@ void pc_window_size(int* width, int* height);
 /// coordinates: y counts from the bottom).
 void pc_window_viewport(int* x, int* y, int* width, int* height);
 void pc_window_set_fullscreen(int on);
+/// 60 when the swap chain itself holds the game to 60 frames per second.
+int pc_window_vsync_hz(void);
 int pc_window_is_fullscreen(void);
 
 /// Whether a GL context exists (rendering calls must check this).

@@ -13,7 +13,8 @@
 typedef struct PCConfig {
     int max_frames;      ///< exit after this many VIWaitForRetrace calls (0 = never)
     bool log_stubs;      ///< print the first call of each stubbed SDK function
-    bool realtime;       ///< pace VIWaitForRetrace to 60 Hz
+    bool realtime;       ///< pace VIWaitForRetrace to 60 Hz (default for windowed runs)
+    bool fast;           ///< --fast: windowed run without pacing
     bool autoplay;       ///< synthesize Start/A presses on port 1 to push through prompts
     const char* input_script; ///< file of scripted port-1 inputs (see pad.c)
     unsigned seed;       ///< if nonzero, the game's RNG seed (else the clock)

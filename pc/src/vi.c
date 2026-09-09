@@ -13,8 +13,10 @@
 
 #include <stdio.h>
 #include <windows.h>
+#include <mmsystem.h>
 
 extern void pc_ax_frame(void);
+extern int pc_window_vsync_hz(void);
 
 static VIRetraceCallback pre_cb;
 static VIRetraceCallback post_cb;
@@ -89,22 +91,45 @@ VIRetraceCallback VISetPostRetraceCallback(VIRetraceCallback cb)
     return old;
 }
 
+/* Holds each frame to 1/60 s. When the swap chain is already synchronized
+ * to a multiple of 60 Hz (see pc_window_vsync_hz) it does the pacing and
+ * this is skipped: two pacers fighting over the same frame drop to 30 Hz.
+ * The period is fixed, not measured from the previous frame, so the
+ * average rate is exact; after a stall the deadline is reset instead of
+ * catching up. */
 static void pace_to_60hz(void)
 {
-    LARGE_INTEGER freq, now;
-    QueryPerformanceFrequency(&freq);
-    if (last_frame.QuadPart == 0) {
-        QueryPerformanceCounter(&last_frame);
+    static LARGE_INTEGER freq, deadline;
+    static int period_set;
+    LARGE_INTEGER now;
+    if (pc_window_vsync_hz() == 60) {
         return;
     }
+    if (freq.QuadPart == 0) {
+        QueryPerformanceFrequency(&freq);
+    }
+    if (!period_set) {
+        timeBeginPeriod(1); /* 1 ms Sleep granularity */
+        period_set = 1;
+    }
+    QueryPerformanceCounter(&now);
+    if (deadline.QuadPart == 0 || now.QuadPart > deadline.QuadPart + freq.QuadPart / 10) {
+        deadline = now; /* first frame, or more than 100 ms behind */
+    }
+    deadline.QuadPart += freq.QuadPart / 60;
     for (;;) {
+        LONGLONG left;
         QueryPerformanceCounter(&now);
-        if ((now.QuadPart - last_frame.QuadPart) * 60 >= freq.QuadPart) {
+        left = deadline.QuadPart - now.QuadPart;
+        if (left <= 0) {
             break;
         }
-        Sleep(1);
+        if (left > freq.QuadPart / 500) {
+            Sleep(1); /* more than 2 ms to go */
+        } else {
+            YieldProcessor(); /* spin out the last stretch */
+        }
     }
-    last_frame = now;
 }
 
 void VIWaitForRetrace(void)
