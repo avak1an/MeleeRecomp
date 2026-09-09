@@ -15,15 +15,18 @@ engine units, and three pure-C SDK units compile and link into
 disc image, the HSD engine parses and byte-swaps archives, and a headless
 run with `--autoplay` boots through the memory-card prompt, the opening
 movie, the title screen and the main menu into the character-select
-screen (about 500 frames of real game logic, drawing every frame through
-the GX stubs). Controllers work through XInput or the keyboard. Nothing is
-displayed yet.
+screen. Controllers work through XInput or the keyboard.
+
+**Milestone 3 (rendering) — menus done.** A GX-on-OpenGL layer draws the
+memory-card prompt, the title screen, the main menu and the
+character-select screen in a window, with correct text, textures, models
+and layout. See "Renderer" below for what it covers and what it does not
+yet.
 
 Planned milestones:
 
-3. **Rendering.** A GX emulation layer on OpenGL; menus first, then
-   in-game. Also the game-specific data structures behind the menus
-   (character select is the first that reads swapped fields).
+3b. **In-game rendering.** Stages and fighters (skinning, shape animation,
+   fog, EFB effects), plus the remaining game-side data swaps those need.
 4. **Audio, saves, polish.** AX mixing, THP video decoding, memory-card
    files on disk, window and input options.
 
@@ -62,12 +65,49 @@ build\pc\melee.exe [--iso PATH] [--frames N] [--realtime] [--autoplay] [--quiet-
 - `--autoplay`: tap Start and A on port 1 every 150 frames, which pushes a
   headless run through prompts and menus.
 - `--quiet-stubs`: don't log the first call of each SDK stub.
+- `--headless`: no window; run the game logic only (what the regression
+  runs use).
+- `--screenshots DIR`: save a BMP of every 60th frame into DIR, with the
+  draw and vertex counts of that frame on stderr.
 - `--extract DIR`: write every file of the disc to `DIR/files`, in the
   disc's own folder layout, and the boot header, FST, apploader and
   `main.dol` to `DIR/sys` (the same layout the decomp's `orig/` uses), then
   exit. This is the starting point for modding: a later milestone adds a
   loose-file override so files in such a folder take precedence over the
   image.
+
+The window is 640x480 and can be resized (the frame is scaled); Escape or
+closing it ends the run. Rendering is as fast as the machine allows
+unless `--realtime` is given, which also enables vsync.
+
+## Renderer
+
+`pc/src/gx_render.c` implements the GX API on OpenGL 2.x. Geometry
+arrives two ways and is decoded by the same code: immediate mode (the
+`GXPosition3f32`-style inline functions in `GXVert.h` write to the
+recorder on PC) and display lists from disc (the same command format,
+big-endian). Vertices are decoded with the current vertex descriptor,
+attribute formats and index arrays, then transformed on the CPU as the
+console's XF unit would: position/normal matrices from the matrix memory,
+per-vertex lighting from the channel controls, texture-coordinate
+generation. The fragment side is a GLSL shader generated from the TEV
+stage configuration (all inputs, compare ops, bias/scale, swap tables,
+konstants, alpha compare). Textures are decoded from the console formats
+(I4/I8/IA4/IA8/RGB565/RGB5A3/RGBA8/CMPR and the C4/C8/C14X2 palette
+formats) into a cache keyed by image pointer. EFB-to-texture copies use a
+framebuffer copy. GX clip-space depth [-w, 0] is remapped to GL's [-w, w]
+in the vertex shader; viewport and scissor are flipped from the console's
+top-left origin.
+
+Not done yet: fog, indirect texturing, Z textures, destination alpha,
+mipmaps and LOD bias, GX line/point texture offsets, dithering. These
+matter in-game more than in the menus.
+
+Debugging: `MELEE_GX_DEBUG=1` logs the first draws of the run (vertex
+descriptor, first vertex in view and clip space, TEV/texture state, the
+current position matrix) and the joint display entries; `MELEE_GX_FLAT=1`
+replaces every fragment with magenta and disables the alpha test, which
+separates geometry problems from shading problems.
 
 Exit status: 0 frame limit, 3 game assertion/`OSPanic`, 4 spin on an
 unimplemented SDK function (a stub called two million times), 5 unsupported
@@ -106,7 +146,10 @@ L/R, Space = Z, Enter = Start, numpad 8/2/4/6 = D-pad).
 | `src/vi.c` | Frame boundary: retrace callbacks, pacing, frame limit. |
 | `src/dvd.c` | Disc image access with the SDK's FST lookup; reads complete from the pump. |
 | `src/aram.c` | 16 MB auxiliary RAM and its DMA request queue. |
-| `src/gx.c` | Fifo object, draw-done notification, write-gather pipe sink. |
+| `src/gx.c` | Fifo object, draw-done notification, texture/palette objects, texture buffer sizes. |
+| `src/gx_render.c` | The GX-on-OpenGL renderer: state, vertex decoding, transform and lighting, texture decoding, TEV shader generation, frame copies. |
+| `src/gl_window.c`, `src/pc_gl.h` | Win32 window, OpenGL context and entry-point loader. |
+| `src/pc_gx.h` | Shared texture/palette object layout and the immediate-mode write interface. |
 | `src/pad.c` | XInput and keyboard controllers, autoplay. |
 | `src/card.c` | Memory card: reports "no card". |
 | `src/hsd_swap.c` | Byte-swapping of HSD descriptors (see below). |
@@ -181,7 +224,20 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   - `efalt.c`, `hsd_3B2B.c`, `ground.c`, `grheal.c`, `lbfile.c`,
     `ftyoshispecialn.c`: `__va_arg`, variable-length arrays,
     const-from-const globals.
-- `gm_1A3F.c`: scene-transition log line. `lbdvd.c`: preload sanity checks.
+- `gm_1A3F.c`: scene-transition log line. `jobj.c`: joint display log
+  (`MELEE_GX_DEBUG`).
+- `dolphin/gx/GXVert.h`: on PC the vertex inline functions write to the
+  renderer; direct pipe writes in `gm_1832.c`, `hsd_3915.c`, `psdisp.c`
+  go through `GX_FIFO_F32`/`GX_FIFO_U8` (token-identical on GameCube).
+- `hsd_3A76.c`: SIS text streams are big-endian byte streams both on disc
+  and as built at runtime, so their 16-bit token reads go through
+  `SIS_U16`/`SIS_S16`; pointer tokens are stored in host order on PC.
+- `wobj.c`, `fog.c`, `jobj.c`: the `*Init` and recursive helpers that copy
+  descriptor fields without going through the hooked loaders got the same
+  swap hooks.
+- `mncharsel.c` + `Runtime/platform.h`: `PC_ADJACENT(k)` places the six
+  statics that `CSS_ALL` views as one block into a linker-ordered section;
+  the scene entry verifies the layout.
 
 ## Known gaps (deliberate, for later milestones)
 

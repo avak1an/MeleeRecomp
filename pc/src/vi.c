@@ -5,6 +5,7 @@
  * sample controllers and flip frame buffers), drains completions, paces the
  * loop when asked to, and ends a bounded run.
  */
+#include "pc_gl.h"
 #include "pc_runtime.h"
 
 #include <dolphin/gx/GXStruct.h>
@@ -108,6 +109,10 @@ void VIWaitForRetrace(void)
 {
     pc_frame_count++;
     retrace_count++;
+    if (!pc_window_pump()) {
+        fprintf(stderr, "[pc] window closed\n");
+        pc_exit(0);
+    }
     if (pc_config.realtime) {
         pace_to_60hz();
     }

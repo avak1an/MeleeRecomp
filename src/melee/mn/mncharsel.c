@@ -112,7 +112,7 @@ static s8 mnCharSel_804D6CF9;
 #define ICONBNDS_COL8_L 24.4F
 #define ICONBNDS_COL8_R 30.2F
 
-static CSSIconsData mnCharSel_803F0A48 = {
+static CSSIconsData PC_ADJACENT(a) mnCharSel_803F0A48 = {
     {
         // GnW Name
         0x82, 0x6C, 0x82, 0x92, // 0x803F0A48
@@ -152,7 +152,7 @@ static CSSIconsData mnCharSel_803F0A48 = {
     },
 };
 
-static CSSIcon icons[25 + 1] = {
+static CSSIcon PC_ADJACENT(b) icons[25 + 1] = {
     // -------- Icons Top Row --------
 
     { // Dr. Mario -                      0x803F0B24
@@ -263,7 +263,7 @@ static CSSIcon icons[25 + 1] = {
       ICONROWHT_BTM_BTM }
 };
 
-static CSSDoorsData mnCharSel_803F0DFC = {
+static CSSDoorsData PC_ADJACENT(c) mnCharSel_803F0DFC = {
     { { 0x2E, 0x33, 0x38, 0x85, 0x29,  0xA6,  0x3D,  0x41,
         0x40, 0,    0,    0,    0,     0,     0,     0,
         0,    0,    0,    0,    -35.6, -28.6, -26.8, -21.0F },
@@ -277,19 +277,19 @@ static CSSDoorsData mnCharSel_803F0DFC = {
         0x00, 0x00, 0x00, 0x00, 11.0F, 17.0F, 19.0F, 24.6 } },
 };
 
-static CSSTag mnCharSel_803F0E8C[4] = {
+static CSSTag PC_ADJACENT(d) mnCharSel_803F0E8C[4] = {
     { NULL, 0x70, 0x73, 0x74, 0x72, 0x71 },
     { NULL, 0x75, 0x78, 0x79, 0x77, 0x76 },
     { NULL, 0x7A, 0x7D, 0x7E, 0x7C, 0x7B },
     { NULL, 0x7F, 0x82, 0x83, 0x81, 0x80 },
 };
 
-static struct CSSDoorsMisc mnCharSel_803F0EBC = {
+static struct CSSDoorsMisc PC_ADJACENT(e) mnCharSel_803F0EBC = {
     0,    0,    0, 0, 0x4A, 0x4D, 0x4E,  0x4C, 0x4B, 0,    0,    0,
     0x2F, 0x01, 0, 0, 0,    NULL, -10.9, -4.2, 12.5, 19.6, -6.8, -12.1,
 };
 
-static struct CSSDoorsData2 data2 = {
+static struct CSSDoorsData2 PC_ADJACENT(f) data2 = {
     { 0x35, 0x39, 0x36, 0x38, 0x37 },
     0,
     0,
@@ -5305,6 +5305,22 @@ s32 mnCharSel_802640A0(void)
 
 void mnCharSel_Scene_OnEnter(void* arg0)
 {
+#ifdef TARGET_PC
+    /* CSS_ALL is a view over six consecutive statics (see PC_ADJACENT). */
+    if ((u8*) &mnCharSel_803F0DFC - (u8*) &mnCharSel_803F0A48 != 0x3B4 ||
+        (u8*) mnCharSel_803F0E8C - (u8*) &mnCharSel_803F0A48 != 0x444 ||
+        (u8*) &mnCharSel_803F0EBC - (u8*) &mnCharSel_803F0A48 != 0x474 ||
+        (u8*) &data2 - (u8*) &mnCharSel_803F0A48 != 0x4A4)
+    {
+        OSPanic(__FILE__, __LINE__,
+                "character select statics are not laid out as CSSAllData expects "
+                "(doors %+d tags %+d misc %+d data2 %+d)",
+                (int) ((u8*) &mnCharSel_803F0DFC - (u8*) &mnCharSel_803F0A48),
+                (int) ((u8*) mnCharSel_803F0E8C - (u8*) &mnCharSel_803F0A48),
+                (int) ((u8*) &mnCharSel_803F0EBC - (u8*) &mnCharSel_803F0A48),
+                (int) ((u8*) &data2 - (u8*) &mnCharSel_803F0A48));
+    }
+#endif
     PAD_STACK(8);
 
     lbCardNew_AllocWorkArea();

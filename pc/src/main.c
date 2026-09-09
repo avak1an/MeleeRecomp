@@ -7,6 +7,8 @@
  * VIWaitForRetrace() once the requested number of frames has elapsed, or
  * from OSPanic()/assertion failures.
  */
+#include "pc_gl.h"
+#include "pc_gx.h"
 #include "pc_runtime.h"
 
 #include <stdio.h>
@@ -27,6 +29,8 @@ static void usage(void)
             "  --autoplay      press Start and A on port 1 every couple of seconds\n"
             "                  (pushes headless runs through prompts)\n"
             "  --quiet-stubs   do not log the first call of each SDK stub\n"
+            "  --headless      no window; run the game logic only\n"
+            "  --screenshots DIR  save a BMP of every 60th frame into DIR\n"
             "  --extract DIR   write every file of the disc to DIR/files (and the\n"
             "                  system files to DIR/sys), then exit\n");
 }
@@ -51,6 +55,10 @@ int main(int argc, char** argv)
             pc_config.autoplay = true;
         } else if (strcmp(argv[i], "--quiet-stubs") == 0) {
             pc_config.log_stubs = false;
+        } else if (strcmp(argv[i], "--headless") == 0) {
+            pc_config.headless = true;
+        } else if (strcmp(argv[i], "--screenshots") == 0 && i + 1 < argc) {
+            pc_config.screenshot_dir = argv[++i];
         } else {
             usage();
             return 2;
@@ -63,5 +71,11 @@ int main(int argc, char** argv)
         pc_dvd_extract(extract_dir);
         return 0;
     }
+    if (!pc_config.headless) {
+        if (!pc_window_open(640, 480, "Super Smash Bros. Melee")) {
+            fprintf(stderr, "[pc] continuing without rendering\n");
+        }
+    }
+    pc_gx_render_init();
     return melee_main();
 }

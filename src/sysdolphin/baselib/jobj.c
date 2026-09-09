@@ -573,6 +573,17 @@ void HSD_JObjAnimAll(HSD_JObj* jobj)
 void HSD_JObjDispAll(HSD_JObj* jobj, Mtx vmtx, u32 flags, u32 rendermode)
 {
     MtxPtr new_var = vmtx;
+#ifdef TARGET_PC
+    {
+        extern int pc_debug_gx;
+        static int logged;
+        if (pc_debug_gx && jobj != NULL && logged < 12) {
+            logged++;
+            OSReport("[gx] JObjDispAll jobj=%p flags=%08x pass=%x rendermode=%08x child=%p\n",
+                     jobj, jobj->flags, flags, rendermode, jobj->child);
+        }
+    }
+#endif
     if (jobj != NULL) {
         if (jobj->flags & JOBJ_INSTANCE) {
             if (!(jobj->flags & JOBJ_HIDDEN)) {
@@ -615,6 +626,9 @@ void HSD_JObjSetDefaultClass(HSD_ClassInfo* info)
 
 static inline HSD_JObj* JObjLoadJointSub(HSD_Joint* joint, HSD_JObj* parent)
 {
+#ifdef TARGET_PC
+    pc_swap_joint(joint);
+#endif
     HSD_JObj* jobj;
     HSD_ClassInfo* info;
     if (joint == NULL) {

@@ -31,7 +31,33 @@ extern volatile PPCWGPipe GXWGFifo;
 #define GXWGFifo (*(volatile PPCWGPipe *)GXFIFO_ADDR)
 #endif
 
-#if DEBUG
+#if defined(TARGET_PC)
+
+/* The PC build records immediate-mode vertex data instead of writing the
+ * hardware pipe (pc/src/gx_render.c). */
+void pc_gx_write_u8(u8 v);
+void pc_gx_write_u16(u16 v);
+void pc_gx_write_u32(u32 v);
+void pc_gx_write_s8(s8 v);
+void pc_gx_write_s16(s16 v);
+void pc_gx_write_s32(s32 v);
+void pc_gx_write_f32(f32 v);
+
+#define FUNC_1PARAM(name, T) static inline void name##1##T(T x) { pc_gx_write_##T(x); }
+#define FUNC_2PARAM(name, T) static inline void name##2##T(T x, T y) { pc_gx_write_##T(x); pc_gx_write_##T(y); }
+#define FUNC_3PARAM(name, T) static inline void name##3##T(T x, T y, T z) { pc_gx_write_##T(x); pc_gx_write_##T(y); pc_gx_write_##T(z); }
+#define FUNC_4PARAM(name, T) static inline void name##4##T(T x, T y, T z, T w) { pc_gx_write_##T(x); pc_gx_write_##T(y); pc_gx_write_##T(z); pc_gx_write_##T(w); }
+#define FUNC_INDEX8(name) static inline void name##1x8(u8 x) { pc_gx_write_u8(x); }
+#define FUNC_INDEX16(name) static inline void name##1x16(u16 x) { pc_gx_write_u16(x); }
+
+/* Direct pipe writes in game code go through these. */
+#define GX_FIFO_F32(x) pc_gx_write_f32(x)
+#define GX_FIFO_U8(x) pc_gx_write_u8(x)
+
+#elif DEBUG
+
+#define GX_FIFO_F32(x) GXWGFifo.f32 = (x)
+#define GX_FIFO_U8(x) GXWGFifo.u8 = (x)
 
 // external functions
 
@@ -43,6 +69,9 @@ extern volatile PPCWGPipe GXWGFifo;
 #define FUNC_INDEX16(name)   void name##1x16(u16 x);
 
 #else
+
+#define GX_FIFO_F32(x) GXWGFifo.f32 = (x)
+#define GX_FIFO_U8(x) GXWGFifo.u8 = (x)
 
 // inline functions
 

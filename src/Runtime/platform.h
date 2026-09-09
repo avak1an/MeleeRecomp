@@ -161,6 +161,35 @@ typedef bool (*Predicate)(void);
 #define ASSERT_OFFSET(expr, member, offset)
 #endif
 
+/// Marks globals that the game addresses as one contiguous block through a
+/// larger struct (an original-link-order dependency). On PC they go into a
+/// dedicated data section so the linker keeps them adjacent and in order;
+/// on the console the attribute is empty.
+/// PC_ADJACENT(k): k is a single letter giving the position in the block;
+/// the linker sorts ".pcadj$k" contributions alphabetically into ".pcadj".
+#ifdef TARGET_PC
+#pragma section(".pcadj$a", read, write)
+#pragma section(".pcadj$b", read, write)
+#pragma section(".pcadj$c", read, write)
+#pragma section(".pcadj$d", read, write)
+#pragma section(".pcadj$e", read, write)
+#pragma section(".pcadj$f", read, write)
+#pragma section(".pcadj$g", read, write)
+#pragma section(".pcadj$h", read, write)
+/* __declspec(allocate) wants a single string literal (no concatenation). */
+#define PC_ADJ_SECTION_a ".pcadj$a"
+#define PC_ADJ_SECTION_b ".pcadj$b"
+#define PC_ADJ_SECTION_c ".pcadj$c"
+#define PC_ADJ_SECTION_d ".pcadj$d"
+#define PC_ADJ_SECTION_e ".pcadj$e"
+#define PC_ADJ_SECTION_f ".pcadj$f"
+#define PC_ADJ_SECTION_g ".pcadj$g"
+#define PC_ADJ_SECTION_h ".pcadj$h"
+#define PC_ADJACENT(k) __declspec(allocate(PC_ADJ_SECTION_##k))
+#else
+#define PC_ADJACENT(k)
+#endif
+
 /// Defines a file-local integer constant that may be built from other such
 /// constants. Metrowerks and clang fold `static T const` initializers; MSVC
 /// does not, so the PC build makes these enumerators instead.

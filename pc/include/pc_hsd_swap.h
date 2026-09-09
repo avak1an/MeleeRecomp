@@ -38,6 +38,7 @@ void pc_swap_robjdesc(HSD_RObjDesc* desc);
 void pc_swap_spline(HSD_Spline* spline);
 void pc_swap_animjoint(HSD_AnimJoint* anim);
 void pc_swap_texanim(HSD_TexAnim* anim);
+void pc_swap_sis_message(u8* message);
 
 /// Forget every "already swapped" record inside [base, base + size): call
 /// when a loaded file's memory is released so a later file at the same

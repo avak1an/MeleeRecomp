@@ -23,6 +23,7 @@
 
 PCConfig pc_config;
 uint32_t pc_frame_count;
+int pc_debug_gx;
 
 /* --- Memory ---------------------------------------------------------------
  * The retail GameCube has 24 MB of main memory; the game also checks for a

@@ -98,20 +98,10 @@ void GXFlush(void) {}
  * images into it; here it holds the plain parameters so the getters (and,
  * later, the renderer) can read them back. */
 
-typedef struct PCTexObj {
-    void* image;
-    u16 width;
-    u16 height;
-    u32 format;
-    u32 wrap_s;
-    u32 wrap_t;
-    u32 tlut_name;
-    u8 mipmap;
-    u8 pad[3];
-    void* user_data;
-} PCTexObj;
+#include "pc_gx.h"
 
 STATIC_ASSERT(sizeof(PCTexObj) <= sizeof(GXTexObj));
+STATIC_ASSERT(sizeof(PCTlutObj) <= sizeof(GXTlutObj));
 
 void GXInitTexObj(GXTexObj* obj, void* image_ptr, u16 width, u16 height, GXTexFmt format,
                   GXTexWrapMode wrap_s, GXTexWrapMode wrap_t, u8 mipmap)
@@ -121,10 +111,12 @@ void GXInitTexObj(GXTexObj* obj, void* image_ptr, u16 width, u16 height, GXTexFm
     t->image = image_ptr;
     t->width = width;
     t->height = height;
-    t->format = format;
-    t->wrap_s = wrap_s;
-    t->wrap_t = wrap_t;
+    t->format = (u8) format;
+    t->wrap_s = (u8) wrap_s;
+    t->wrap_t = (u8) wrap_t;
     t->mipmap = mipmap;
+    t->min_filt = (u8) (mipmap ? GX_LIN_MIP_LIN : GX_LINEAR);
+    t->mag_filt = GX_LINEAR;
 }
 
 void GXInitTexObjCI(GXTexObj* obj, void* image_ptr, u16 width, u16 height, GXTexFmt format,
@@ -138,8 +130,11 @@ void GXInitTexObjLOD(GXTexObj* obj, GXTexFilter min_filt, GXTexFilter mag_filt, 
                      f32 max_lod, f32 lod_bias, u8 bias_clamp, u8 do_edge_lod,
                      GXAnisotropy max_aniso)
 {
-    (void) obj; (void) min_filt; (void) mag_filt; (void) min_lod; (void) max_lod;
-    (void) lod_bias; (void) bias_clamp; (void) do_edge_lod; (void) max_aniso;
+    PCTexObj* t = (PCTexObj*) obj;
+    t->min_filt = (u8) min_filt;
+    t->mag_filt = (u8) mag_filt;
+    (void) min_lod; (void) max_lod; (void) lod_bias; (void) bias_clamp; (void) do_edge_lod;
+    (void) max_aniso;
 }
 
 void GXInitTexObjData(GXTexObj* obj, void* image_ptr)
@@ -149,8 +144,8 @@ void GXInitTexObjData(GXTexObj* obj, void* image_ptr)
 
 void GXInitTexObjWrapMode(GXTexObj* obj, GXTexWrapMode sm, GXTexWrapMode tm)
 {
-    ((PCTexObj*) obj)->wrap_s = sm;
-    ((PCTexObj*) obj)->wrap_t = tm;
+    ((PCTexObj*) obj)->wrap_s = (u8) sm;
+    ((PCTexObj*) obj)->wrap_t = (u8) tm;
 }
 
 void GXInitTexObjTlut(GXTexObj* obj, u32 tlut_name)
@@ -166,6 +161,14 @@ void GXInitTexObjUserData(GXTexObj* obj, void* user_data)
 void* GXGetTexObjUserData(const GXTexObj* obj)
 {
     return ((const PCTexObj*) obj)->user_data;
+}
+
+void GXInitTlutObj(GXTlutObj* tlut_obj, void* lut, GXTlutFmt fmt, u16 n_entries)
+{
+    PCTlutObj* t = (PCTlutObj*) tlut_obj;
+    t->lut = lut;
+    t->fmt = (u16) fmt;
+    t->n_entries = n_entries;
 }
 
 u16 GXGetTexObjWidth(const GXTexObj* to)

@@ -15,10 +15,15 @@ typedef struct PCConfig {
     bool log_stubs;      ///< print the first call of each stubbed SDK function
     bool realtime;       ///< pace VIWaitForRetrace to 60 Hz
     bool autoplay;       ///< synthesize Start/A presses on port 1 to push through prompts
+    bool headless;       ///< no window, no rendering
+    const char* screenshot_dir; ///< if set, dump a BMP of every 60th frame here
     const char* iso;     ///< path of the disc image (NULL = auto-detect)
 } PCConfig;
 
 extern PCConfig pc_config;
+
+/// Set when MELEE_GX_DEBUG is in the environment; engine code may log.
+extern int pc_debug_gx;
 
 /// Number of VIWaitForRetrace calls so far.
 extern uint32_t pc_frame_count;

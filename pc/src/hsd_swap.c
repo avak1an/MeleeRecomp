@@ -446,6 +446,55 @@ void pc_swap_pobjdesc(HSD_PObjDesc* desc)
     }
 }
 
+/* --- SIS text messages ----------------------------------------------------
+ * A message is a byte stream: opcodes below 0x20 with 0-4 bytes of
+ * parameters (some 16-bit), 16-bit glyph codes otherwise, terminated by
+ * opcode 0. Opcodes 8 (jump) and 9 (call) carry a relocated pointer to
+ * another message. See hsd_3A76.c for the interpreter. */
+void pc_swap_sis_message(u8* p)
+{
+    if (p == NULL || !once(p)) {
+        return;
+    }
+    for (;;) {
+        u8 op = *p;
+        if (op >= 0x20) {
+            pc_swap16(p);
+            p += 2;
+            continue;
+        }
+        switch (op) {
+        case 0:
+            return;
+        case 5:
+            pc_swap16(p + 1);
+            p += 3;
+            break;
+        case 6:
+        case 7:
+        case 10:
+        case 14:
+            pc_swap16(p + 1);
+            pc_swap16(p + 3);
+            p += 5;
+            break;
+        case 12:
+            p += 4;
+            break;
+        case 8:
+            pc_swap_sis_message(*(u8**) (p + 1));
+            return;
+        case 9:
+            pc_swap_sis_message(*(u8**) (p + 1));
+            p += 5;
+            break;
+        default:
+            p += 1;
+            break;
+        }
+    }
+}
+
 /* --- Animation sets ------------------------------------------------------
  * Most animation descriptors are pointer-only (relocated already) and lead
  * to AObj/FObj descriptors that the animation loaders swap. The two with
