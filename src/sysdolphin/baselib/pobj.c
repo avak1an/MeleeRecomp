@@ -1,4 +1,7 @@
 #include "pobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <math.h> // IWYU pragma: keep
 #include <string.h>
@@ -280,6 +283,9 @@ static HSD_ShapeSet* loadShapeSetDesc(HSD_ShapeSetDesc* sdesc)
 
 static s32 PObjLoad(HSD_PObj* pobj, HSD_PObjDesc* desc)
 {
+#ifdef TARGET_PC
+    pc_swap_pobjdesc(desc);
+#endif
     pobj->next = HSD_PObjLoadDesc(desc->next);
     pobj->verts = desc->verts;
     pobj->flags = desc->flags;

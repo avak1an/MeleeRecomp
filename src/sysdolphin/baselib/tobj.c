@@ -1,4 +1,7 @@
 #include "tobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <placeholder.h>
 #include <string.h>
@@ -58,6 +61,9 @@ static HSD_TexAnim* lookupTextureAnim(s32 id, HSD_TexAnim* texanim)
 
 void HSD_TObjAddAnim(HSD_TObj* tobj, HSD_TexAnim* texanim)
 {
+#ifdef TARGET_PC
+    pc_swap_texanim(texanim);
+#endif
     s32 i;
     HSD_TexAnim* ta;
 
@@ -250,6 +256,9 @@ void HSD_TObjAnimAll(HSD_TObj* tobj)
 
 static int TObjLoad(HSD_TObj* tobj, HSD_TObjDesc* td)
 {
+#ifdef TARGET_PC
+    pc_swap_tobjdesc(td);
+#endif
     tobj->next = HSD_TObjLoadDesc(td->next);
     tobj->id = td->id;
     tobj->src = td->src;
@@ -298,6 +307,9 @@ HSD_TObj* HSD_TObjLoadDesc(HSD_TObjDesc* td)
 
 HSD_Tlut* HSD_TlutLoadDesc(HSD_TlutDesc* tlutdesc)
 {
+#ifdef TARGET_PC
+    pc_swap_tlutdesc(tlutdesc);
+#endif
     if (tlutdesc != NULL) {
         HSD_Tlut* tlut = HSD_TlutAlloc();
         memcpy(tlut, tlutdesc, sizeof(HSD_Tlut));
@@ -308,6 +320,9 @@ HSD_Tlut* HSD_TlutLoadDesc(HSD_TlutDesc* tlutdesc)
 
 HSD_TObjTev* HSD_TObjTevLoadDesc(HSD_TObjTevDesc* tevdesc)
 {
+#ifdef TARGET_PC
+    pc_swap_tobjtevdesc(tevdesc);
+#endif
     if (tevdesc != NULL) {
         HSD_TObjTev* new = HSD_TObjTevAlloc();
         memcpy(new, tevdesc, sizeof(HSD_TObjTev));

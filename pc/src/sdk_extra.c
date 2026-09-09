@@ -36,10 +36,35 @@ GXRenderModeObj GXNtsc480Prog = {
 
 /* --- AX (audio) --------------------------------------------------------- */
 
+/* Voice pool. Nothing is mixed yet, but the sound engine indexes its own
+ * tables by voice->index and dereferences the result without a NULL check,
+ * so hand out real parameter blocks. */
+static AXVPB voices[AX_MAX_VOICES];
+static u8 voice_used[AX_MAX_VOICES];
+
 AXVPB* AXAcquireVoice(u32 priority, void (*callback)(void*), u32 userContext)
 {
-    pc_stub_hit("AXAcquireVoice");
-    return NULL; /* no free voice: the game handles this gracefully */
+    int i;
+    for (i = 0; i < AX_MAX_VOICES; i++) {
+        if (!voice_used[i]) {
+            AXVPB* v = &voices[i];
+            voice_used[i] = 1;
+            memset(v, 0, sizeof(*v));
+            v->index = (u32) i;
+            v->priority = (int) priority;
+            v->callback = callback;
+            v->userContext = userContext;
+            return v;
+        }
+    }
+    return NULL;
+}
+
+void AXFreeVoice(AXVPB* p)
+{
+    if (p != NULL && p >= voices && p < voices + AX_MAX_VOICES) {
+        voice_used[p - voices] = 0;
+    }
 }
 
 void AXRegisterAuxACallback(void (*callback)(void*, void*), void* context)

@@ -1,4 +1,7 @@
 #include "archive.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <string.h>
 
@@ -15,6 +18,49 @@ static inline void Locate(HSD_Archive* archive)
     }
 }
 
+#ifdef TARGET_PC
+/* Archives are big-endian on disc. On a little-endian host the parts the
+ * parser itself reads are swapped in place before parsing: the header, the
+ * relocation/public/extern tables, and every pointer slot named by the
+ * relocation table. Other fields are swapped by the code that consumes
+ * them (see pc/README.md, "Endianness"). */
+static u32 pc_bswap32(u32 v)
+{
+    return (v >> 24) | ((v >> 8) & 0xFF00) | ((v << 8) & 0xFF0000) | (v << 24);
+}
+
+static void pc_archive_swap(u8* src, size_t file_size)
+{
+    u32* header = (u32*) src;
+    u32 i, offset, nb_reloc, nb_public, nb_extern, data_size;
+    u32* table;
+
+    /* Already host order (e.g. parsed twice)? Then leave it alone. */
+    if (header[0] == file_size) {
+        return;
+    }
+    /* A freshly loaded file: any "already swapped" records inside its
+     * memory belong to a previous file at the same address. */
+    pc_swap_forget_range(src, file_size);
+    for (i = 0; i < 6; i++) {
+        header[i] = pc_bswap32(header[i]);
+    }
+    data_size = header[1];
+    nb_reloc = header[2];
+    nb_public = header[3];
+    nb_extern = header[4];
+    offset = sizeof(HSD_ArchiveHeader) + data_size;
+    table = (u32*) (src + offset);
+    for (i = 0; i < nb_reloc + 2 * nb_public + 2 * nb_extern; i++) {
+        table[i] = pc_bswap32(table[i]);
+    }
+    for (i = 0; i < nb_reloc; i++) {
+        u32* slot = (u32*) (src + sizeof(HSD_ArchiveHeader) + table[i]);
+        *slot = pc_bswap32(*slot);
+    }
+}
+#endif
+
 s32 HSD_ArchiveParse(HSD_Archive* archive, u8* src, size_t file_size)
 {
     u32 offset;
@@ -23,6 +69,9 @@ s32 HSD_ArchiveParse(HSD_Archive* archive, u8* src, size_t file_size)
         return -1;
     }
 
+#ifdef TARGET_PC
+    pc_archive_swap(src, file_size);
+#endif
     memset(archive, 0, sizeof(HSD_Archive));
     archive->flags |= 1;
     memcpy(archive, src, sizeof(HSD_ArchiveHeader));

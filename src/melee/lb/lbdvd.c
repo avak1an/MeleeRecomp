@@ -269,6 +269,16 @@ void lbDvd_CachePreloadedFile(s32 index)
     }
 
     if (heap == 0) {
+#ifdef TARGET_PC
+        if (preloadEntry->entry_num < 0 || preloadEntry->entry_num >= 1212) {
+            OSPanic(__FILE__, __LINE__,
+                    "preload cache entry %d corrupted: state %d type %d heap %d "
+                    "entry %d score %d size %u",
+                    index, preloadEntry->state, preloadEntry->type,
+                    preloadEntry->heap, preloadEntry->entry_num,
+                    preloadEntry->load_score, preloadEntry->size);
+        }
+#endif
         if (preloadEntry->size == 0) {
             preloadEntry->size = lbFile_8001634C(preloadEntry->entry_num);
         }

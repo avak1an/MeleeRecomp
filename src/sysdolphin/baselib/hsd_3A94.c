@@ -1,4 +1,7 @@
 #include "hsd_3A94.h"
+#ifdef TARGET_PC
+#include <stdlib.h>
+#endif
 
 #include "hsd_3B2B.h"
 #include "hsd_3B2E.h"
@@ -102,7 +105,11 @@ typedef struct CardQueueEntry {
 
 /* 3A949C */ static void hsd_803A949C(s32 chan, s32 arg1);
 /* 3ACB74 */ static s32 fn_803ACB74(s32 seq_a, s32 seq_b);
+#ifdef TARGET_PC
+#define hsd_804D1148 (*(u32(*)[0x80][0x9]) (hsd_card_area + 0x10))
+#else
 /* 4D1148 */ extern u32 hsd_804D1148[0x80][0x9];
+#endif
 /* 4D2348 */ extern __baselib_UnkType003 hsd_804D2348;
 /* 4D7980 */ extern volatile s32 hsd_804D7980;
 /* 4D7984 */ extern volatile s32 hsd_804D7984;
@@ -924,6 +931,13 @@ void hsd_803AAA48(void)
 
         cmd = (s32*) &((CardBufEntry*) ctx)[hsd_804D7980];
         type = *(cmd += 4);
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_CARD") != NULL) {
+            OSReport("[card] run idx=%d type=%d state=%p x8=%d res=%d entry=%u cmd=%u\n",
+                     hsd_804D7980, type, (void*) cmd[1], cmd[2], hsd_804D7988,
+                     (unsigned) sizeof(CardBufEntry), (unsigned) sizeof(CardCmd));
+        }
+#endif
 
         switch ((u32) type) {
         case 0:
@@ -1454,6 +1468,12 @@ s32 fn_803AC168(s32* cmd_buf)
         s32 idx = hsd_804D7984;
         hsd_804D7984 = (hsd_804D7984 + 1) % 128;
         memcpy((u8*) hsd_804D1148[idx], cmd_buf, sizeof(CardCmd));
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_CARD") != NULL) {
+            OSReport("[card] queue idx=%d type=%d state=%p x8=%d xC=%d x10=%d\n", idx,
+                     cmd_buf[0], (void*) cmd_buf[1], cmd_buf[2], cmd_buf[3], cmd_buf[4]);
+        }
+#endif
     }
 
     if (mode == 2) {

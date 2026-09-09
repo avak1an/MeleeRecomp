@@ -3,7 +3,6 @@
 #include "pc_runtime.h"
 
 #include <dolphin/ai.h>
-#include <dolphin/ar.h>
 #include <dolphin/ax.h>
 #include <dolphin/axfx.h>
 #include <dolphin/base/PPCArch.h>
@@ -23,8 +22,6 @@
 #include <dolphin/gx/GXTransform.h>
 #include <dolphin/mcc.h>
 #include <dolphin/mtx.h>
-#include <dolphin/os.h>
-#include <dolphin/os/OSAlarm.h>
 #include <dolphin/os/OSCache.h>
 #include <dolphin/os/OSContext.h>
 #include <dolphin/os/OSError.h>
@@ -32,9 +29,7 @@
 #include <dolphin/os/OSResetSW.h>
 #include <dolphin/os/OSRtc.h>
 #include <dolphin/os/OSThread.h>
-#include <dolphin/pad.h>
 #include <dolphin/thp/thp.h>
-#include <dolphin/vi/vifuncs.h>
 
 #define STUB(name) pc_stub_hit(#name)
 
@@ -56,40 +51,6 @@ void AISetStreamVolLeft(u8 vol)
 void AISetStreamVolRight(u8 vol)
 {
     STUB(AISetStreamVolRight);
-}
-
-u32 ARAlloc(u32 length)
-{
-    STUB(ARAlloc);
-    { static u32 zero; return zero; }
-}
-
-u32 ARFree(u32 * length)
-{
-    STUB(ARFree);
-    { static u32 zero; return zero; }
-}
-
-u32 ARGetSize(void)
-{
-    STUB(ARGetSize);
-    { static u32 zero; return zero; }
-}
-
-u32 ARInit(u32 * stack_index_addr, u32 num_entries)
-{
-    STUB(ARInit);
-    { static u32 zero; return zero; }
-}
-
-void ARQInit(void)
-{
-    STUB(ARQInit);
-}
-
-void ARQPostRequest(struct ARQRequest * request, u32 owner, u32 type, u32 priority, u32 source, u32 dest, u32 length, ARQCallback callback)
-{
-    STUB(ARQPostRequest);
 }
 
 void AXFXChorusCallback(struct AXFX_BUFFERUPDATE* bufferUpdate, struct AXFX_CHORUS* chorus)
@@ -158,11 +119,6 @@ int AXFXReverbStdShutdown(struct AXFX_REVERBSTD* rev)
 {
     STUB(AXFXReverbStdShutdown);
     { static int zero; return zero; }
-}
-
-void AXFreeVoice(AXVPB* p)
-{
-    STUB(AXFreeVoice);
 }
 
 void AXInit(void)
@@ -353,39 +309,9 @@ void GXGetProjectionv(f32 *ptr)
     STUB(GXGetProjectionv);
 }
 
-u32 GXGetTexBufferSize(u16 width, u16 height, u32 format, u8 mipmap, u8 max_lod)
-{
-    STUB(GXGetTexBufferSize);
-    { static u32 zero; return zero; }
-}
-
-GXTexFmt GXGetTexObjFmt(const GXTexObj *to)
-{
-    STUB(GXGetTexObjFmt);
-    { static GXTexFmt zero; return zero; }
-}
-
-u16 GXGetTexObjHeight(const GXTexObj *to)
-{
-    STUB(GXGetTexObjHeight);
-    { static u16 zero; return zero; }
-}
-
-u16 GXGetTexObjWidth(const GXTexObj *to)
-{
-    STUB(GXGetTexObjWidth);
-    { static u16 zero; return zero; }
-}
-
 void GXGetViewportv(f32 *vp)
 {
     STUB(GXGetViewportv);
-}
-
-GXFifoObj* GXInit(void *base, u32 size)
-{
-    STUB(GXInit);
-    { static GXFifoObj* zero; return zero; }
 }
 
 void GXInitFogAdjTable(GXFogAdjTable *table, u16 width, f32 projmtx[4][4])
@@ -421,21 +347,6 @@ void GXInitLightPos(GXLightObj *lt_obj, f32 x, f32 y, f32 z)
 void GXInitLightSpot(GXLightObj *lt_obj, f32 cutoff, GXSpotFn spot_func)
 {
     STUB(GXInitLightSpot);
-}
-
-void GXInitTexObj(GXTexObj *obj, void *image_ptr, u16 width, u16 height, GXTexFmt format, GXTexWrapMode wrap_s, GXTexWrapMode wrap_t, u8 mipmap)
-{
-    STUB(GXInitTexObj);
-}
-
-void GXInitTexObjCI(GXTexObj *obj, void *image_ptr, u16 width, u16 height, GXTexFmt format, GXTexWrapMode wrap_s, GXTexWrapMode wrap_t, u8 mipmap, u32 tlut_name)
-{
-    STUB(GXInitTexObjCI);
-}
-
-void GXInitTexObjLOD(GXTexObj *obj, GXTexFilter min_filt, GXTexFilter mag_filt, f32 min_lod, f32 max_lod, f32 lod_bias, GXBool bias_clamp, GXBool do_edge_lod, GXAnisotropy max_aniso)
-{
-    STUB(GXInitTexObjLOD);
 }
 
 void GXInitTlutObj(GXTlutObj *tlut_obj, void *lut, GXTlutFmt fmt, u16 n_entries)
@@ -582,17 +493,6 @@ u32 GXSetDispCopyYScale(f32 vscale)
 void GXSetDither(GXBool dither)
 {
     STUB(GXSetDither);
-}
-
-void GXSetDrawDone(void)
-{
-    STUB(GXSetDrawDone);
-}
-
-GXDrawDoneCallback GXSetDrawDoneCallback(GXDrawDoneCallback cb)
-{
-    STUB(GXSetDrawDoneCallback);
-    { static GXDrawDoneCallback zero; return zero; }
 }
 
 void GXSetDstAlpha(GXBool enable, u8 alpha)
@@ -810,11 +710,6 @@ void GXSetZTexture(GXZTexOp op, GXTexFmt fmt, u32 bias)
     STUB(GXSetZTexture);
 }
 
-void GXWaitDrawDone(void)
-{
-    STUB(GXWaitDrawDone);
-}
-
 int MCCClose(enum MCC_CHANNEL chID)
 {
     STUB(MCCClose);
@@ -906,11 +801,6 @@ void MTXRotRad(Mtx m, char axis, f32 rad)
     STUB(MTXRotRad);
 }
 
-void OSCancelAlarm(OSAlarm* alarm)
-{
-    STUB(OSCancelAlarm);
-}
-
 long OSCheckActiveThreads(void)
 {
     STUB(OSCheckActiveThreads);
@@ -920,17 +810,6 @@ long OSCheckActiveThreads(void)
 void OSClearContext(OSContext *context)
 {
     STUB(OSClearContext);
-}
-
-void OSCreateAlarm(OSAlarm* alarm)
-{
-    STUB(OSCreateAlarm);
-}
-
-OSContext* OSGetCurrentContext(void)
-{
-    STUB(OSGetCurrentContext);
-    { static OSContext* zero; return zero; }
 }
 
 unsigned long OSGetResetCode(void)
@@ -943,11 +822,6 @@ BOOL OSGetResetSwitchState(void)
 {
     STUB(OSGetResetSwitchState);
     { static BOOL zero; return zero; }
-}
-
-void OSInitAlarm(void)
-{
-    STUB(OSInitAlarm);
 }
 
 void OSLoadFPUContext(OSContext *fpuContext)
@@ -977,11 +851,6 @@ void OSSaveFPUContext(OSContext *fpuContext)
     STUB(OSSaveFPUContext);
 }
 
-void OSSetAlarm(OSAlarm* alarm, OSTime tick, OSAlarmHandler handler)
-{
-    STUB(OSSetAlarm);
-}
-
 void OSSetCurrentContext(OSContext *context)
 {
     STUB(OSSetCurrentContext);
@@ -993,11 +862,6 @@ OSErrorHandler OSSetErrorHandler(OSError error, OSErrorHandler handler)
     { static OSErrorHandler zero; return zero; }
 }
 
-void OSSetPeriodicAlarm(OSAlarm* alarm, OSTime start, OSTime period, OSAlarmHandler handler)
-{
-    STUB(OSSetPeriodicAlarm);
-}
-
 void OSSetProgressiveMode(u32 mode)
 {
     STUB(OSSetProgressiveMode);
@@ -1006,50 +870,6 @@ void OSSetProgressiveMode(u32 mode)
 void OSSetSoundMode(unsigned long mode)
 {
     STUB(OSSetSoundMode);
-}
-
-void OSTicksToCalendarTime(OSTime ticks, OSCalendarTime* td)
-{
-    STUB(OSTicksToCalendarTime);
-}
-
-void PADControlMotor(s32 chan, u32 command)
-{
-    STUB(PADControlMotor);
-}
-
-BOOL PADInit(void)
-{
-    STUB(PADInit);
-    { static BOOL zero; return zero; }
-}
-
-u32 PADRead(struct PADStatus* status)
-{
-    STUB(PADRead);
-    { static u32 zero; return zero; }
-}
-
-BOOL PADRecalibrate(u32 mask)
-{
-    STUB(PADRecalibrate);
-    { static BOOL zero; return zero; }
-}
-
-int PADReset(unsigned long mask)
-{
-    STUB(PADReset);
-    { static int zero; return zero; }
-}
-
-void PADSetSamplingRate(unsigned long msec)
-{
-    STUB(PADSetSamplingRate);
-}
-
-void PADSetSpec(u32 spec)
-{
-    STUB(PADSetSpec);
 }
 
 u32 PPCMfmsr(void)
@@ -1094,65 +914,4 @@ s32 THPVideoDecode(void* file, void* tileY, void* tileU, void* tileV, void* work
 {
     STUB(THPVideoDecode);
     { static s32 zero; return zero; }
-}
-
-void VIConfigure(GXRenderModeObj *rm)
-{
-    STUB(VIConfigure);
-}
-
-void VIFlush(void)
-{
-    STUB(VIFlush);
-}
-
-u32 VIGetDTVStatus(void)
-{
-    STUB(VIGetDTVStatus);
-    { static u32 zero; return zero; }
-}
-
-u32 VIGetNextField(void)
-{
-    STUB(VIGetNextField);
-    { static u32 zero; return zero; }
-}
-
-u32 VIGetRetraceCount(void)
-{
-    STUB(VIGetRetraceCount);
-    { static u32 zero; return zero; }
-}
-
-u32 VIGetTvFormat(void)
-{
-    STUB(VIGetTvFormat);
-    { static u32 zero; return zero; }
-}
-
-void VIInit(void)
-{
-    STUB(VIInit);
-}
-
-void VISetBlack(BOOL black)
-{
-    STUB(VISetBlack);
-}
-
-void VISetNextFrameBuffer(void *fb)
-{
-    STUB(VISetNextFrameBuffer);
-}
-
-VIRetraceCallback VISetPostRetraceCallback(VIRetraceCallback cb)
-{
-    STUB(VISetPostRetraceCallback);
-    { static VIRetraceCallback zero; return zero; }
-}
-
-VIRetraceCallback VISetPreRetraceCallback(VIRetraceCallback cb)
-{
-    STUB(VISetPreRetraceCallback);
-    { static VIRetraceCallback zero; return zero; }
 }

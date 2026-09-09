@@ -1,4 +1,7 @@
 #include "jobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <math.h>
 #include <string.h>
@@ -298,6 +301,9 @@ void JObjSortAnim(HSD_AObj* aobj)
 void HSD_JObjAddAnim(HSD_JObj* jobj, HSD_AnimJoint* an_joint,
                      HSD_MatAnimJoint* mat_joint, HSD_ShapeAnimJoint* sh_joint)
 {
+#ifdef TARGET_PC
+    pc_swap_animjoint(an_joint);
+#endif
     if (jobj != NULL) {
         if (an_joint != NULL) {
             if (jobj->aobj != NULL) {
@@ -666,6 +672,9 @@ s32 JObjLoad(HSD_JObj* jobj, HSD_Joint* joint, HSD_JObj* parent)
 
 HSD_JObj* HSD_JObjLoadJoint(HSD_Joint* arg0)
 {
+#ifdef TARGET_PC
+    pc_swap_joint(arg0);
+#endif
     HSD_JObj* jobj = JObjLoadJointSub(arg0, 0);
     HSD_JObjResolveRefsAll(jobj, arg0);
     return jobj;

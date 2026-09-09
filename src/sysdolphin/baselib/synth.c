@@ -1,4 +1,7 @@
 #include "synth.h"
+#ifdef TARGET_PC
+#include <pc_endian.h>
+#endif
 
 #include <math.h> // IWYU pragma: keep
 #include <placeholder.h>
@@ -58,6 +61,11 @@ static void HSD_SynthSFXSampleLoadCallback(int result, int length, void* addr,
         u32 data_bytes = header_size - 0x10;
         size_t alloc_size;
         u32 total;
+#ifdef TARGET_PC
+        /* The sample table (a count followed by 0x40-byte entries) is
+         * big-endian on disc; the fields touched here are 32-bit. */
+        pc_swap32_range(HSD_Synth_804D7730, data_bytes);
+#endif
         u32 dnw;
         int bankID;
         AXVPB** pp;
@@ -154,6 +162,10 @@ static void HSD_SynthSFXHeaderLoadCallback(int result, int length, void* addr,
     s32 header_size;
     size_t alloc_size;
 
+#ifdef TARGET_PC
+    /* .ssm header: eight big-endian 32-bit words. */
+    pc_swap32_range(hsd_SynthSFXLoadBuf, 0x20);
+#endif
     if (HSD_Synth_804D7738 == 0) {
         int bankID = HSD_Synth_804C2A60[0].bankID;
 

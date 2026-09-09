@@ -23,6 +23,11 @@ endif()
 set(REPO ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(GAME_VERSION GALE01)
 
+# CMake's default Debug flags add /RTC1 (run-time checks). The decompiled
+# code relies on behaviour those checks flag, such as reading a local the
+# console left as zero, so they are removed.
+string(REPLACE "/RTC1" "" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+
 # --- Sources ----------------------------------------------------------------
 # Game and engine: everything the GameCube build links, minus the few units
 # that are not part of the DOL.
@@ -101,8 +106,56 @@ target_compile_options(melee PRIVATE
 # errors so every call site is checked against the SDK headers.
 target_compile_options(melee PRIVATE /we4013)
 
-target_link_options(melee PRIVATE /SUBSYSTEM:CONSOLE /STACK:0x400000)
-target_link_libraries(melee PRIVATE dbghelp)
+# clang-cl (Visual Studio's "C++ Clang tools" component). Configure with
+#   -DCMAKE_C_COMPILER=clang-cl -DCMAKE_C_FLAGS=-m32
+# or run `pc\build.cmd clang`. Warning choices mirror the repository's own
+# clang lint pass (configure.py); the two -Wno-error lines cover idioms the
+# decomp relies on that recent clang promotes to errors.
+# Function-entry tracing (clang only): every function records itself in a
+# ring buffer that the crash handler prints. Slow; for finding crashes that
+# leave no usable stack. Configure with -DMELEE_TRACE_FUNCS=ON.
+option(MELEE_TRACE_FUNCS "Record the last function entries for crash reports" OFF)
+if(MELEE_TRACE_FUNCS AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+    target_compile_options(melee PRIVATE -Xclang -finstrument-functions)
+    target_compile_definitions(melee PRIVATE MELEE_TRACE_FUNCS=1)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    target_compile_options(melee PRIVATE
+        # The decompiled code reads locals it never wrote in places where the
+        # console's stack happened to hold zeros; make that deterministic.
+        -ftrivial-auto-var-init=zero
+        -Wno-error=return-mismatch
+        -Wno-error=incompatible-function-pointer-types
+        -Wno-unused-variable
+        -Wno-unused-but-set-variable
+        -Wno-unused-value
+        -Wno-unused-function
+        -Wno-unused-parameter
+        -Wno-unused-command-line-argument
+        -Wno-missing-braces
+        -Wno-missing-field-initializers
+        -Wno-array-parameter
+        -Wno-sometimes-uninitialized
+        -Wno-return-type
+        -Wno-absolute-value
+        -Wno-format
+        -Wno-compare-distinct-pointer-types
+        -Wno-incompatible-pointer-types
+        -Wno-int-conversion
+        -Wno-pointer-sign
+        -Wno-parentheses
+        -Wno-switch
+        -Wno-microsoft-anon-tag
+        -Wno-deprecated-non-prototype
+        -Wno-unknown-pragmas
+    )
+endif()
+
+# /LARGEADDRESSAWARE lets the 32-bit process map the console's main-memory
+# range (0x80000000+), which the game uses to tell main memory from ARAM.
+target_link_options(melee PRIVATE /SUBSYSTEM:CONSOLE /STACK:0x400000 /LARGEADDRESSAWARE)
+target_link_libraries(melee PRIVATE dbghelp xinput9_1_0)
 set_target_properties(melee PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     C_STANDARD 11)

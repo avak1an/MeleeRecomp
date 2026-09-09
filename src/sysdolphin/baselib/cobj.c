@@ -1,4 +1,7 @@
 #include "cobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <math.h>
 #include <placeholder.h>
@@ -1273,6 +1276,9 @@ static inline void CObjResetFlags(HSD_CObj* cobj, u32 flags)
 
 static int CObjLoad(HSD_CObj* cobj, HSD_CObjDesc* desc)
 {
+#ifdef TARGET_PC
+    pc_swap_cobjdesc(desc);
+#endif
     static Vec3 up = { 0.0f, 1.0f, 0.0f };
     cobj->flags = desc->common.flags;
     CObjResetFlags(cobj, desc->common.flags);

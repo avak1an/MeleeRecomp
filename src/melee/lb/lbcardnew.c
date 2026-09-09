@@ -1121,6 +1121,12 @@ void lbCardNew_AllocWorkArea(void)
     if (_p(work_area) == NULL) {
         _p(work_area) = HSD_MemAlloc(0xA000);
         _p(lib_area) = HSD_MemAlloc(0x2000);
+#ifdef TARGET_PC
+        /* The card library reads its command queue before writing it and
+         * expects fresh (zero) memory; the heap may hand back a used block. */
+        memset(_p(work_area), 0, 0xA000);
+        memset(_p(lib_area), 0, 0x2000);
+#endif
     }
 }
 

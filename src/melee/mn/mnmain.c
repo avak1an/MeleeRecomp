@@ -1664,7 +1664,13 @@ static inline HSD_GObj* mn_8022BE34_OnEnter(void)
 
     mn_804D6BAC = gobj;
     cobj = HSD_CObjLoadDesc(MenMain_cam);
+#ifdef TARGET_PC
+    /* The +0x14 below reproduces a stack-slot quirk of the original build;
+     * on x86 it overwrites the return address. */
+    HSD_CObjGetEyePosition(cobj, &pos);
+#else
     HSD_CObjGetEyePosition(cobj, (Vec3*) ((u8*) &pos + 0x14));
+#endif
     HSD_GObjObject_80390A70(gobj, HSD_GObj_CameraKind, cobj);
     GObj_SetupGXLinkMax(gobj, fn_8022BDB4, 0);
     gobj->gxlink_prios = 0x7F;

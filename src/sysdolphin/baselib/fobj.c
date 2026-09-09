@@ -1,4 +1,7 @@
 #include "fobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <string.h>
 
@@ -467,6 +470,9 @@ void HSD_FObjInterpretAnimAll(void* fobj, void* obj,
 
 HSD_FObj* HSD_FObjLoadDesc(HSD_FObjDesc* desc)
 {
+#ifdef TARGET_PC
+    pc_swap_fobjdesc(desc);
+#endif
     if (desc != NULL) {
         HSD_FObj* fobj = HSD_FObjAlloc();
         fobj->next = HSD_FObjLoadDesc(desc->next);

@@ -10,21 +10,26 @@
 
 #define TARGET_PC 1
 
-/* MSVC-only for now. Keep the checks so a future clang build gets a clear
- * error instead of silently compiling something wrong. */
+/* MSVC ABI only (cl.exe or clang-cl). Keep the checks so another toolchain
+ * gets a clear error instead of silently compiling something wrong. */
 #if !defined(_MSC_VER)
-#error "pc_platform.h currently supports MSVC only"
+#error "pc_platform.h currently supports MSVC and clang-cl only"
 #endif
 
 #if defined(_WIN64) || defined(__LP64__) || (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ != 4)
 #error "The PC build must be 32-bit: HSD archives relocate 32-bit pointers in place"
 #endif
 
-/* Alignment attributes: the GameCube needs 32-byte alignment for DMA; the PC
- * build does not, and MSVC puts __declspec(align) in a different position,
- * so the attribute is compiled out. Defined here so <dolphin/types.h> picks
- * it up (it only defines it when not already defined). */
+/* Alignment attributes. The engine asserts 32-byte alignment on buffers it
+ * hands to the disc and audio DMA paths, so the attribute has to work.
+ * clang-cl accepts the GNU spelling in the trailing position the code uses;
+ * MSVC's __declspec(align) cannot go there, so under cl.exe the attribute is
+ * compiled out and those asserts fire (build with clang-cl: pc\build.cmd). */
+#if defined(__clang__)
+#define ATTRIBUTE_ALIGN(num) __attribute__((aligned(num)))
+#else
 #define ATTRIBUTE_ALIGN(num)
+#endif
 
 /* Attribute spellings that <Runtime/platform.h> resolves to GNU syntax. */
 #define ATTRIBUTE_NORETURN __declspec(noreturn)

@@ -135,6 +135,10 @@ void gm_801A4014(GameMode* mode)
     sm = &state_machine;
     state = findState(mode->states);
     sm->routing.curr_state_id = state->id;
+#ifdef TARGET_PC
+    OSReport("[pc] scene: mode %d state %d scene_kind %d\n", mode->kind,
+             state->id, state->info.scene_kind);
+#endif
 
     preloadState(state);
     if (state->on_enter != NULL) {

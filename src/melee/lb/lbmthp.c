@@ -1,4 +1,7 @@
 #include "lbmthp.h"
+#ifdef TARGET_PC
+#include <pc_endian.h>
+#endif
 
 #include <placeholder.h>
 
@@ -117,6 +120,10 @@ static void fn_8001E910(int arg0, int arg1, void* arg2, int cancelflag)
     } else {
         var_r0 = streamPlayer->unk_8C - 1;
     }
+#ifdef TARGET_PC
+    /* A frame read just completed: swap its header words (see fn_8001ECF4). */
+    pc_swap32_range((void*) streamPlayer->frame_buffers[var_r0], 16);
+#endif
     streamPlayer->currPackedSize = *(u32*) streamPlayer->frame_buffers[var_r0];
     if (streamPlayer->unk_90 != streamPlayer->unk_8C &&
         streamPlayer->unk_70 != 0)
@@ -166,6 +173,10 @@ static s32 fn_8001EB14(THPDecComp* data, const char* path)
     THPInit();
     data->file_entrynum = DVDConvertPathToEntrynum(path);
     lbFile_800161C4(data->file_entrynum, 0, (u32) data, 0x40, 0x21, 1);
+#ifdef TARGET_PC
+    /* THP file header: big-endian 32-bit words after the 8-byte magic. */
+    pc_swap32_range((u8*) data + 8, 0x40 - 8);
+#endif
 
     data->unk_40 = data->num_frames;
     data->width = data->x_size;
@@ -295,6 +306,10 @@ static void fn_8001ECF4(THPDecComp* data, void* buf)
             lbFile_800161C4(data->file_entrynum, data->curr_file_offset,
                             (u32) var_r29, (var_r24 + 0x1F) & 0xFFFFFFE0, 0x21,
                             1);
+#ifdef TARGET_PC
+            /* THP frame header: next size, previous size, component sizes. */
+            pc_swap32_range(var_r29, 16);
+#endif
             csizep = var_r29;
             data->curr_file_offset += var_r24;
             var_r24 = *(u32*) var_r29;

@@ -1,4 +1,7 @@
 #include "mobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <string.h>
 
@@ -151,6 +154,9 @@ void HSD_MObjAnim(HSD_MObj* mobj)
 
 static int MObjLoad(HSD_MObj* mobj, HSD_MObjDesc* desc)
 {
+#ifdef TARGET_PC
+    pc_swap_mobjdesc(desc);
+#endif
     mobj->rendermode = desc->rendermode;
     mobj->tobj = HSD_TObjLoadDesc(desc->texdesc);
     mobj->mat = HSD_MaterialAlloc();

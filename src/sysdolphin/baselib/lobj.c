@@ -1,4 +1,7 @@
 #include "lobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <placeholder.h>
 
@@ -954,6 +957,9 @@ void HSD_LObjSetInterestWObj(HSD_LObj* lobj, HSD_WObj* wobj)
 
 static int LObjLoad(HSD_LObj* lobj, HSD_LightDesc* ldesc)
 {
+#ifdef TARGET_PC
+    pc_swap_lightdesc(ldesc);
+#endif
     HSD_LObjSetColor(lobj, ldesc->color);
     HSD_LObjSetFlags(lobj, ldesc->flags);
     switch (ldesc->flags & LOBJ_TYPE_MASK) {
