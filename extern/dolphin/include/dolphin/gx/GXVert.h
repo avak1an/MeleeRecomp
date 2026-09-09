@@ -25,6 +25,8 @@ typedef union
 
 #if defined(__MWERKS__) && !defined(M2CTX)
 volatile PPCWGPipe GXWGFifo : GXFIFO_ADDR;
+#elif defined(TARGET_PC)
+extern volatile PPCWGPipe GXWGFifo;
 #else
 #define GXWGFifo (*(volatile PPCWGPipe *)GXFIFO_ADDR)
 #endif

@@ -375,11 +375,10 @@ static inline void ftGameWatch_SpecialLw_UpdateVarsColl(HSD_GObj* gobj)
     }
 }
 
-static u32 const transition_flags0 =
-    Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit |
+STATIC_CONST(u32, transition_flags0, Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit |
     Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim | Ft_MF_UpdateCmd |
     Ft_MF_SkipItemVis | Ft_MF_Unk19 | Ft_MF_SkipModelPartVis |
-    Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 void ftGw_SpecialLw_GroundToAir(HSD_GObj* gobj)
 {
@@ -422,10 +421,9 @@ static inline void ftGameWatch_SpecialLw_UpdateVarsAction(HSD_GObj* gobj)
 }
 
 /// @todo Combine common flags with #transition_flags0.
-static u32 const transition_flags1 =
-    Ft_MF_KeepGfx | Ft_MF_SkipHit | Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim |
+STATIC_CONST(u32, transition_flags1, Ft_MF_KeepGfx | Ft_MF_SkipHit | Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim |
     Ft_MF_UpdateCmd | Ft_MF_SkipItemVis | Ft_MF_Unk19 |
-    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 void ftGw_SpecialLw_UpdateAction(HSD_GObj* gobj, float anim_frame)
 {

@@ -18,9 +18,8 @@
 #include <melee/lb/lb_00B0.h>
 #include <melee/lb/lb_00F9.h>
 
-static MotionFlags const ftSk_MF_SpecialLw_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus |
-    Ft_MF_SkipHit;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialLw_Coll, ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus |
+    Ft_MF_SkipHit);
 
 static void fn_80114034(Fighter_GObj* gobj)
 {

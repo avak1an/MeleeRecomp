@@ -26,9 +26,8 @@
 #include <melee/lb/lbvector.h>
 #include <sysdolphin/baselib/gobj.h>
 
-static MotionFlags const ftSk_MF_SpecialHi_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus |
-    Ft_MF_SkipHit;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialHi_Coll, ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus |
+    Ft_MF_SkipHit);
 
 /* 112ED8 */ static void fn_80112ED8(Fighter_GObj* gobj);
 /* 112F48 */ static void ftSk_SpecialHi_80112F48(Fighter_GObj* gobj);

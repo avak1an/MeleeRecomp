@@ -174,9 +174,9 @@ static void setAccessory4Callback(Fighter_GObj* gobj)
     fp->accessory4_cb = fn_8012E110;
 }
 
-static u32 const motion_flags = (1 << 1) | (1 << 7) | (1 << 12) | (1 << 14) |
+STATIC_CONST(u32, motion_flags, (1 << 1) | (1 << 7) | (1 << 12) | (1 << 14) |
                                 (1 << 18) | (1 << 19) | (1 << 22) | (1 << 26) |
-                                (1 << 27);
+                                (1 << 27));
 
 void fn_8012E3B4(Fighter_GObj* gobj)
 {

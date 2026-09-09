@@ -639,10 +639,9 @@ void ftSk_SpecialAirSStart_Coll(HSD_GObj* gobj)
     }
 }
 
-static u32 const transition_flags =
-    Ft_MF_SkipHit | Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim | Ft_MF_UpdateCmd |
+STATIC_CONST(u32, transition_flags, Ft_MF_SkipHit | Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim | Ft_MF_UpdateCmd |
     Ft_MF_SkipItemVis | Ft_MF_Unk19 | Ft_MF_SkipModelPartVis |
-    Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 void ftSk_SpecialS_80111440(HSD_GObj* gobj)
 {

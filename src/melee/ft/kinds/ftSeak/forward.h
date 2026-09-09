@@ -4,42 +4,32 @@
 #include <melee/ft/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 
-static MotionFlags const ftSk_MF_Special =
-    Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
-    Ft_MF_FreezeState;
+STATIC_CONST(MotionFlags, ftSk_MF_Special, Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
+    Ft_MF_FreezeState);
 
-static MotionFlags const ftSk_MF_SpecialS = ftSk_MF_Special | Ft_MF_KeepGfx;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialS, ftSk_MF_Special | Ft_MF_KeepGfx);
 
-static MotionFlags const ftSk_MF_SpecialLw =
-    ftSk_MF_Special | Ft_MF_KeepColAnimHitStatus;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialLw, ftSk_MF_Special | Ft_MF_KeepColAnimHitStatus);
 
-static MotionFlags const ftSk_MF_SpecialN =
-    ftSk_MF_Special | Ft_MF_KeepFastFall | Ft_MF_SkipThrowException;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialN, ftSk_MF_Special | Ft_MF_KeepFastFall | Ft_MF_SkipThrowException);
 
-static MotionFlags const ftSk_MF_SpecialHi =
-    ftSk_MF_SpecialS | Ft_MF_KeepFastFall | Ft_MF_KeepSfx;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialHi, ftSk_MF_SpecialS | Ft_MF_KeepFastFall | Ft_MF_KeepSfx);
 
-static MotionFlags const ftSk_MF_SpecialAirS =
-    ftSk_MF_SpecialS | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialAirS, ftSk_MF_SpecialS | Ft_MF_SkipParasol);
 
-static MotionFlags const ftSk_MF_SpecialAirLw =
-    ftSk_MF_SpecialLw | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialAirLw, ftSk_MF_SpecialLw | Ft_MF_SkipParasol);
 
-static MotionFlags const ftSk_MF_SpecialAirN =
-    ftSk_MF_SpecialN | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialAirN, ftSk_MF_SpecialN | Ft_MF_SkipParasol);
 
-static MotionFlags const ftSk_MF_SpecialAirHi =
-    ftSk_MF_SpecialHi | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialAirHi, ftSk_MF_SpecialHi | Ft_MF_SkipParasol);
 
-static MotionFlags const ftSk_MF_SpecialSLoop = ftSk_MF_SpecialS | Ft_MF_Unk19;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialSLoop, ftSk_MF_SpecialS | Ft_MF_Unk19);
 
-static MotionFlags const ftSk_MF_SpecialNLoop = ftSk_MF_SpecialN | Ft_MF_Unk19;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialNLoop, ftSk_MF_SpecialN | Ft_MF_Unk19);
 
-static MotionFlags const ftSk_MF_SpecialAirSLoop =
-    ftSk_MF_SpecialSLoop | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialAirSLoop, ftSk_MF_SpecialSLoop | Ft_MF_SkipParasol);
 
-static MotionFlags const ftSk_MF_SpecialAirNLoop =
-    ftSk_MF_SpecialNLoop | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSk_MF_SpecialAirNLoop, ftSk_MF_SpecialNLoop | Ft_MF_SkipParasol);
 
 typedef enum ftSeak_MotionState {
     ftSk_MS_SpecialNStart = ftCo_MS_Count,

@@ -199,13 +199,11 @@ void ftZd_SpecialAirHiStart_0_Coll(HSD_GObj* gobj)
     }
 }
 
-static u32 const transition_flags0 =
-    Ft_MF_KeepGfx | Ft_MF_SkipHit | Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim |
+STATIC_CONST(u32, transition_flags0, Ft_MF_KeepGfx | Ft_MF_SkipHit | Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim |
     Ft_MF_UpdateCmd | Ft_MF_SkipItemVis | Ft_MF_Unk19 |
-    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
-static u32 const transition_flags1 =
-    transition_flags0 | Ft_MF_KeepColAnimHitStatus;
+STATIC_CONST(u32, transition_flags1, transition_flags0 | Ft_MF_KeepColAnimHitStatus);
 
 void ftZd_SpecialHi_80139B44(HSD_GObj* gobj)
 {

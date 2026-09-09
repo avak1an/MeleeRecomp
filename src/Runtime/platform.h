@@ -161,6 +161,15 @@ typedef bool (*Predicate)(void);
 #define ASSERT_OFFSET(expr, member, offset)
 #endif
 
+/// Defines a file-local integer constant that may be built from other such
+/// constants. Metrowerks and clang fold `static T const` initializers; MSVC
+/// does not, so the PC build makes these enumerators instead.
+#ifdef TARGET_PC
+#define STATIC_CONST(type, name, ...) enum { name = (int) (__VA_ARGS__) }
+#else
+#define STATIC_CONST(type, name, ...) static type const name = __VA_ARGS__
+#endif
+
 #define RETURN_IF(cond)                                                       \
     do {                                                                      \
         if ((cond)) {                                                         \

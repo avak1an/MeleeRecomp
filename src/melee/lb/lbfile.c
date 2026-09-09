@@ -49,8 +49,13 @@ void lbFile_800161C4(int file, uintptr_t src, uintptr_t dst, size_t size,
 }
 
 #define MAX_FILENAME_LENGTH 0x20
+#ifdef TARGET_PC
+enum { FILE_EXTENSION_LENGTH = 4 }; // ".usd" or ".dat"
+enum { MAX_BASENAME_LENGTH = MAX_FILENAME_LENGTH - FILE_EXTENSION_LENGTH };
+#else
 const int FILE_EXTENSION_LENGTH = 4; // ".usd" or ".dat"
 const int MAX_BASENAME_LENGTH = MAX_FILENAME_LENGTH - FILE_EXTENSION_LENGTH;
+#endif
 
 /// append file extension (if needed)
 char* lbFileGetFullName(const char* basename)

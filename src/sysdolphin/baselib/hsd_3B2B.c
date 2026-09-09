@@ -4,7 +4,11 @@
 void hsd_803B2B20(u8* src, int len, void* dest)
 {
     int i;
+#ifdef TARGET_PC
+    enum { spCount = 16 };
+#else
     const int spCount = 16;
+#endif
     u8 sp[spCount];
     sp[0x0] = 0x01;
     sp[0x1] = 0x23;

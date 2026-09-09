@@ -22,8 +22,7 @@
 #include <melee/lb/lb_00B0.h>
 #include <sysdolphin/baselib/random.h>
 
-static MotionFlags const ftMr_MF_SpecialN_Coll =
-    Ft_MF_SkipColAnim | Ft_MF_UpdateCmd;
+STATIC_CONST(MotionFlags, ftMr_MF_SpecialN_Coll, Ft_MF_SkipColAnim | Ft_MF_UpdateCmd);
 
 static int pickMegavitamin(Fighter* fp, const int* arr, int outpos)
 {

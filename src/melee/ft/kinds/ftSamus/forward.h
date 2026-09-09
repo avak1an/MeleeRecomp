@@ -6,42 +6,30 @@
 
 typedef struct Fighter ftSs_Fighter;
 
-static MotionFlags const ftSs_MF_Special =
-    Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
-    Ft_MF_FreezeState;
+STATIC_CONST(MotionFlags, ftSs_MF_Special, Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
+    Ft_MF_FreezeState);
 
-static MotionFlags const ftSs_MF_SpecialN =
-    ftSs_MF_Special | Ft_MF_KeepFastFall | Ft_MF_SkipThrowException;
+STATIC_CONST(MotionFlags, ftSs_MF_SpecialN, ftSs_MF_Special | Ft_MF_KeepFastFall | Ft_MF_SkipThrowException);
 
-static MotionFlags const ftSs_MF_SpecialS =
-    ftSs_MF_Special | Ft_MF_KeepGfx | Ft_MF_SkipThrowException;
+STATIC_CONST(MotionFlags, ftSs_MF_SpecialS, ftSs_MF_Special | Ft_MF_KeepGfx | Ft_MF_SkipThrowException);
 
-static MotionFlags const ftSs_MF_SpecialLw =
-    ftSs_MF_Special | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipThrowException;
+STATIC_CONST(MotionFlags, ftSs_MF_SpecialLw, ftSs_MF_Special | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipThrowException);
 
-static MotionFlags const ftSs_MF_SpecialHi =
-    ftSs_MF_Special | Ft_MF_KeepFastFall | Ft_MF_KeepGfx | Ft_MF_KeepSfx;
+STATIC_CONST(MotionFlags, ftSs_MF_SpecialHi, ftSs_MF_Special | Ft_MF_KeepFastFall | Ft_MF_KeepGfx | Ft_MF_KeepSfx);
 
-static MotionFlags const ftSs_MF_SpecialAirN =
-    ftSs_MF_SpecialN | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSs_MF_SpecialAirN, ftSs_MF_SpecialN | Ft_MF_SkipParasol);
 
-static MotionFlags const ftSs_MF_SpecialAirS =
-    ftSs_MF_SpecialS | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSs_MF_SpecialAirS, ftSs_MF_SpecialS | Ft_MF_SkipParasol);
 
-static MotionFlags const ftSs_MF_SpecialAirLw =
-    ftSs_MF_SpecialLw | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSs_MF_SpecialAirLw, ftSs_MF_SpecialLw | Ft_MF_SkipParasol);
 
-static MotionFlags const ftSs_MF_SpecialAirHi =
-    ftSs_MF_SpecialHi | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSs_MF_SpecialAirHi, ftSs_MF_SpecialHi | Ft_MF_SkipParasol);
 
-static MotionFlags const ftSs_MF_SpecialSSmash =
-    ftSs_MF_SpecialS | Ft_MF_SkipRumble;
+STATIC_CONST(MotionFlags, ftSs_MF_SpecialSSmash, ftSs_MF_SpecialS | Ft_MF_SkipRumble);
 
-static MotionFlags const ftSs_MF_SpecialAirSSmash =
-    ftSs_MF_SpecialSSmash | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftSs_MF_SpecialAirSSmash, ftSs_MF_SpecialSSmash | Ft_MF_SkipParasol);
 
-static MotionFlags const ftSs_MF_ZairCatch =
-    Ft_MF_SkipModelPartVis | Ft_MF_SkipMetalB;
+STATIC_CONST(MotionFlags, ftSs_MF_ZairCatch, Ft_MF_SkipModelPartVis | Ft_MF_SkipMetalB);
 
 typedef enum ftSamus_MotionState {
     ftSs_MS_SpecialLw = ftCo_MS_Count,

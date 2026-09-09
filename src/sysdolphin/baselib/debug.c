@@ -11,12 +11,17 @@ struct DebugContext {
 
 static ReportCallback reportCallback;
 static PanicCallback panicCallback;
+#ifndef TARGET_PC
 static __io_proc logFunc;
+#endif
 
 #ifdef MUST_MATCH
 #pragma peephole off
 #endif
 
+#ifdef TARGET_PC
+void HSD_LogInit(void) {}
+#else
 static int report_func(__file_handle arg0, unsigned char* arg1, size_t* arg2,
                        __idle_proc arg3)
 {
@@ -35,6 +40,7 @@ void HSD_LogInit(void)
     stdout->write_proc = report_func;
     stdout->state.error = 0;
 }
+#endif
 
 void __assert(char* str, u32 arg1, char* arg2)
 {
@@ -44,6 +50,11 @@ void __assert(char* str, u32 arg1, char* arg2)
 
 void HSD_Panic(char* arg0, u32 line, char* arg2)
 {
+#ifdef TARGET_PC
+    /* The crash handler draws a screen and waits for input; without a
+     * renderer that is an endless loop, so go straight to OSPanic. */
+    OSPanic(arg0, line, arg2);
+#endif
     if (panicCallback != NULL) {
         OSSaveContext(&HSD_Debug_804C2608.context);
         OSReport("%s in %s on line %d.\n", arg2, arg0, line);

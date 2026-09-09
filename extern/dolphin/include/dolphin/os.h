@@ -70,6 +70,9 @@ u32 __OSSimulatedMemSize : (OS_BASE_CACHED | 0x00F0);
 u32 __OSBusClock : (OS_BASE_CACHED | 0x00F8);
 u32 __OSCoreClock : (OS_BASE_CACHED | 0x00FC);
 int __EXIProbeStartTime[2] : (OS_BASE_CACHED | 0x30C0);
+#elif defined(TARGET_PC)
+extern u32 __OSBusClock;
+extern u32 __OSCoreClock;
 #else
 #define __OSBusClock (*(u32*) (OS_BASE_CACHED | 0x00F8))
 #define __OSCoreClock (*(u32*) (OS_BASE_CACHED | 0x00FC))

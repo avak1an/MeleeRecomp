@@ -3278,7 +3278,11 @@ int Ground_801C5940(void)
     }* phi_r8;
     int i, j, out_idx;
     UnkArchiveStruct* archive;
+#ifdef TARGET_PC
+    enum { vals_count = 32 };
+#else
     const size_t vals_count = 32;
+#endif
     u8 _[4];
     int vals[vals_count];
     archive = grDatFiles_GetArchive();

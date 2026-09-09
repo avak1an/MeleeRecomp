@@ -2,7 +2,7 @@
 
 #include <Runtime/platform.h>
 
-#include <setjmp.h>
+#include <Runtime/Gecko_setjmp.h>
 #include <stdarg.h>
 
 #include "grdatfiles.h"

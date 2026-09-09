@@ -19,10 +19,10 @@
 #include <melee/ft/kinds/ftCommon/inlines.h>
 #include <melee/ft/types.h>
 
-static u32 const coll_mf = Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim |
+STATIC_CONST(u32, coll_mf, Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim |
                            Ft_MF_UpdateCmd | Ft_MF_SkipItemVis | Ft_MF_Unk19 |
                            Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags |
-                           Ft_MF_Unk27;
+                           Ft_MF_Unk27);
 
 static void setCallbacks(HSD_GObj* gobj)
 {

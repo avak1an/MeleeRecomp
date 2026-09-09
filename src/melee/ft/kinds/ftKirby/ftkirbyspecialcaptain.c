@@ -190,10 +190,9 @@ void ftKb_CaSpecialAirN_Phys(Fighter_GObj* gobj)
     }
 }
 
-static u32 const ftKb_Ca_transition_flags =
-    Ft_MF_KeepGfx | Ft_MF_SkipMatAnim | Ft_MF_SkipRumble | Ft_MF_UpdateCmd |
+STATIC_CONST(u32, ftKb_Ca_transition_flags, Ft_MF_KeepGfx | Ft_MF_SkipMatAnim | Ft_MF_SkipRumble | Ft_MF_UpdateCmd |
     Ft_MF_SkipColAnim | Ft_MF_SkipItemVis | Ft_MF_Unk19 |
-    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 void ftKb_CaSpecialN_Coll(Fighter_GObj* gobj)
 {

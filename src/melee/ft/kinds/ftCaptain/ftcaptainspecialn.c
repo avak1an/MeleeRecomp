@@ -203,10 +203,9 @@ void ftCa_SpecialAirN_Phys(HSD_GObj* gobj)
 }
 
 /// @todo Share with #ftCa_Init_MotionStateTable
-static u32 const transition_flags =
-    Ft_MF_KeepGfx | Ft_MF_SkipMatAnim | Ft_MF_SkipRumble | Ft_MF_UpdateCmd |
+STATIC_CONST(u32, transition_flags, Ft_MF_KeepGfx | Ft_MF_SkipMatAnim | Ft_MF_SkipRumble | Ft_MF_UpdateCmd |
     Ft_MF_SkipColAnim | Ft_MF_SkipItemVis | Ft_MF_Unk19 |
-    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 void ftCa_SpecialN_Coll(HSD_GObj* gobj)
 {
