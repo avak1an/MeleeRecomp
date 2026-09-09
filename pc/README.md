@@ -7,23 +7,23 @@ compatible with it.
 
 ## Status
 
-**Milestone 1 (build scaffold) — done.** All 907 game units, the 76 HSD
+**Milestone 1 (build scaffold) - done.** All 907 game units, the 76 HSD
 engine units, and three pure-C SDK units compile and link into
 `build/pc/melee.exe`.
 
-**Milestone 2 (boot) — done.** The game reads its files straight from a
+**Milestone 2 (boot) - done.** The game reads its files straight from a
 disc image, the HSD engine parses and byte-swaps archives, and a headless
 run with `--autoplay` boots through the memory-card prompt, the opening
 movie, the title screen and the main menu into the character-select
 screen. Controllers work through XInput or the keyboard.
 
-**Milestone 3 (rendering) — menus done.** A GX-on-OpenGL layer draws the
+**Milestone 3 (rendering) - menus done.** A GX-on-OpenGL layer draws the
 memory-card prompt, the title screen, the main menu and the
 character-select screen in a window, with correct text, textures, models
 and layout. See "Renderer" below for what it covers and what it does not
 yet.
 
-**Milestone 3b (in-game rendering) � matches render.** The title
+**Milestone 3b (in-game rendering) - matches render.** The title
 screen's attract demo (reached by the scripted route in
 `pc/scripts/title-demo.txt`) plays complete four-player CPU matches: stages
 (Great Bay, Corneria, Brinstar, Peach's Castle, Yoshi's Story, ... whatever
@@ -36,10 +36,22 @@ texturing, mipmaps and destination alpha are still missing from the
 renderer, and a few in-match effects are only contained rather than fixed
 (see "Known gaps").
 
+**Milestone 4 (audio, video, saves, polish) - done.** A software AX
+mixer plays the game's sound effects and streamed music through the
+Windows audio device; THP movies (the Nintendo/HAL logo, the opening, the
+how-to-play and ending videos) decode on the CPU into the game's YUV
+textures; the memory card is a directory of files next to the executable,
+so progress persists between runs; the window can go full screen or start
+at an integer scale, the keyboard layout is remappable and the volume is
+adjustable. See "Running" for the options.
+
 Planned milestones:
 
-4. **Audio, saves, polish.** AX mixing, THP video decoding, memory-card
-   files on disk, window and input options.
+5. **Coverage and mods.** The stages and modes the demo route does not
+   reach (parameter blocks still unswapped), the remaining renderer
+   features (fog, indirect texturing, mipmaps, destination alpha), a
+   loose-file override so files in an extracted folder take precedence
+   over the disc image.
 
 ## Building (Windows)
 
@@ -64,13 +76,15 @@ trips DMA-alignment asserts sooner or later.
 ## Running
 
 ```
-build\pc\melee.exe [--iso PATH] [--frames N] [--realtime] [--autoplay] [--input FILE] [--seed N] [--quiet-stubs]
+build\pc\melee.exe [--iso PATH] [--realtime] [--fullscreen] [--scale N] [--keymap FILE]
+                    [--volume N] [--no-audio] [--saves DIR] [--frames N] [--autoplay]
+                    [--input FILE] [--seed N] [--quiet-stubs] [--headless] [--screenshots DIR]
 ```
 
 A typical check that a change did not break the match:
 
 ```
-build\pc\melee.exe --headless --quiet-stubs --input pc\scripts	itle-demo.txt --seed 3 --frames 3000
+build\pc\melee.exe --headless --quiet-stubs --input pc\scripts\title-demo.txt --seed 3 --frames 3000
 ```
 
 Status 0 means two demo matches played out; a crash prints a symbolized
@@ -82,6 +96,15 @@ backtrace and a hang is reported by the watchdog (status 8).
   written.
 - `--frames N`: stop after N video frames (status 0).
 - `--realtime`: pace the loop to 60 Hz (default: as fast as possible).
+  Audio is mixed either way, but only sounds right when paced.
+- `--fullscreen`: start in a borderless window covering the monitor. F11
+  or Alt+Enter toggles at any time.
+- `--scale N`: start with an N x 640x480 window (1-8).
+- `--keymap FILE`: keyboard layout for port 1, see "Controllers" below.
+- `--volume N`: audio volume in percent (default 100). `--no-audio` (or
+  `MELEE_NO_AUDIO=1`) does not open the audio device at all.
+- `--saves DIR`: where the memory-card files live (default: a `saves`
+  directory next to `melee.exe`, created on the first save).
 - `--autoplay`: tap Start and A on port 1 every 150 frames, which pushes a
   headless run through prompts and menus.
 - `--input FILE`: scripted controller input for port 1. Each line is
@@ -104,9 +127,23 @@ backtrace and a hang is reported by the watchdog (status 8).
   loose-file override so files in such a folder take precedence over the
   image.
 
-The window is 640x480 and can be resized (the frame is scaled); Escape or
-closing it ends the run. Rendering is as fast as the machine allows
-unless `--realtime` is given, which also enables vsync.
+The window starts at 640x480 (or `--scale` times that) and can be resized
+or made full screen: the frame keeps its 4:3 shape, centred with black
+bars. Escape or closing the window ends the run. Rendering is as fast as
+the machine allows unless `--realtime` is given, which also enables vsync.
+
+Audio: a 32 kHz stereo mix of every voice the game's sound engine starts
+(sound effects from ARAM, music streamed from the disc), 5 ms at a time,
+played through waveOut. Sound is generated in unpaced and headless runs
+too, so `MELEE_AUDIO_DUMP=out.wav` records what a scripted run would have
+played.
+
+Saves: slot A is a virtual 64 Mbit memory card whose files are
+`<name>.sav` in the saves directory: a 96-byte header (the directory
+entry: name, size, timestamp, icon and comment locations) followed by the
+raw data the game wrote. The data is the game's own in-memory layout, so
+the files are not interchangeable with real memory-card dumps, which are
+big-endian. Slot B is always empty.
 
 ## Renderer
 
@@ -146,7 +183,23 @@ call counts at the end are the to-do list.
 
 Controllers: XInput devices map to ports 1-4. With no gamepad, the keyboard
 drives port 1 (arrows = stick, IJKL = C stick, Z/X/C/V = A/B/X/Y, Q/E =
-L/R, Space = Z, Enter = Start, numpad 8/2/4/6 = D-pad).
+L/R, Space = Z, Enter = Start, numpad 8/2/4/6 = D-pad). `--keymap FILE`
+changes that layout; each line is `ACTION = KEY`, for example:
+
+```
+# actions: A B X Y Z L R START DPAD_UP/DOWN/LEFT/RIGHT
+#          STICK_UP/DOWN/LEFT/RIGHT C_UP/DOWN/LEFT/RIGHT
+A = K
+B = J
+STICK_UP = W
+START = ENTER
+```
+
+Keys are letters, digits, `F1`-`F24`, or names: `ENTER SPACE TAB BACKSPACE
+SHIFT LSHIFT RSHIFT CTRL LCTRL RCTRL ALT UP DOWN LEFT RIGHT INSERT DELETE
+HOME END PAGEUP PAGEDOWN NUMPAD0`-`NUMPAD9 NUMPAD+ NUMPAD- NUMPAD* NUMPAD/
+NUMPAD. COMMA PERIOD MINUS PLUS SEMICOLON SLASH BACKTICK LBRACKET
+BACKSLASH RBRACKET QUOTE`. Actions not mentioned keep their default.
 
 ### Debugging aids
 
@@ -164,6 +217,9 @@ L/R, Space = Z, Enter = Start, numpad 8/2/4/6 = D-pad).
   with status 8 when no frame completes for N seconds: the way to find
   where a run spins.
 - `MELEE_TRACE_CARD=1` logs the memory-card command queue.
+- `MELEE_AUDIO_DUMP=FILE` writes the mixed audio of the run as a 32 kHz
+  stereo WAV; `MELEE_THP_DUMP=DIR` writes every decoded movie frame's luma
+  plane as a PGM image and logs its mean brightness.
 - A build configured with `-DMELEE_TRACE_FUNCS=ON` (clang only) records every
   function entry in a ring buffer and prints the last 96 on a crash, and
   verifies each function's return address as it returns, naming the frame
@@ -191,10 +247,12 @@ L/R, Space = Z, Enter = Start, numpad 8/2/4/6 = D-pad).
 | `src/gx_render.c` | The GX-on-OpenGL renderer: state, vertex decoding, transform and lighting, texture decoding, TEV shader generation, frame copies. |
 | `src/gl_window.c`, `src/pc_gl.h` | Win32 window, OpenGL context and entry-point loader. |
 | `src/pc_gx.h` | Shared texture/palette object layout and the immediate-mode write interface. |
-| `src/pad.c` | XInput and keyboard controllers, autoplay. |
-| `src/card.c` | Memory card: reports "no card". |
+| `src/pad.c` | XInput and keyboard controllers, keyboard layout files, autoplay, scripted input. |
+| `src/card.c` | Memory card: a directory of save files, with the SDK's asynchronous completion semantics. |
+| `src/ax.c` | The AX sound driver: voice pool with priority stealing, ADPCM/PCM decoding from ARAM, sample-rate conversion, volume ramps, waveOut output, the AI interface. |
+| `src/thp.c` | THP movie decoder (baseline JPEG without byte stuffing) writing GX-tiled Y/U/V planes. |
 | `src/hsd_swap.c` | Byte-swapping of HSD descriptors (see below). |
-| `src/mtx.c`, `src/sdk_extra.c` | Matrix library; render-mode tables, voice pool, thread stub, Metrowerks runtime helpers. |
+| `src/mtx.c`, `src/sdk_extra.c` | Matrix library; render-mode tables, thread stub, Metrowerks runtime helpers. |
 | `src/trace.c` | Function-entry ring buffer and return-address check (`MELEE_TRACE_FUNCS`). |
 | `generated/stubs.c` | No-op SDK stubs, produced by `tools/gen_stubs.py`. |
 | `tools/gen_stubs.py` | Reads the link log, looks unresolved names up in the SDK headers, emits stubs. |
@@ -224,9 +282,44 @@ tracked by address; a freshly parsed archive clears the records inside its
 memory. Only descriptors inside the emulated main memory are touched, so
 static descriptors compiled into the game are left alone. Raw GX payloads
 (vertex arrays, display lists, textures, palettes) stay in console order
-for the renderer to decode. Non-HSD formats swapped so far: the `.ssm`
-sound-bank header and sample table, the `.sem` sound-macro tables, the THP
-movie header and frame headers.
+for the renderer to decode. Non-HSD formats swapped: the `.ssm` sound-bank
+header and sample table (the AX parameter blocks inside it are 16-bit
+fields that the game also reads 32 bits at a time, so they are kept as
+32-bit words and their halves exchanged: `pc_rotate32_range`), the `.sem`
+sound-macro tables and command streams, `.hps` music stream headers and
+block headers, the THP movie header and the size word before each frame.
+JPEG data, sample data and movie frames are byte streams and stay as they
+are.
+
+**Audio is mixed in software, on the game thread.** The console's DSP
+mixes 64 voices every 5 ms; here `VIWaitForRetrace` renders the 5 ms
+frames that fall into each video frame (`pc_ax_frame`): the sound engine's
+registered callback runs first, then every running voice is decoded from
+the emulated ARAM (the same 4-bit ADPCM as the console, or 8/16-bit PCM),
+resampled with the voice's 16.16 ratio, scaled by its envelope and left /
+right mix and accumulated. Voice parameter blocks are the console's
+structures, addressed by the same fields the game writes. The result goes
+to waveOut through a few 50 ms buffers; when the device falls behind a
+frame is dropped rather than queued.
+
+**THP is a JPEG decoder with the console's output layout.** The SDK's
+decoder is PowerPC assembly around the inverse DCT; `thp.c` is a fresh
+baseline-JPEG decoder (Huffman tables, 4:2:0, restart intervals, no byte
+stuffing in the entropy data, which is how the THP tools write it) that
+stores each 8x8 block straight into the 8x4 tiles of the GX I8 textures
+the movie player binds. The player's work area holds the decoder state.
+Because the planes are rewritten in place, the renderer drops its cached
+upload of any texture inside a range the game flushes (`DCStoreRange`,
+`DCFlushRange`) or the decoder wrote.
+
+**The memory card is a directory.** Files are held in memory while the
+card is mounted and written through to disk on every create, write, status
+change, rename or delete. The SDK completes asynchronous card requests
+from interrupts after the call returned, and the game's state machines
+depend on that ordering (they set their own "busy" flag after issuing the
+request), so completions are queued and delivered from the pump; the
+game's card state machine, which spins without reaching a wait point,
+pumps on entry.
 
 **Stubs are generated, not written.** Every SDK function the game links
 against but the runtime does not implement is a generated no-op that logs
@@ -251,10 +344,17 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - Engine loaders (`jobj.c`, `cobj.c`, `wobj.c`, `lobj.c`, `fog.c`, `aobj.c`,
   `fobj.c`, `mobj.c`, `tobj.c`, `pobj.c`, `robj.c`): one-line swap hooks.
 - `archive.c`: endian pre-pass. `synth.c`, `axdriver.c`, `lbmthp.c`: file
-  header swaps.
+  header, sample table, stream header and command stream swaps.
+- `synth.c`: the bank-compaction code stores the new bank end through the
+  bank list array at index 0x20, which on the console is the array that
+  follows it (`hsd_SynthSFXBank`); on PC the store names that array.
+- `hsd_3A94.c`: the card state machine pumps completions on entry (the
+  game spins on it while a request is in flight); the command queue
+  `hsd_804D2348` is addressed as `hsd_804D1138 + 0x1210`, so it is part of
+  the same block.
 - Decomp quirks that only work on the console, each fixed under `TARGET_PC`:
-  - `hsd_3A94.c`/`hsd_4D11.c`: two globals used as one contiguous buffer
-    (`hsd_804D1138`/`hsd_804D1148`) are one block on PC.
+  - `hsd_3A94.c`/`hsd_4D11.c`: three globals used as one contiguous buffer
+    (`hsd_804D1138`/`hsd_804D1148`/`hsd_804D2348`) are one block on PC.
   - `mnmain.c`: a matching trick writes 0x14 bytes past a 12-byte local,
     which on x86 hits the return address.
   - `lbcardnew.c`: the card work area is zeroed (the code reads it before
@@ -325,12 +425,16 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - Particle lists occasionally end up with a corrupt link after item hit
   effects; the walker drops the rest of the list and logs
   `particle list ... is corrupt` instead of crashing. Root cause not found.
-- Sound-effect banks are loaded but their records are not swapped; unload
-  walks are skipped and banks wrap instead of asserting (audio is
-  milestone 4).
+- The mixer ignores the auxiliary effect buses (reverb, chorus, delay:
+  the `AXFX*` functions are still stubs), interaural delay (`ITD`) and the
+  low-pass filter; sample-rate conversion is linear rather than the DSP's
+  4-tap filter. Volumes are not calibrated against the console.
+- Save files are the PC layout of the game's structures; converting to or
+  from real memory-card dumps (`.gci`) would need a byte swap of the game's
+  save-data structs.
 - Four more "index past a global" idioms exist (`gm_19EF.c`, `soundtest.c`)
   that assume console link order.
 - The settings structs `gmm_x0`, `lbl_8046B6A0_t`, `TmData` differ in size
   on PC (bit-field packing); nothing reads them from disc yet.
 - `char` signedness and paired-single float rounding are not matched.
-- THP video, AX audio mixing, memory-card saves and threads are stubs.
+- Threads are stubs (the game creates none that matter on PC).

@@ -34,59 +34,6 @@ GXRenderModeObj GXNtsc480Prog = {
     { 0, 0, 21, 22, 21, 0, 0 },
 };
 
-/* --- AX (audio) --------------------------------------------------------- */
-
-/* Voice pool. Nothing is mixed yet, but the sound engine indexes its own
- * tables by voice->index and dereferences the result without a NULL check,
- * so hand out real parameter blocks. */
-static AXVPB voices[AX_MAX_VOICES];
-static u8 voice_used[AX_MAX_VOICES];
-
-AXVPB* AXAcquireVoice(u32 priority, void (*callback)(void*), u32 userContext)
-{
-    int i;
-    for (i = 0; i < AX_MAX_VOICES; i++) {
-        if (!voice_used[i]) {
-            AXVPB* v = &voices[i];
-            voice_used[i] = 1;
-            memset(v, 0, sizeof(*v));
-            v->index = (u32) i;
-            v->priority = (int) priority;
-            v->callback = callback;
-            v->userContext = userContext;
-            return v;
-        }
-    }
-    return NULL;
-}
-
-void AXFreeVoice(AXVPB* p)
-{
-    if (p != NULL && p >= voices && p < voices + AX_MAX_VOICES) {
-        voice_used[p - voices] = 0;
-    }
-}
-
-void AXRegisterAuxACallback(void (*callback)(void*, void*), void* context)
-{
-    pc_stub_hit("AXRegisterAuxACallback");
-}
-
-void AXRegisterAuxBCallback(void (*callback)(void*, void*), void* context)
-{
-    pc_stub_hit("AXRegisterAuxBCallback");
-}
-
-void AXRegisterCallback(void (*callback)())
-{
-    pc_stub_hit("AXRegisterCallback");
-}
-
-void AXFXSetHooks(void* (*alloc_hook)(unsigned long), void (*free_hook)(void*))
-{
-    pc_stub_hit("AXFXSetHooks");
-}
-
 /* --- OS threads --------------------------------------------------------- */
 
 int OSCreateThread(struct OSThread* thread, void* (*func)(void*), void* param, void* stack,

@@ -122,7 +122,7 @@ static void fn_8001E910(int arg0, int arg1, void* arg2, int cancelflag)
     }
 #ifdef TARGET_PC
     /* A frame read just completed: swap its header words (see fn_8001ECF4). */
-    pc_swap32_range((void*) streamPlayer->frame_buffers[var_r0], 16);
+    pc_swap32_range((void*) streamPlayer->frame_buffers[var_r0], 4);
 #endif
     streamPlayer->currPackedSize = *(u32*) streamPlayer->frame_buffers[var_r0];
     if (streamPlayer->unk_90 != streamPlayer->unk_8C &&
@@ -307,8 +307,9 @@ static void fn_8001ECF4(THPDecComp* data, void* buf)
                             (u32) var_r29, (var_r24 + 0x1F) & 0xFFFFFFE0, 0x21,
                             1);
 #ifdef TARGET_PC
-            /* THP frame header: next size, previous size, component sizes. */
-            pc_swap32_range(var_r29, 16);
+            /* each buffered frame starts with one big-endian word, the size
+             * of the next frame; the JPEG data follows it directly */
+            pc_swap32_range(var_r29, 4);
 #endif
             csizep = var_r29;
             data->curr_file_offset += var_r24;

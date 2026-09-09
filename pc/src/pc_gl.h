@@ -92,6 +92,11 @@ void pc_window_present(void);
 
 /// Current drawable size in pixels.
 void pc_window_size(int* width, int* height);
+/// The 4:3 rectangle inside the window that the frame is drawn into (GL
+/// coordinates: y counts from the bottom).
+void pc_window_viewport(int* x, int* y, int* width, int* height);
+void pc_window_set_fullscreen(int on);
+int pc_window_is_fullscreen(void);
 
 /// Whether a GL context exists (rendering calls must check this).
 int pc_window_ready(void);

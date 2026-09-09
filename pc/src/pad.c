@@ -16,6 +16,7 @@
 #include <dolphin/pad.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <windows.h>
 #include <xinput.h>
@@ -129,30 +130,161 @@ static int key(int vk)
     return (GetAsyncKeyState(vk) & 0x8000) != 0;
 }
 
+enum {
+    KEY_A, KEY_B, KEY_X, KEY_Y, KEY_Z, KEY_L, KEY_R, KEY_START,
+    KEY_DUP, KEY_DDOWN, KEY_DLEFT, KEY_DRIGHT,
+    KEY_SUP, KEY_SDOWN, KEY_SLEFT, KEY_SRIGHT,
+    KEY_CUP, KEY_CDOWN, KEY_CLEFT, KEY_CRIGHT,
+    KEY_COUNT
+};
+
+static const char* const key_action_names[KEY_COUNT] = {
+    "A", "B", "X", "Y", "Z", "L", "R", "START",
+    "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
+    "STICK_UP", "STICK_DOWN", "STICK_LEFT", "STICK_RIGHT",
+    "C_UP", "C_DOWN", "C_LEFT", "C_RIGHT",
+};
+
+/* default layout, see the file comment */
+static int key_vk[KEY_COUNT] = {
+    'Z', 'X', 'C', 'V', VK_SPACE, 'Q', 'E', VK_RETURN,
+    VK_NUMPAD8, VK_NUMPAD2, VK_NUMPAD4, VK_NUMPAD6,
+    VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT,
+    'I', 'K', 'J', 'L',
+};
+
+static const struct {
+    const char* name;
+    int vk;
+} key_names[] = {
+    { "ENTER", VK_RETURN }, { "SPACE", VK_SPACE }, { "TAB", VK_TAB }, { "BACKSPACE", VK_BACK },
+    { "SHIFT", VK_SHIFT }, { "LSHIFT", VK_LSHIFT }, { "RSHIFT", VK_RSHIFT }, { "CTRL", VK_CONTROL },
+    { "LCTRL", VK_LCONTROL }, { "RCTRL", VK_RCONTROL }, { "ALT", VK_MENU },
+    { "UP", VK_UP }, { "DOWN", VK_DOWN }, { "LEFT", VK_LEFT }, { "RIGHT", VK_RIGHT },
+    { "INSERT", VK_INSERT }, { "DELETE", VK_DELETE }, { "HOME", VK_HOME }, { "END", VK_END },
+    { "PAGEUP", VK_PRIOR }, { "PAGEDOWN", VK_NEXT },
+    { "NUMPAD0", VK_NUMPAD0 }, { "NUMPAD1", VK_NUMPAD1 }, { "NUMPAD2", VK_NUMPAD2 },
+    { "NUMPAD3", VK_NUMPAD3 }, { "NUMPAD4", VK_NUMPAD4 }, { "NUMPAD5", VK_NUMPAD5 },
+    { "NUMPAD6", VK_NUMPAD6 }, { "NUMPAD7", VK_NUMPAD7 }, { "NUMPAD8", VK_NUMPAD8 },
+    { "NUMPAD9", VK_NUMPAD9 }, { "NUMPAD+", VK_ADD }, { "NUMPAD-", VK_SUBTRACT },
+    { "NUMPAD*", VK_MULTIPLY }, { "NUMPAD/", VK_DIVIDE }, { "NUMPAD.", VK_DECIMAL },
+    { "COMMA", VK_OEM_COMMA }, { "PERIOD", VK_OEM_PERIOD }, { "MINUS", VK_OEM_MINUS },
+    { "PLUS", VK_OEM_PLUS }, { "SEMICOLON", VK_OEM_1 }, { "SLASH", VK_OEM_2 },
+    { "BACKTICK", VK_OEM_3 }, { "LBRACKET", VK_OEM_4 }, { "BACKSLASH", VK_OEM_5 },
+    { "RBRACKET", VK_OEM_6 }, { "QUOTE", VK_OEM_7 },
+};
+
+static int parse_key(const char* name)
+{
+    size_t i;
+    if (name[0] != '\0' && name[1] == '\0') {
+        char c = name[0];
+        if (c >= 'a' && c <= 'z') {
+            c = (char) (c - 'a' + 'A');
+        }
+        if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+            return c;
+        }
+    }
+    if ((name[0] == 'F' || name[0] == 'f') && name[1] >= '1' && name[1] <= '9') {
+        int n = atoi(name + 1);
+        if (n >= 1 && n <= 24) {
+            return VK_F1 + n - 1;
+        }
+    }
+    for (i = 0; i < sizeof(key_names) / sizeof(key_names[0]); i++) {
+        if (_stricmp(key_names[i].name, name) == 0) {
+            return key_names[i].vk;
+        }
+    }
+    return 0;
+}
+
+static char* trim(char* s)
+{
+    char* end;
+    while (*s == ' ' || *s == '\t') {
+        s++;
+    }
+    end = s + strlen(s);
+    while (end > s && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n')) {
+        *--end = '\0';
+    }
+    return s;
+}
+
+/**
+ * Loads a keyboard layout: lines of `ACTION = KEY`, where ACTION is one of
+ * A B X Y Z L R START DPAD_UP/DOWN/LEFT/RIGHT STICK_UP/DOWN/LEFT/RIGHT
+ * C_UP/DOWN/LEFT/RIGHT and KEY is a letter, a digit, F1-F24 or a name such
+ * as ENTER, SPACE, UP, NUMPAD8, LSHIFT. `#` starts a comment.
+ */
+int pc_pad_load_keymap(const char* path)
+{
+    FILE* f = fopen(path, "r");
+    char line[256];
+    int line_no = 0, errors = 0;
+    if (f == NULL) {
+        fprintf(stderr, "[pc] keymap: cannot open %s\n", path);
+        return 0;
+    }
+    while (fgets(line, sizeof(line), f) != NULL) {
+        char *hash, *eq, *action, *keyname;
+        int i, vk;
+        line_no++;
+        hash = strchr(line, '#');
+        if (hash != NULL) {
+            *hash = '\0';
+        }
+        eq = strchr(line, '=');
+        if (eq == NULL) {
+            continue; /* blank or comment */
+        }
+        *eq = '\0';
+        action = trim(line);
+        keyname = trim(eq + 1);
+        vk = parse_key(keyname);
+        for (i = 0; i < KEY_COUNT; i++) {
+            if (_stricmp(key_action_names[i], action) == 0) {
+                break;
+            }
+        }
+        if (i == KEY_COUNT || vk == 0) {
+            fprintf(stderr, "[pc] keymap: %s:%d: unknown %s '%s'\n", path, line_no,
+                    i == KEY_COUNT ? "action" : "key", i == KEY_COUNT ? action : keyname);
+            errors++;
+            continue;
+        }
+        key_vk[i] = vk;
+    }
+    fclose(f);
+    return errors == 0;
+}
+
 static void read_keyboard(PADStatus* st)
 {
     u16 b = 0;
     int x = 0, y = 0, cx = 0, cy = 0;
-    if (key('Z')) b |= PAD_BUTTON_A;
-    if (key('X')) b |= PAD_BUTTON_B;
-    if (key('C')) b |= PAD_BUTTON_X;
-    if (key('V')) b |= PAD_BUTTON_Y;
-    if (key(VK_RETURN)) b |= PAD_BUTTON_START;
-    if (key(VK_SPACE)) b |= PAD_TRIGGER_Z;
-    if (key('Q')) b |= PAD_TRIGGER_L;
-    if (key('E')) b |= PAD_TRIGGER_R;
-    if (key(VK_NUMPAD8)) b |= PAD_BUTTON_UP;
-    if (key(VK_NUMPAD2)) b |= PAD_BUTTON_DOWN;
-    if (key(VK_NUMPAD4)) b |= PAD_BUTTON_LEFT;
-    if (key(VK_NUMPAD6)) b |= PAD_BUTTON_RIGHT;
-    if (key(VK_LEFT)) x -= 100;
-    if (key(VK_RIGHT)) x += 100;
-    if (key(VK_DOWN)) y -= 100;
-    if (key(VK_UP)) y += 100;
-    if (key('J')) cx -= 100;
-    if (key('L')) cx += 100;
-    if (key('K')) cy -= 100;
-    if (key('I')) cy += 100;
+    if (key(key_vk[KEY_A])) b |= PAD_BUTTON_A;
+    if (key(key_vk[KEY_B])) b |= PAD_BUTTON_B;
+    if (key(key_vk[KEY_X])) b |= PAD_BUTTON_X;
+    if (key(key_vk[KEY_Y])) b |= PAD_BUTTON_Y;
+    if (key(key_vk[KEY_START])) b |= PAD_BUTTON_START;
+    if (key(key_vk[KEY_Z])) b |= PAD_TRIGGER_Z;
+    if (key(key_vk[KEY_L])) b |= PAD_TRIGGER_L;
+    if (key(key_vk[KEY_R])) b |= PAD_TRIGGER_R;
+    if (key(key_vk[KEY_DUP])) b |= PAD_BUTTON_UP;
+    if (key(key_vk[KEY_DDOWN])) b |= PAD_BUTTON_DOWN;
+    if (key(key_vk[KEY_DLEFT])) b |= PAD_BUTTON_LEFT;
+    if (key(key_vk[KEY_DRIGHT])) b |= PAD_BUTTON_RIGHT;
+    if (key(key_vk[KEY_SLEFT])) x -= 100;
+    if (key(key_vk[KEY_SRIGHT])) x += 100;
+    if (key(key_vk[KEY_SDOWN])) y -= 100;
+    if (key(key_vk[KEY_SUP])) y += 100;
+    if (key(key_vk[KEY_CLEFT])) cx -= 100;
+    if (key(key_vk[KEY_CRIGHT])) cx += 100;
+    if (key(key_vk[KEY_CDOWN])) cy -= 100;
+    if (key(key_vk[KEY_CUP])) cy += 100;
     st->button = b;
     st->stickX = (s8) x;
     st->stickY = (s8) y;

@@ -282,6 +282,20 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep)
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
+extern void pc_ax_shutdown(void);
+
+int pc_ptr_readable(const void* p, size_t bytes)
+{
+    MEMORY_BASIC_INFORMATION mbi;
+    if (p == NULL || VirtualQuery(p, &mbi, sizeof(mbi)) == 0) {
+        return 0;
+    }
+    if (mbi.State != MEM_COMMIT || (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD))) {
+        return 0;
+    }
+    return (const u8*) p + bytes <= (const u8*) mbi.BaseAddress + mbi.RegionSize;
+}
+
 __declspec(noreturn) void pc_exit(int status)
 {
     if (status != 0) {
@@ -289,6 +303,7 @@ __declspec(noreturn) void pc_exit(int status)
     }
     fprintf(stderr, "[pc] exiting after %u frame(s), status %d\n", pc_frame_count, status);
     print_stub_summary();
+    pc_ax_shutdown();
     fflush(stdout);
     fflush(stderr);
     exit(status);
@@ -375,6 +390,7 @@ bool pc_pump(void)
         ran |= pc_arq_pump();
         ran |= pc_gx_pump();
         ran |= pc_alarm_pump();
+        ran |= pc_card_pump();
         any |= ran;
     } while (ran && ++guard < 100000);
     return any;

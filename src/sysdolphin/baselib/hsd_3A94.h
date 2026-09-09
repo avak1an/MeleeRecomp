@@ -84,7 +84,7 @@ typedef struct CardState {
                              s32 version, void (*callback)(s32, s32));
 #ifdef TARGET_PC
 /* One block with hsd_804D1148 (see hsd_4D11.c). */
-extern u8 hsd_card_area[0x10 + 0x80 * 0x9 * 4];
+extern u8 hsd_card_area[0x10 + 0x80 * 0x9 * 4 + 0x300];
 #define hsd_804D1138 (hsd_card_area)
 #else
 /* 4D1138 */ extern u8 hsd_804D1138[0x10];

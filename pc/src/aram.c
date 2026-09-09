@@ -21,6 +21,17 @@ static u32 stack_pointer;
 static u32 stack_count;
 static int initialized;
 
+/// Host view of the emulated ARAM for the audio mixer.
+u8* pc_aram_data(void)
+{
+    return aram;
+}
+
+u32 pc_aram_size(void)
+{
+    return aram != NULL ? ARAM_SIZE : 0;
+}
+
 u32 ARInit(u32* stack_index_addr, u32 num_entries)
 {
     (void) num_entries;

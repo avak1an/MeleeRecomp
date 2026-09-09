@@ -1,5 +1,6 @@
 #include "hsd_3A94.h"
 #ifdef TARGET_PC
+#include "pc_runtime.h"
 #include <stdlib.h>
 #endif
 
@@ -110,7 +111,11 @@ typedef struct CardQueueEntry {
 #else
 /* 4D1148 */ extern u32 hsd_804D1148[0x80][0x9];
 #endif
+#ifdef TARGET_PC
+#define hsd_804D2348 (*(__baselib_UnkType003*) (hsd_card_area + 0x1210))
+#else
 /* 4D2348 */ extern __baselib_UnkType003 hsd_804D2348;
+#endif
 /* 4D7980 */ extern volatile s32 hsd_804D7980;
 /* 4D7984 */ extern volatile s32 hsd_804D7984;
 /* 4D7988 */ extern s32 hsd_804D7988;
@@ -904,6 +909,15 @@ void hsd_803AAA48(void)
 {
     s32 r;
     s32 chan;
+#ifdef TARGET_PC
+    static int trace = -1;
+    /* the game spins on this function while card requests are in flight;
+     * their completions are delivered from the pump */
+    pc_pump();
+    if (trace < 0) {
+        trace = getenv("MELEE_TRACE_CARD") != NULL;
+    }
+#endif
     while (1) {
         CardContext* ctx = (CardContext*) hsd_804D1138;
         CardState** state = &ctx->x4;
@@ -932,7 +946,7 @@ void hsd_803AAA48(void)
         cmd = (s32*) &((CardBufEntry*) ctx)[hsd_804D7980];
         type = *(cmd += 4);
 #ifdef TARGET_PC
-        if (getenv("MELEE_TRACE_CARD") != NULL) {
+        if (trace) {
             OSReport("[card] run idx=%d type=%d state=%p x8=%d res=%d entry=%u cmd=%u\n",
                      hsd_804D7980, type, (void*) cmd[1], cmd[2], hsd_804D7988,
                      (unsigned) sizeof(CardBufEntry), (unsigned) sizeof(CardCmd));

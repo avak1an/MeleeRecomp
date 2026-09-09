@@ -20,6 +20,13 @@ typedef struct PCConfig {
     bool headless;       ///< no window, no rendering
     const char* screenshot_dir; ///< if set, dump a BMP of every 60th frame here
     const char* iso;     ///< path of the disc image (NULL = auto-detect)
+    const char* save_dir; ///< memory card files (NULL = "saves")
+    bool quiet_stubs;    ///< --quiet-stubs: also silences informational prints
+    bool fullscreen;     ///< start in a borderless full-screen window
+    int scale;           ///< initial window size, in multiples of 640x480 (default 1)
+    const char* keymap;  ///< keyboard layout file (see pad.c)
+    int volume;          ///< audio output volume in percent (default 100)
+    bool no_audio;       ///< do not open the audio device
 } PCConfig;
 
 extern PCConfig pc_config;
@@ -45,6 +52,8 @@ __declspec(noreturn) void pc_exit(int status);
 /// Print a symbolized stack trace of the calling thread to stderr.
 void pc_print_backtrace(void);
 /// Symbol name for a code address ("func+0x12"), in a static buffer.
+/// True when [p, p + bytes) is mapped readable memory (diagnostics only).
+int pc_ptr_readable(const void* p, size_t bytes);
 const char* pc_symbol_name(const void* addr);
 
 /// Print the most recent function entries (only when built with
@@ -63,6 +72,10 @@ void pc_stub_hit(const char* name);
 
 /// Run all pending completions. Returns true if anything ran.
 bool pc_pump(void);
+bool pc_card_pump(void);
+
+/// Keyboard layout file for port 1 (pad.c); returns false on errors.
+int pc_pad_load_keymap(const char* path);
 
 bool pc_dvd_pump(void);
 bool pc_alarm_pump(void);

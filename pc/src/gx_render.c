@@ -1245,17 +1245,18 @@ static Shader* get_shader(void)
 
 static void apply_raster_state(void)
 {
-    int ww, wh;
+    int vx, vy, vw, vh;
     float sx, sy;
-    pc_window_size(&ww, &wh);
-    sx = (float) ww / EFB_W;
-    sy = (float) wh / EFB_H;
+    pc_window_viewport(&vx, &vy, &vw, &vh);
+    sx = (float) vw / EFB_W;
+    sy = (float) vh / EFB_H;
 
-    glViewport((GLint) (gx.vp[0] * sx), (GLint) ((EFB_H - gx.vp[1] - gx.vp[3]) * sy),
+    glViewport(vx + (GLint) (gx.vp[0] * sx), vy + (GLint) ((EFB_H - gx.vp[1] - gx.vp[3]) * sy),
                (GLsizei) (gx.vp[2] * sx), (GLsizei) (gx.vp[3] * sy));
     glDepthRange(gx.vp[4], gx.vp[5]);
     glEnable(GL_SCISSOR_TEST);
-    glScissor((GLint) (gx.scissor[0] * sx), (GLint) ((EFB_H - (int) gx.scissor[1] - (int) gx.scissor[3]) * sy),
+    glScissor(vx + (GLint) (gx.scissor[0] * sx),
+              vy + (GLint) ((EFB_H - (int) gx.scissor[1] - (int) gx.scissor[3]) * sy),
               (GLsizei) (gx.scissor[2] * sx), (GLsizei) (gx.scissor[3] * sy));
 
     if (gx.cull == GX_CULL_NONE || debug_nocull) {
@@ -2148,6 +2149,33 @@ void GXLoadTlut(GXTlutObj* tlut_obj, u32 tlut_name)
 
 void GXInvalidateTexAll(void) {}
 
+/// Drops cached uploads of textures whose image lies in [addr, addr+bytes):
+/// the game rewrites some textures in place (movie frames, EFB copies) and
+/// announces it with a data-cache store or flush.
+void pc_gx_texture_changed(const void* addr, u32 bytes)
+{
+    const u8* lo = (const u8*) addr;
+    const u8* hi = lo + bytes;
+    u32 i;
+    for (i = 0; i < TEX_CACHE; i++) {
+        const u8* img = (const u8*) tex_cache[i].image;
+        if (tex_cache[i].tex != 0 && img >= lo && img < hi) {
+            glDeleteTextures(1, &tex_cache[i].tex);
+            memset(&tex_cache[i], 0, sizeof(TexEntry));
+        }
+    }
+}
+
+void DCStoreRange(void* addr, u32 nBytes)
+{
+    pc_gx_texture_changed(addr, nBytes);
+}
+
+void DCFlushRange(void* addr, u32 nBytes)
+{
+    pc_gx_texture_changed(addr, nBytes);
+}
+
 /* --- Frame buffer copies --------------------------------------------------- */
 
 static void do_clear(void)
@@ -2275,13 +2303,16 @@ void GXCopyTex(void* dest, GXBool clear)
     e->dest = dest;
     e->width = tex_copy.wd;
     e->height = tex_copy.ht;
-    pc_window_size(&ww, &wh);
-    sx = (float) ww / EFB_W;
-    sy = (float) wh / EFB_H;
-    glBindTexture(GL_TEXTURE_2D, e->tex);
-    glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (GLint) (tex_copy.left * sx),
-                     (GLint) ((EFB_H - tex_copy.top - tex_copy.ht) * sy), (GLsizei) (tex_copy.wd * sx),
-                     (GLsizei) (tex_copy.ht * sy), 0);
+    {
+        int vx, vy, vw, vh;
+        pc_window_viewport(&vx, &vy, &vw, &vh);
+        sx = (float) vw / EFB_W;
+        sy = (float) vh / EFB_H;
+        glBindTexture(GL_TEXTURE_2D, e->tex);
+        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, vx + (GLint) (tex_copy.left * sx),
+                         vy + (GLint) ((EFB_H - tex_copy.top - tex_copy.ht) * sy), (GLsizei) (tex_copy.wd * sx),
+                         (GLsizei) (tex_copy.ht * sy), 0);
+    }
     if (clear) {
         do_clear();
     }

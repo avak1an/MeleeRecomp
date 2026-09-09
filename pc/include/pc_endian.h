@@ -68,6 +68,19 @@ static __inline void pc_swap32_range(void* p, size_t bytes)
     }
 }
 
+/// Exchange the 16-bit halves of every 32-bit word in [p, p + bytes).
+/// Applied after pc_swap32_range() this turns a big-endian run of 16-bit
+/// values into host order (used for AX parameter blocks inside sound data
+/// that the game otherwise reads 32 bits at a time).
+static __inline void pc_rotate32_range(void* p, size_t bytes)
+{
+    uint32_t* v = (uint32_t*) p;
+    size_t n = bytes / 4, i;
+    for (i = 0; i < n; i++) {
+        v[i] = (v[i] << 16) | (v[i] >> 16);
+    }
+}
+
 /// Swap a float in place (same bytes as a 32-bit swap).
 #define pc_swapf(p) pc_swap32(p)
 

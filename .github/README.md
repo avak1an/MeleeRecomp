@@ -20,6 +20,34 @@ Super Smash Bros Melee \
 
 This repo contains a WIP decompilation of Super Smash Bros Melee (US).
 
+# About this fork: MeleeRecomp
+
+This repository is a copy of [doldecomp/melee](https://github.com/doldecomp/melee)
+with one addition: a **native Windows port** of the game built from the
+decompiled sources. Everything below this section is the upstream decomp's
+own README, kept as is so the GameCube build keeps working.
+
+The port lives entirely in the [`pc/`](../pc) directory and is documented in
+[`pc/README.md`](../pc/README.md): status by milestone, how to build and run,
+the command-line options, what the renderer and the audio mixer cover, and
+the known gaps. In short:
+
+- The game and engine sources in `src/` are shared with the GameCube build
+  and stay byte-for-byte compatible with it; PC-specific code sits behind
+  `TARGET_PC`.
+- `pc/build.cmd` produces `build/pc/melee.exe`, a 32-bit Windows binary that
+  reads its files straight from a `GALE01` disc image. It needs Visual
+  Studio with the C++ and Clang components, and a completed GameCube build
+  (the `configure.py` + `ninja` steps below) because some tables are
+  extracted from the original DOL.
+- The executable plays the game with rendering, sound, movies, memory-card
+  saves on disk, XInput or keyboard controls, and a set of options for
+  window size, full screen, key layout and volume.
+
+To get started with the port, follow "Dependencies" and "Building" below
+for the GameCube build first, then read the "Building" and "Running"
+sections of [`pc/README.md`](../pc/README.md).
+
 > [!TIP]
 > The DOL this repository builds can be shifted! Meaning you are able to now add and remove code as you see fit, for modding or research purposes.
 

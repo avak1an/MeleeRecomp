@@ -839,11 +839,12 @@ void AXDriver_8038DA70(const char* path, void (*callback)(void))
     DVDClose(&fileInfo);
 
 #ifdef TARGET_PC
-    /* .sem header: four big-endian tables, each a 32-bit count followed by
-     * that many 32-bit words. The command streams after them are decoded
-     * byte-wise by the driver and are left as-is. */
+    /* .sem file: four big-endian tables, each a 32-bit count followed by
+     * that many 32-bit words, then the command streams, which the driver
+     * reads as 32-bit words (AXDriver_8038C6C0). */
     {
         u32* w = (u32*) AXDriver_804D7798;
+        u8* end = (u8*) AXDriver_804D7798 + (AXDriver_804D779C & ~3u);
         int t;
         for (t = 0; t < 4; t++) {
             u32 n;
@@ -851,6 +852,9 @@ void AXDriver_8038DA70(const char* path, void (*callback)(void))
             n = *w++;
             pc_swap32_range(w, n * 4);
             w += n;
+        }
+        if ((u8*) w < end) {
+            pc_swap32_range(w, end - (u8*) w);
         }
     }
 #endif

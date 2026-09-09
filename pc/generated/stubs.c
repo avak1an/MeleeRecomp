@@ -2,11 +2,8 @@
 /* clang-format off */
 #include "pc_runtime.h"
 
-#include <dolphin/ai.h>
-#include <dolphin/ax.h>
 #include <dolphin/axfx.h>
 #include <dolphin/base/PPCArch.h>
-#include <dolphin/card.h>
 #include <dolphin/db.h>
 #include <dolphin/mcc.h>
 #include <dolphin/mtx.h>
@@ -17,29 +14,8 @@
 #include <dolphin/os/OSResetSW.h>
 #include <dolphin/os/OSRtc.h>
 #include <dolphin/os/OSThread.h>
-#include <dolphin/thp/thp.h>
 
 #define STUB(name) pc_stub_hit(#name)
-
-void AIInit(u8 *stack)
-{
-    STUB(AIInit);
-}
-
-void AISetDSPSampleRate(u32 rate)
-{
-    STUB(AISetDSPSampleRate);
-}
-
-void AISetStreamVolLeft(u8 vol)
-{
-    STUB(AISetStreamVolLeft);
-}
-
-void AISetStreamVolRight(u8 vol)
-{
-    STUB(AISetStreamVolRight);
-}
 
 void AXFXChorusCallback(struct AXFX_BUFFERUPDATE* bufferUpdate, struct AXFX_CHORUS* chorus)
 {
@@ -109,122 +85,15 @@ int AXFXReverbStdShutdown(struct AXFX_REVERBSTD* rev)
     { static int zero; return zero; }
 }
 
-void AXInit(void)
-{
-    STUB(AXInit);
-}
-
-void AXSetVoiceAddr(AXVPB* p, AXPBADDR* addr)
-{
-    STUB(AXSetVoiceAddr);
-}
-
-void AXSetVoiceAdpcm(AXVPB* p, AXPBADPCM* adpcm)
-{
-    STUB(AXSetVoiceAdpcm);
-}
-
-void AXSetVoiceAdpcmLoop(AXVPB* p, AXPBADPCMLOOP* adpcmloop)
-{
-    STUB(AXSetVoiceAdpcmLoop);
-}
-
-void AXSetVoiceCurrentAddr(AXVPB* p, u32 addr)
-{
-    STUB(AXSetVoiceCurrentAddr);
-}
-
-void AXSetVoiceEndAddr(AXVPB* p, u32 addr)
-{
-    STUB(AXSetVoiceEndAddr);
-}
-
-void AXSetVoiceItdOn(AXVPB* p)
-{
-    STUB(AXSetVoiceItdOn);
-}
-
-void AXSetVoiceItdTarget(AXVPB* p, u16 lShift, u16 rShift)
-{
-    STUB(AXSetVoiceItdTarget);
-}
-
-void AXSetVoiceLoop(AXVPB* p, u16 loop)
-{
-    STUB(AXSetVoiceLoop);
-}
-
-void AXSetVoiceLoopAddr(AXVPB* p, u32 addr)
-{
-    STUB(AXSetVoiceLoopAddr);
-}
-
-void AXSetVoiceMix(AXVPB* p, AXPBMIX* mix)
-{
-    STUB(AXSetVoiceMix);
-}
-
-void AXSetVoicePriority(AXVPB* p, u32 priority)
-{
-    STUB(AXSetVoicePriority);
-}
-
-void AXSetVoiceSrc(AXVPB* p, AXPBSRC* src_)
-{
-    STUB(AXSetVoiceSrc);
-}
-
-void AXSetVoiceSrcRatio(AXVPB* p, float ratio)
-{
-    STUB(AXSetVoiceSrcRatio);
-}
-
-void AXSetVoiceState(AXVPB* p, u16 state)
-{
-    STUB(AXSetVoiceState);
-}
-
-void AXSetVoiceVe(AXVPB* p, AXPBVE* ve)
-{
-    STUB(AXSetVoiceVe);
-}
-
-void AXSetVoiceVeDelta(AXVPB* p, s16 delta)
-{
-    STUB(AXSetVoiceVeDelta);
-}
-
-s32 CARDFormatAsync(s32 chan, CARDCallback callback)
-{
-    STUB(CARDFormatAsync);
-    { static s32 zero; return zero; }
-}
-
-s32 CARDRenameAsync(s32 chan, const char* oldName, const char* newName, CARDCallback callback)
-{
-    STUB(CARDRenameAsync);
-    { static s32 zero; return zero; }
-}
-
 BOOL DBIsDebuggerPresent(void)
 {
     STUB(DBIsDebuggerPresent);
     { static BOOL zero; return zero; }
 }
 
-void DCFlushRange(void* addr, u32 nBytes)
-{
-    STUB(DCFlushRange);
-}
-
 void DCInvalidateRange(void* addr, u32 nBytes)
 {
     STUB(DCInvalidateRange);
-}
-
-void DCStoreRange(void* addr, u32 nBytes)
-{
-    STUB(DCStoreRange);
 }
 
 void FIOExit(void)
@@ -433,37 +302,4 @@ u32 PPCMfmsr(void)
 void PPCMtmsr(u32 newMSR)
 {
     STUB(PPCMtmsr);
-}
-
-s32 THPDec_8032F8D4(u8* data, THPDec_8032FD40_Data* out)
-{
-    STUB(THPDec_8032F8D4);
-    { static s32 zero; return zero; }
-}
-
-s32 THPDec_8032FD40(THPDec_8032FD40_Data* arg0, u16 arg1)
-{
-    STUB(THPDec_8032FD40);
-    { static s32 zero; return zero; }
-}
-
-void THPDec_80331340(s32 _p0, void* _p1, void* _p2, void* _p3)
-{
-    STUB(THPDec_80331340);
-}
-
-void THPDec_803313D0(s32 _p0, void* _p1, void* _p2, void* _p3, u32 _p4)
-{
-    STUB(THPDec_803313D0);
-}
-
-void THPInit(void)
-{
-    STUB(THPInit);
-}
-
-s32 THPVideoDecode(void* file, void* tileY, void* tileU, void* tileV, void* work)
-{
-    STUB(THPVideoDecode);
-    { static s32 zero; return zero; }
 }

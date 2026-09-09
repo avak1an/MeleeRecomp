@@ -39,6 +39,38 @@ static HGLRC hglrc;
 static int ready;
 static int closed;
 static int win_w, win_h;
+static int fullscreen;
+static RECT windowed_rect; /* window rectangle to restore after full screen */
+
+/// Switches between the bordered window and a borderless window covering
+/// the monitor (the GL context and swap chain are unaffected).
+void pc_window_set_fullscreen(int on)
+{
+    if (hwnd == NULL || on == fullscreen) {
+        return;
+    }
+    if (on) {
+        MONITORINFO mi;
+        mi.cbSize = sizeof(mi);
+        GetWindowRect(hwnd, &windowed_rect);
+        GetMonitorInfoA(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi);
+        SetWindowLongA(hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+        SetWindowPos(hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+                     mi.rcMonitor.right - mi.rcMonitor.left, mi.rcMonitor.bottom - mi.rcMonitor.top,
+                     SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+    } else {
+        SetWindowLongA(hwnd, GWL_STYLE, WS_OVERLAPPEDWINDOW | WS_VISIBLE);
+        SetWindowPos(hwnd, NULL, windowed_rect.left, windowed_rect.top,
+                     windowed_rect.right - windowed_rect.left, windowed_rect.bottom - windowed_rect.top,
+                     SWP_FRAMECHANGED | SWP_NOZORDER | SWP_SHOWWINDOW);
+    }
+    fullscreen = on;
+}
+
+int pc_window_is_fullscreen(void)
+{
+    return fullscreen;
+}
 
 static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 {
@@ -53,8 +85,21 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
     case WM_KEYDOWN:
         if (wp == VK_ESCAPE) {
             closed = 1;
+        } else if (wp == VK_F11) {
+            pc_window_set_fullscreen(!fullscreen);
         }
         return 0;
+    case WM_SYSKEYDOWN:
+        if (wp == VK_RETURN && (lp & (1 << 29))) { /* Alt+Enter */
+            pc_window_set_fullscreen(!fullscreen);
+            return 0;
+        }
+        break;
+    case WM_SYSCHAR:
+        if (wp == VK_RETURN) {
+            return 0; /* no beep for Alt+Enter */
+        }
+        break;
     }
     return DefWindowProcA(h, msg, wp, lp);
 }
@@ -90,6 +135,10 @@ int pc_window_open(int width, int height, const char* title)
     wc.lpszClassName = "MeleePC";
     RegisterClassA(&wc);
 
+    if (pc_config.scale > 1) {
+        width *= pc_config.scale;
+        height *= pc_config.scale;
+    }
     r.left = 0;
     r.top = 0;
     r.right = width;
@@ -105,6 +154,9 @@ int pc_window_open(int width, int height, const char* title)
     win_w = width;
     win_h = height;
     hdc = GetDC(hwnd);
+    if (pc_config.fullscreen) {
+        pc_window_set_fullscreen(1);
+    }
 
     memset(&pfd, 0, sizeof(pfd));
     pfd.nSize = sizeof(pfd);
@@ -179,9 +231,36 @@ int pc_window_pump(void)
 
 void pc_window_present(void)
 {
-    if (ready) {
-        SwapBuffers(hdc);
+    int x, y, w, h;
+    if (!ready) {
+        return;
     }
+    SwapBuffers(hdc);
+    pc_window_viewport(&x, &y, &w, &h);
+    if (w != win_w || h != win_h) {
+        /* the frame is letterboxed: keep the bars black */
+        glPushAttrib(GL_SCISSOR_BIT | GL_COLOR_BUFFER_BIT);
+        glDisable(GL_SCISSOR_TEST);
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glPopAttrib();
+    }
+}
+
+/// The largest 4:3 rectangle centred in the window: where the frame goes.
+void pc_window_viewport(int* x, int* y, int* w, int* h)
+{
+    int ww = win_w > 0 ? win_w : 1, wh = win_h > 0 ? win_h : 1;
+    if (ww * 3 >= wh * 4) {
+        *h = wh;
+        *w = wh * 4 / 3;
+    } else {
+        *w = ww;
+        *h = ww * 3 / 4;
+    }
+    *x = (ww - *w) / 2;
+    *y = (wh - *h) / 2;
 }
 
 void pc_window_size(int* width, int* height)

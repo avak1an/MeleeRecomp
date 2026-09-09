@@ -14,6 +14,8 @@
 #include <stdio.h>
 #include <windows.h>
 
+extern void pc_ax_frame(void);
+
 static VIRetraceCallback pre_cb;
 static VIRetraceCallback post_cb;
 static u32 retrace_count;
@@ -123,6 +125,7 @@ void VIWaitForRetrace(void)
         post_cb(retrace_count);
     }
     pc_pump();
+    pc_ax_frame();
     if (pc_config.max_frames > 0 && pc_frame_count >= (u32) pc_config.max_frames) {
         pc_exit(0);
     }
