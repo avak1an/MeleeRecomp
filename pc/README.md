@@ -45,21 +45,34 @@ so progress persists between runs; the window can go full screen or start
 at an integer scale, the keyboard layout is remappable and the volume is
 adjustable. See "Running" for the options.
 
+**Milestone 5 (mods, launcher, coverage) - done.** Files in a mod folder
+replace the disc's (`mods\<name>\files\...`, the layout `--extract`
+writes); `melee-launcher.exe`, a plain Windows program built next to the
+game, holds every setting, extracts the disc and manages mods; the
+renderer gained fog and mipmapping; the remaining stage parameter blocks
+are swapped and the demo route was pushed through more stages, which
+found and fixed two compiler-layout differences (bit-field packing) and
+one more adjacent-globals case (Mute City).
+
 Planned milestones:
 
-5. **Coverage and mods.** The stages and modes the demo route does not
-   reach (parameter blocks still unswapped), the remaining renderer
-   features (fog, indirect texturing, mipmaps, destination alpha), a
-   loose-file override so files in an extracted folder take precedence
-   over the disc image.
+6. **Play-through coverage.** Scripted routes through the modes the
+   attract demo never shows (1-P modes, Target Test, Home-Run Contest,
+   the trophy scenes), indirect texturing and destination alpha in the
+   renderer, save files convertible to and from real memory-card dumps.
 
 ## Building (Windows)
 
 Requirements: Visual Studio 2022 or newer with the C++ workload and the
 "C++ Clang tools for Windows" component (the build uses VS's bundled CMake
-and Ninja if none are on `PATH`), and a completed GameCube build
-(`configure.py` + `ninja` at the repository root) because the font tables
-in `build/GALE01/include` are extracted from the original DOL.
+and Ninja if none are on `PATH`), and the game's disc image. Two sources
+include byte tables of the font atlases that live in the original
+`main.dol`; `pc\build.cmd` finds the image (`MELEE_ISO`, or `GALE01.iso`
+in the repository, its parent directory, or `build\pc`) and a small host
+tool, `pc/tools/extract_fonts.c`, pulls the tables out of it during the
+build (byte-identical to what the GameCube build's `configure.py` +
+`ninja` would extract, which remains an alternative). The launcher's
+"Build the game" button runs the same script.
 
 ```
 pc\build.cmd          configure and build with clang-cl  -> build\pc
@@ -82,7 +95,8 @@ build\pc\melee.exe [--iso PATH] [--fullscreen] [--scale N] [--keymap FILE] [--vo
 ```
 
 Run from anywhere; with the disc image next to `melee.exe` (or in the
-current or parent directory) no option is needed.
+current or parent directory) no option is needed. `melee-launcher.exe`
+next to it offers the same options in a window (see "Launcher").
 
 A typical check that a change did not break the match:
 
@@ -110,6 +124,9 @@ backtrace and a hang is reported by the watchdog (status 8).
   `MELEE_NO_AUDIO=1`) does not open the audio device at all.
 - `--saves DIR`: where the memory-card files live (default: a `saves`
   directory next to `melee.exe`, created on the first save).
+- `--mod DIR`: use the files under `DIR` (or `DIR\files`) instead of the
+  disc's; repeatable, the first given wins. Without it the mods listed in
+  `mods\enabled.txt` next to the executable are used (see "Mods").
 - `--autoplay`: tap Start and A on port 1 every 150 frames, which pushes a
   headless run through prompts and menus.
 - `--input FILE`: scripted controller input for port 1. Each line is
@@ -146,6 +163,40 @@ played through waveOut. Sound is generated in unpaced and headless runs
 too, so `MELEE_AUDIO_DUMP=out.wav` records what a scripted run would have
 played.
 
+Mods: a mod is a folder holding the files it replaces in the disc's own
+layout, `MyMod\files\GrCn.dat`, `MyMod\files\audio\us\...` and so on.
+Every disc file that exists in the folder is read from there, with the
+folder's file size; files the disc does not have cannot be added, because
+the game finds files through the disc's table. Replacement archives must
+be well-formed (the game checks an archive's size against its header).
+`mods\enabled.txt` next to `melee.exe` lists the active mods, highest
+priority first, one folder name (or full path) per line; the launcher
+maintains it. `MELEE_TRACE_DVD=1` logs every file open and read with its
+source. To make a mod, extract the disc (`--extract DIR` or the launcher's
+button), copy the files you want to change into a new folder under
+`mods\`, edit them, and enable the folder.
+
+Launcher: `melee-launcher.exe` is built alongside the game and needs
+nothing else; each build also copies it to `pc/dist`, where it is
+committed so a fresh clone can start from the launcher (it links the C
+runtime statically and contains nothing from the game; see
+`pc/dist/README.md`). It picks the disc image (checks it is GALE01, and on
+request hashes it: the whole image against the SHA-1 of the v1.02 disc
+the decompilation targets, `d4e70c06...`, and its `main.dol` against the
+README's `08e0bf20...`, so a differently dumped or modified image is told
+apart from a wrong revision), window
+size or full screen, volume and mute, the keyboard layout file (with a
+button that writes the default layout and opens it for editing), the
+saves folder, the mod list (checkboxes for enabled, buttons for priority),
+extracts the disc's files, and starts the game with the matching options.
+Settings persist in `launcher.ini` next to it; an "extra options" box
+passes anything else through. Its "Build from source" section points at a
+checkout of this repository (the launcher's own, two levels up from
+`build\pc`, by default), reports whether Visual Studio with the C++
+workload is installed, and builds the game from the chosen disc image in a
+console window; afterwards it runs the `melee.exe` it built, so the
+launcher alone plus a checkout and a disc is a complete setup.
+
 Saves: slot A is a virtual 64 Mbit memory card whose files are
 `<name>.sav` in the saves directory: a 96-byte header (the directory
 entry: name, size, timestamp, icon and comment locations) followed by the
@@ -174,9 +225,10 @@ copies use a framebuffer copy. GX clip-space depth [-w, 0] is remapped to GL's [
 in the vertex shader; viewport and scissor are flipped from the console's
 top-left origin.
 
-Not done yet: fog, indirect texturing, Z textures, destination alpha,
-mipmaps and LOD bias, GX line/point texture offsets, dithering. These
-matter in-game more than in the menus.
+Fog is applied from eye distance with the console's four curve types;
+mip levels are generated from level 0 for textures that ask for them.
+Not done yet: indirect texturing, Z textures, destination alpha, LOD
+bias, GX line/point texture offsets, dithering.
 
 Debugging: `MELEE_GX_DEBUG=1` logs the first draws of the run (vertex
 descriptor, first vertex in view and clip space, TEV/texture state, the
@@ -217,7 +269,8 @@ BACKSLASH RBRACKET QUOTE`. Actions not mentioned keep their default.
   alpha test; `MELEE_GX_LOG_FRAME=N` logs every draw of frame N with its
   state and first vertex (draws issued while a fighter model is displayed
   are tagged, and each screenshot line reports how many).
-- `--watch 0xADDR` reports every swap helper that touches the word at ADDR
+- `--watch 0xADDR` (or `--watch symbol`, `--watch symbol+0x1c`, resolved
+  through the debug symbols) reports every swap helper that touches the word at ADDR
   and every change of it seen at descriptor swaps, GObj processes and
   render callbacks, naming the callback before and after. The binary is
   linked with `/DYNAMICBASE:NO` so static addresses are the same from run
@@ -256,7 +309,7 @@ BACKSLASH RBRACKET QUOTE`. Actions not mentioned keep their default.
 | `src/main.c` | Process entry point and options; calls the game's `main()` (compiled as `melee_main`). |
 | `src/runtime.c` | OS core: 24 MB arena at the console's address, `OSReport`/`OSPanic`, timers, alarms, the completion pump, crash handler and backtraces. |
 | `src/vi.c` | Frame boundary: retrace callbacks, pacing, frame limit. |
-| `src/dvd.c` | Disc image access with the SDK's FST lookup; reads complete from the pump. |
+| `src/dvd.c` | Disc image access with the SDK's FST lookup, loose-file overrides for mods, extraction; reads complete from the pump. |
 | `src/aram.c` | 16 MB auxiliary RAM and its DMA request queue. |
 | `src/gx.c` | Fifo object, draw-done notification, texture/palette objects, texture buffer sizes. |
 | `src/gx_render.c` | The GX-on-OpenGL renderer: state, vertex decoding, transform and lighting, texture decoding, TEV shader generation, frame copies. |
@@ -266,6 +319,9 @@ BACKSLASH RBRACKET QUOTE`. Actions not mentioned keep their default.
 | `src/card.c` | Memory card: a directory of save files, with the SDK's asynchronous completion semantics. |
 | `src/ax.c` | The AX sound driver: voice pool with priority stealing, ADPCM/PCM decoding from ARAM, sample-rate conversion, volume ramps, waveOut output, the AI interface. |
 | `src/thp.c` | THP movie decoder (baseline JPEG without byte stuffing) writing GX-tiled Y/U/V planes. |
+| `launcher/launcher.c` | The Win32 launcher: settings window, disc verification, disc extraction, mod list, build from source, Play. |
+| `dist/melee-launcher.exe` | The committed launcher build (copied there by every build; `dist/.gitignore` un-ignores it). |
+| `tools/extract_fonts.c` | Build-time host tool: the font atlas byte tables from the disc image's `main.dol`. |
 | `src/hsd_swap.c` | Byte-swapping of HSD descriptors (see below). |
 | `src/mtx.c`, `src/sdk_extra.c` | Matrix library; render-mode tables, thread stub, Metrowerks runtime helpers. |
 | `src/trace.c` | Function-entry ring buffer and return-address check (`MELEE_TRACE_FUNCS`). |
@@ -369,6 +425,24 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   game spins on it while a request is in flight); the command queue
   `hsd_804D2348` is addressed as `hsd_804D1138 + 0x1210`, so it is part of
   the same block.
+- Bit-field packing: Metrowerks places plain bytes that follow a group of
+  `u32` bit-fields inside the bit-fields' 32-bit unit, MSVC starts a new
+  unit. `mn/types.h` (`StartMeleeRules`, 48 bits then bytes) and
+  `if/ifstatus.c` (`FlagsX`) declare those bit-fields byte-sized on PC,
+  which restores the console offsets; `gm/types.h` packs the tournament
+  menu entries on PC as the matching build does. All the settings-struct
+  size asserts are active again. `pc/tools/scan_bitfields.py` finds this
+  pattern.
+- `grmutecity.c`: the car index array, the car array and the word before
+  them are one block (`PC_ADJACENT`), because a sort reads one entry
+  before the array and another routine views both arrays as one struct.
+- `it_26B1.c`: the articles a fighter registers for its own items (PK
+  Fire, ...) come from its Pl*.dat rather than the ItCo tables and are
+  swapped at registration; `ftData` x54, declared `int`, is a pointer to a
+  five-entry effect part table and is swapped as such.
+- `grlast.c`: the untyped parameter block is four material indices,
+  swapped on load; `grpstadium.c` got a generated swapper once the
+  generator learned `u8 r, g, b;` declarations.
 - Decomp quirks that only work on the console, each fixed under `TARGET_PC`:
   - `hsd_3A94.c`/`hsd_4D11.c`: three globals used as one contiguous buffer
     (`hsd_804D1138`/`hsd_804D1148`/`hsd_804D2348`) are one block on PC.
@@ -434,11 +508,13 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 
 ## Known gaps (deliberate, for later milestones)
 
-- Only the data the demo matches touch has been swapped. Stages whose
-  parameter block is typed `void*`/`int*` (Pokemon Stadium, Hyrule Temple,
-  the trophy and target-test stages), item-specific attribute blocks with
-  sub-word fields, and the remaining stage-specific tables are found the
-  same way: run a route, fix the first bad read.
+- Only the data the demo matches and the menus touch has been exercised
+  (the demo picks stages at random; sweeping seeds covers most of them).
+  The remaining untyped parameter blocks (`void*` in the target-test,
+  Home-Run and trophy stages, Temple, Poke Floats) are never dereferenced
+  by the decompiled code, so there is nothing to swap yet. Item-specific
+  attribute blocks with sub-word fields and mode-specific tables are found
+  the same way: run a route, fix the first bad read.
 - Particle lists occasionally end up with a corrupt link after item hit
   effects; the walker drops the rest of the list and logs
   `particle list ... is corrupt` instead of crashing. Root cause not found.
@@ -451,7 +527,5 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   save-data structs.
 - Four more "index past a global" idioms exist (`gm_19EF.c`, `soundtest.c`)
   that assume console link order.
-- The settings structs `gmm_x0`, `lbl_8046B6A0_t`, `TmData` differ in size
-  on PC (bit-field packing); nothing reads them from disc yet.
 - `char` signedness and paired-single float rounding are not matched.
 - Threads are stubs (the game creates none that matter on PC).

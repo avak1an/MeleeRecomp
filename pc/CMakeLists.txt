@@ -63,12 +63,40 @@ set_source_files_properties(${REPO}/src/melee/gm/gmmain.c
 # --- Include paths ----------------------------------------------------------
 # pc/include first so it can shadow headers; src/MSL is deliberately NOT on
 # the path: the game's <math.h>, <string.h> etc. resolve to the host CRT.
+# --- Font tables --------------------------------------------------------------
+# Two sources include byte tables of the game's font atlases. The GameCube
+# build extracts them from the original DOL into build/GALE01/include; with
+# MELEE_ISO set (pc/build.cmd finds the disc image) a small host tool pulls
+# the same bytes straight out of the disc image, so the PC build stands alone.
+set(MELEE_ISO "" CACHE FILEPATH "GALE01 disc image to extract the font tables from")
+set(FONT_INCLUDE_DIR ${REPO}/build/${GAME_VERSION}/include)
+if(MELEE_ISO)
+    add_executable(melee-extract-fonts ${CMAKE_CURRENT_SOURCE_DIR}/tools/extract_fonts.c)
+    target_compile_options(melee-extract-fonts PRIVATE /D_CRT_SECURE_NO_WARNINGS)
+    set(FONT_INCLUDE_DIR ${CMAKE_BINARY_DIR}/include)
+    add_custom_command(
+        OUTPUT ${FONT_INCLUDE_DIR}/sysdolphin/baselib/sislib_font.inc
+               ${FONT_INCLUDE_DIR}/sysdolphin/baselib/debug_font.inc
+        COMMAND melee-extract-fonts "${MELEE_ISO}" "${FONT_INCLUDE_DIR}"
+        DEPENDS melee-extract-fonts "${MELEE_ISO}"
+        COMMENT "Extracting the font tables from ${MELEE_ISO}")
+    add_custom_target(melee-fonts DEPENDS
+        ${FONT_INCLUDE_DIR}/sysdolphin/baselib/sislib_font.inc
+        ${FONT_INCLUDE_DIR}/sysdolphin/baselib/debug_font.inc)
+    add_dependencies(melee melee-fonts)
+elseif(NOT EXISTS ${FONT_INCLUDE_DIR}/sysdolphin/baselib/sislib_font.inc)
+    message(FATAL_ERROR
+        "The font tables are missing. Either pass -DMELEE_ISO=<path to GALE01.iso> "
+        "(pc/build.cmd does this when it finds the disc image) or run the GameCube "
+        "build first (configure.py + ninja at the repository root).")
+endif()
+
 target_include_directories(melee PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${REPO}/src
     ${REPO}/extern/dolphin/include
-    ${REPO}/build/${GAME_VERSION}/include  # font tables extracted by configure.py
+    ${FONT_INCLUDE_DIR}
 )
 
 # --- Compiler flags ---------------------------------------------------------
@@ -158,5 +186,24 @@ endif()
 target_link_options(melee PRIVATE /SUBSYSTEM:CONSOLE /STACK:0x400000 /LARGEADDRESSAWARE /DYNAMICBASE:NO)
 target_link_libraries(melee PRIVATE dbghelp xinput9_1_0 winmm opengl32 gdi32 user32)
 set_target_properties(melee PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    C_STANDARD 11)
+
+# --- Launcher ---------------------------------------------------------------
+# A plain Win32 window next to melee.exe: disc, display, audio, keyboard,
+# saves and mod settings, disc extraction, and a Play button.
+add_executable(melee-launcher WIN32 ${CMAKE_CURRENT_SOURCE_DIR}/launcher/launcher.c)
+target_compile_options(melee-launcher PRIVATE /W3 /O2 /D_CRT_SECURE_NO_WARNINGS)
+# The launcher binary is committed (pc/dist) and runs on machines without a
+# development setup: static release C runtime, no debug CRT dependency.
+set_property(TARGET melee-launcher PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
+add_custom_command(TARGET melee-launcher POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:melee-launcher>
+            ${CMAKE_CURRENT_SOURCE_DIR}/dist/melee-launcher.exe
+    COMMENT "Copying the launcher to pc/dist")
+target_link_libraries(melee-launcher PRIVATE comctl32 comdlg32 shell32 ole32 user32 gdi32 advapi32)
+target_link_options(melee-launcher PRIVATE
+    "/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'")
+set_target_properties(melee-launcher PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     C_STANDARD 11)

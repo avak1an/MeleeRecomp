@@ -26,6 +26,22 @@
 #include <sysdolphin/baselib/random.h>
 #include <sysdolphin/baselib/tobj.h>
 
+#ifdef TARGET_PC
+/* MWCC places the u8 and u16 inside the bit-fields' 32-bit unit (4 bytes
+ * total); MSVC would start a new unit (8 bytes). Byte-sized bit-fields give
+ * the console layout. */
+typedef struct FlagsX {
+    u8 b80 : 1;
+    u8 b40 : 1;
+    u8 b20 : 1;
+    u8 b10 : 1;
+    u8 b8 : 1;
+    u8 b4 : 2;
+    u8 b1 : 1;
+    u8 x;
+    u16 y;
+} FlagsX;
+#else
 typedef struct FlagsX {
     u32 b80 : 1;
     u32 b40 : 1;
@@ -37,6 +53,7 @@ typedef struct FlagsX {
     u8 x;
     u16 y;
 } FlagsX;
+#endif
 
 typedef struct UnkX {
     u8 filler1[0x10];
@@ -46,6 +63,8 @@ typedef struct UnkX {
     Vec4 x44_vec;
     HSD_JObj* x54_jobj[4];
 } UnkX; // HudIndex
+ASSERT_SIZE(FlagsX, 4);
+ASSERT_OFFSET(UnkX, x54_jobj, 0x54);
 
 /* 2F491C */ static void ifStatus_PercentOnDeathAnimationThink(UnkX* value,
                                                                s32, s32);

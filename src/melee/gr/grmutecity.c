@@ -39,7 +39,13 @@ typedef void (*grMc_SpeedFn)(Item_GObj*, Ground*, Vec3*, HSD_GObj*, f32);
 
 const Vec3 grMc_803B81B8 = { 0.0f, 0.0f, 0.0f };
 
-static s32 grMc_8049F440[30];
+#ifdef TARGET_PC
+/* grMuteCity_801F106C views this array and grMc_8049F4B8 as one struct, and
+ * the sort in grMuteCity_801F1328 reads the word before it; keep the three
+ * adjacent and in order (see PC_ADJACENT). */
+static s32 PC_ADJACENT(g) grMc_pc_before[1];
+#endif
+static s32 PC_ADJACENT(h) grMc_8049F440[30];
 
 #include "grmutecity.static.h"
 
@@ -369,6 +375,14 @@ void grMuteCity_801EFC6C(void)
     yakumono_param = Ground_GetYakumonoParam();
 #ifdef TARGET_PC
     pc_swap_yakumono_grmutecity(yakumono_param);
+    if ((u8*) grMc_8049F4B8 - (u8*) grMc_8049F440 != sizeof(grMc_8049F440) ||
+        (u8*) grMc_8049F440 - (u8*) grMc_pc_before != sizeof(grMc_pc_before))
+    {
+        OSPanic(__FILE__, __LINE__, "Mute City car arrays are not adjacent (%d, %d)",
+                (int) ((u8*) grMc_8049F4B8 - (u8*) grMc_8049F440),
+                (int) ((u8*) grMc_8049F440 - (u8*) grMc_pc_before));
+    }
+    grMc_pc_before[0] = 0;
 #endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 0;

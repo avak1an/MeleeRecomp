@@ -89,6 +89,12 @@ def layout_of_body(body, name, texts, cache, path):
         line = raw.split('//')[0]
         if not line.strip():
             continue
+        # `u8 r, g, b;` declares several members of one type: expand them
+        cm_list = re.match(r'^(\s*(?:/\*.*?\*/\s*)?)(\w+)\s+(\w+(?:\s*,\s*\w+)+)\s*;\s*$', line)
+        if cm_list:
+            names = [n.strip() for n in cm_list.group(3).split(',')]
+            body[i:i] = ['%s%s %s;' % (cm_list.group(1), cm_list.group(2), n) for n in names[1:]]
+            line = '%s%s %s;' % (cm_list.group(1), cm_list.group(2), names[0])
         am = anon_open_re.match(line)
         if am:
             sub_body = []

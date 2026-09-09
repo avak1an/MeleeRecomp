@@ -207,6 +207,10 @@ int it_8026B3C0(ItemKind kind)
 /// Store Item article pointer to table
 void it_8026B3F8(Article* article, s32 kind)
 {
+#ifdef TARGET_PC
+    /* a fighter's own item (from its Pl*.dat), not part of the ItCo tables */
+    pc_swap_article(article);
+#endif
     it_804D6D38[kind - It_Kind_Kuriboh] = article;
 }
 

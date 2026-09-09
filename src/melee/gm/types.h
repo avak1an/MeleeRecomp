@@ -428,12 +428,8 @@ struct gmm_x0 {
 };
 ASSERT_SIZE(struct EventData, 0x588 - 0x530);
 ASSERT_SIZE(struct gmm_x0_vsdata, 0x588 - 0x51C);
-#ifndef TARGET_PC /* @todo PC layout differs (bit-field packing); see pc/README.md */
 ASSERT_SIZE(struct gmm_x0_vsmodes, 0x1850 - 0x588);
-#endif
-#ifndef TARGET_PC /* @todo PC layout differs (bit-field packing); see pc/README.md */
 ASSERT_SIZE(struct gmm_x0, 0x8518);
-#endif
 
 /// @todo ::MatchEnd
 struct lbl_8046B6A0_24C_t {
@@ -595,9 +591,7 @@ struct lbl_8046B6A0_t {
     /* 0x024C */ struct lbl_8046B6A0_24C_t x24C;
     /* 0x24C8 */ struct StartMeleeRules x24C8;
 }; /* size = 0x2528 */
-#ifndef TARGET_PC /* @todo PC layout differs (bit-field packing); see pc/README.md */
 ASSERT_SIZE(struct lbl_8046B6A0_t, 0x2528);
-#endif
 
 struct datetime {
     u16 year;
@@ -852,7 +846,7 @@ struct TmData {
     u8 x32;
     u8 x33;
     u8 pad_x34[0x37 - 0x34];
-#if defined(MUST_MATCH) || defined(LINT)
+#if defined(MUST_MATCH) || defined(LINT) || defined(TARGET_PC)
 #pragma pack(push, 1)
 #endif
     struct TmUnkMenuData {
@@ -873,7 +867,7 @@ struct TmData {
         u8 xF;
         u8 pad_X10[0x12 - 0x10];
     } x37[64];
-#if defined(MUST_MATCH) || defined(LINT)
+#if defined(MUST_MATCH) || defined(LINT) || defined(TARGET_PC)
 #pragma pack(pop)
 #endif
     u8 pad_x4B7[0x4B8 - 0x4B7];
@@ -896,9 +890,7 @@ struct TmData {
     HSD_Text* x534[3];
     u8 pad_x540[0x574 - 0x540];
 };
-#ifndef TARGET_PC /* @todo PC layout differs (bit-field packing); see pc/README.md */
 ASSERT_SIZE(struct TmData, 0x574);
-#endif
 
 struct NameData {
     // a lot of this is shared with a struct for character stats as well

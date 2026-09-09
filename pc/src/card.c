@@ -126,18 +126,7 @@ static const char* save_dir(void)
         return pc_config.save_dir;
     }
     if (dir[0] == '\0') {
-        char exe[MAX_PATH];
-        char* slash;
-        DWORD n = GetModuleFileNameA(NULL, exe, sizeof(exe));
-        if (n == 0 || n >= sizeof(exe)) {
-            strcpy(dir, "saves");
-            return dir;
-        }
-        slash = strrchr(exe, '\\');
-        if (slash != NULL) {
-            *slash = '\0';
-        }
-        snprintf(dir, sizeof(dir), "%s/saves", exe);
+        snprintf(dir, sizeof(dir), "%s/saves", pc_exe_dir());
     }
     return dir;
 }

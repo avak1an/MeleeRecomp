@@ -39,6 +39,9 @@ static void usage(void)
             "  --headless      no window; run the game logic only\n"
             "  --screenshots DIR  save a BMP of every 60th frame into DIR\n"
             "  --saves DIR     memory card files (default: saves next to the exe)\n"
+            "  --mod DIR       use the files under DIR (or DIR/files) instead of the disc's;\n"
+            "                  repeatable, the first given wins. Without it, the mods listed\n"
+            "                  in mods/enabled.txt next to the exe are used\n"
             "  --fullscreen    start full screen (F11 or Alt+Enter toggles)\n"
             "  --scale N       window size N x 640x480 (default 1)\n"
             "  --keymap FILE   keyboard layout: lines of ACTION = KEY (see pc/README.md)\n"
@@ -47,10 +50,47 @@ static void usage(void)
             "                  system files to DIR/sys), then exit\n");
 }
 
+/* mods/enabled.txt next to the executable: one mod per line, highest
+ * priority first; a name is a folder under mods/, or a full path. */
+static void load_enabled_mods(void)
+{
+    char path[1024];
+    char line[1024];
+    FILE* f;
+    snprintf(path, sizeof(path), "%s/mods/enabled.txt", pc_exe_dir());
+    f = fopen(path, "r");
+    if (f == NULL) {
+        return;
+    }
+    while (fgets(line, sizeof(line), f) != NULL) {
+        char* p = line;
+        char* end;
+        while (*p == ' ' || *p == '\t') {
+            p++;
+        }
+        end = p + strlen(p);
+        while (end > p && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n')) {
+            *--end = '\0';
+        }
+        if (*p == '\0' || *p == '#') {
+            continue;
+        }
+        if (p[1] == ':' || p[0] == '\\' || p[0] == '/') {
+            pc_dvd_add_mod(p);
+        } else {
+            char full[1024];
+            snprintf(full, sizeof(full), "%s/mods/%s", pc_exe_dir(), p);
+            pc_dvd_add_mod(full);
+        }
+    }
+    fclose(f);
+}
+
 int main(int argc, char** argv)
 {
     int i;
     const char* extract_dir = NULL;
+    bool mods_given = false;
     pc_config.max_frames = 0;
     pc_config.log_stubs = true;
     pc_config.volume = 100;
@@ -72,7 +112,15 @@ int main(int argc, char** argv)
         } else if (strcmp(argv[i], "--input") == 0 && i + 1 < argc) {
             pc_config.input_script = argv[++i];
         } else if (strcmp(argv[i], "--watch") == 0 && i + 1 < argc) {
-            pc_debug_watch = (const unsigned int*) (uintptr_t) strtoul(argv[++i], NULL, 0);
+            const char* spec = argv[++i];
+            uintptr_t addr = (spec[0] >= '0' && spec[0] <= '9') ? (uintptr_t) strtoul(spec, NULL, 0)
+                                                                : pc_symbol_address(spec);
+            if (addr == 0) {
+                fprintf(stderr, "[pc] --watch: cannot resolve %s\n", spec);
+                return 2;
+            }
+            fprintf(stderr, "[pc] watching %s at %p\n", spec, (void*) addr);
+            pc_debug_watch = (const unsigned int*) addr;
             pc_debug_watch_install();
         } else if (strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
             pc_config.seed = (unsigned) strtoul(argv[++i], NULL, 0);
@@ -85,6 +133,9 @@ int main(int argc, char** argv)
             pc_config.screenshot_dir = argv[++i];
         } else if (strcmp(argv[i], "--saves") == 0 && i + 1 < argc) {
             pc_config.save_dir = argv[++i];
+        } else if (strcmp(argv[i], "--mod") == 0 && i + 1 < argc) {
+            pc_dvd_add_mod(argv[++i]);
+            mods_given = true;
         } else if (strcmp(argv[i], "--fullscreen") == 0) {
             pc_config.fullscreen = true;
         } else if (strcmp(argv[i], "--scale") == 0 && i + 1 < argc) {
@@ -111,6 +162,9 @@ int main(int argc, char** argv)
     }
 
     pc_runtime_init();
+    if (!mods_given) {
+        load_enabled_mods();
+    }
     pc_dvd_init(pc_config.iso);
     if (extract_dir != NULL) {
         pc_dvd_extract(extract_dir);

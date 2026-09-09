@@ -53,6 +53,13 @@ __declspec(noreturn) void pc_exit(int status);
 /// Print a symbolized stack trace of the calling thread to stderr.
 void pc_print_backtrace(void);
 /// Symbol name for a code address ("func+0x12"), in a static buffer.
+/// Address of a global by name, with an optional "+offset"; 0 if unknown.
+uintptr_t pc_symbol_address(const char* spec);
+/// Directory holding melee.exe (no trailing separator).
+const char* pc_exe_dir(void);
+/// Loose-file overrides: files under DIR (or DIR/files) replace the disc's.
+void pc_dvd_add_mod(const char* dir);
+
 /// True when [p, p + bytes) is mapped readable memory (diagnostics only).
 int pc_ptr_readable(const void* p, size_t bytes);
 const char* pc_symbol_name(const void* addr);

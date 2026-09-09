@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <stdio.h>
+#endif
 #include "itcoll.h"
 
 #include <Runtime/platform.h>
@@ -1017,6 +1020,12 @@ void it_8027163C(Item_GObj* item_gobj)
     it_hurtbox = article->x8_hurtbones;
     it_dynams = (ItCollDynamics*) article->x14_dynamics;
     if (it_hurtbox != NULL) {
+#ifdef TARGET_PC
+        if (it_hurtbox->count > 2) {
+            fprintf(stderr, "[pc] item kind %d article %p hurtbones %p count %d descs %p\n", item->kind,
+                    (void*) article, (void*) it_hurtbox, it_hurtbox->count, (void*) it_hurtbox->descs);
+        }
+#endif
         if (it_hurtbox->count > 2) {
             HSD_ASSERTREPORT(0x3F4, 0, "item hit num over!\n");
         }

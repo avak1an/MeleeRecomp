@@ -354,7 +354,16 @@ void pc_swap_ftdata(struct ftData* d, int anim_count, int alt_anim_count, int co
             }
         }
     }
-    pc_swap32(&d->x54);
+    /* x54 is declared int but ftCo_09F7.c reads it as a pointer to a table
+     * of five ints (an effect part list): relocated, so swap the table */
+    if (pc_swap_is_reloc_slot(&d->x54)) {
+        int* table = (int*) (uintptr_t) d->x54;
+        if (table != NULL && pc_swap_ptr_ok(table) && pc_swap_once(table)) {
+            pc_swap32_range(table, 5 * sizeof(int));
+        }
+    } else {
+        pc_swap32(&d->x54);
+    }
     if (d->x58 != NULL && pc_swap_once(d->x58)) {
         pc_swapf(&d->x58->x4);
         pc_swapf(&d->x58->xC);

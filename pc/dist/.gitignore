@@ -1,0 +1,3 @@
+# The repository ignores *.exe; the launcher build is committed on purpose
+# (see README.md here).
+!melee-launcher.exe

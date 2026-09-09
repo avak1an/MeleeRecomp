@@ -12,6 +12,8 @@
 #include <ctype.h>
 #include <direct.h>
 #include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,6 +45,7 @@ static u32 be32(const u8* p)
 }
 
 extern void pc_gx_texture_changed(const void* addr, u32 bytes);
+static void apply_mods(void);
 
 static void disc_read(u64 offset, void* dst, u32 length)
 {
@@ -111,6 +114,7 @@ void pc_dvd_init(const char* path)
     fst_strings = (char*) fst + max_entry * sizeof(FSTEntry);
     current_dir = 0;
     fprintf(stderr, "[pc] DVD: %s (%.32s), %u FST entries\n", path, disc_header + 0x20, max_entry);
+    apply_mods();
 }
 
 /* --- Extraction ------------------------------------------------------------
@@ -208,6 +212,128 @@ void pc_dvd_extract(const char* out_dir)
     fprintf(stderr, "[pc] extracted %u entries to %s\n", max_entry, out_dir);
 }
 
+/* --- Loose-file overrides (mods) ------------------------------------------
+ * A mod directory mirrors the disc: DIR/files/<disc path> (what --extract
+ * writes) or DIR/<disc path>. Every disc file that exists in a mod is read
+ * from the mod instead, with the mod file's size; the first mod given wins.
+ * Files the disc does not have cannot be added (the game finds files through
+ * the disc's own table). */
+
+typedef struct Override {
+    u32 entry;
+    u32 start; /* the file's disc address, the key reads are matched on */
+    u32 length;
+    char* path;
+} Override;
+
+static Override* overrides;
+static u32 n_overrides, cap_overrides;
+static const char* mod_dirs[64];
+static int n_mod_dirs;
+
+void pc_dvd_add_mod(const char* dir)
+{
+    if (n_mod_dirs < (int) (sizeof(mod_dirs) / sizeof(mod_dirs[0]))) {
+        mod_dirs[n_mod_dirs++] = _strdup(dir);
+    }
+}
+
+/* MELEE_TRACE_DVD=1 logs every read with its source */
+static int trace_dvd(void)
+{
+    static int on = -1;
+    if (on < 0) {
+        on = getenv("MELEE_TRACE_DVD") != NULL;
+    }
+    return on;
+}
+
+static Override* find_override(u32 entry)
+{
+    u32 i;
+    for (i = 0; i < n_overrides; i++) {
+        if (overrides[i].entry == entry) {
+            return &overrides[i];
+        }
+    }
+    return NULL;
+}
+
+static u32 scan_mod_dir(const char* root, u32 dir, const char* rel)
+{
+    u32 i = dir + 1, added = 0;
+    while (i < nextDir(dir)) {
+        char sub[1024];
+        const char* name = fst_strings + stringOff(i);
+        if (rel[0] != '\0') {
+            snprintf(sub, sizeof(sub), "%s/%s", rel, name);
+        } else {
+            snprintf(sub, sizeof(sub), "%s", name);
+        }
+        if (entryIsDir(i)) {
+            added += scan_mod_dir(root, i, sub);
+            i = nextDir(i);
+        } else {
+            char path[1024];
+            struct _stat64 st;
+            snprintf(path, sizeof(path), "%s/%s", root, sub);
+            if (_stat64(path, &st) == 0 && (st.st_mode & _S_IFREG) && find_override(i) == NULL) {
+                Override* o;
+                if (n_overrides == cap_overrides) {
+                    cap_overrides = cap_overrides ? cap_overrides * 2 : 64;
+                    overrides = (Override*) realloc(overrides, cap_overrides * sizeof(Override));
+                }
+                o = &overrides[n_overrides++];
+                o->entry = i;
+                o->start = filePosition(i);
+                o->length = (u32) st.st_size;
+                o->path = _strdup(path);
+                fileLength(i) = o->length; /* what DVDFastOpen reports */
+                added++;
+            }
+            i++;
+        }
+    }
+    return added;
+}
+
+static void apply_mods(void)
+{
+    int m;
+    for (m = 0; m < n_mod_dirs; m++) {
+        char files[1024];
+        struct _stat64 st;
+        const char* root = mod_dirs[m];
+        u32 added;
+        snprintf(files, sizeof(files), "%s/files", root);
+        if (_stat64(files, &st) == 0 && (st.st_mode & _S_IFDIR)) {
+            root = files;
+        } else if (_stat64(mod_dirs[m], &st) != 0 || !(st.st_mode & _S_IFDIR)) {
+            fprintf(stderr, "[pc] mod: %s is not a directory\n", mod_dirs[m]);
+            continue;
+        }
+        added = scan_mod_dir(root, 0, "");
+        fprintf(stderr, "[pc] mod: %s (%u file%s)\n", mod_dirs[m], added, added == 1 ? "" : "s");
+    }
+}
+
+/* Reads from an override's host file; missing bytes read as zero. */
+static void override_read(const Override* o, u32 offset, void* dst, u32 length)
+{
+    FILE* f = fopen(o->path, "rb");
+    size_t got = 0;
+    if (f != NULL) {
+        if (_fseeki64(f, offset, SEEK_SET) == 0) {
+            got = fread(dst, 1, length, f);
+        }
+        fclose(f);
+    }
+    if (got < length) {
+        memset((u8*) dst + got, 0, length - got);
+    }
+    pc_gx_texture_changed(dst, length);
+}
+
 /* --- Path lookup (ported from extern/dolphin/src/dolphin/dvd/dvdfs.c) --- */
 
 static BOOL isSame(const char* path, const char* string)
@@ -301,6 +427,11 @@ BOOL DVDFastOpen(s32 entrynum, DVDFileInfo* fileInfo)
     fileInfo->length = fileLength(entrynum);
     fileInfo->callback = NULL;
     fileInfo->cb.state = DVD_STATE_END;
+    if (trace_dvd()) {
+        const Override* o = find_override((u32) entrynum);
+        fprintf(stderr, "[dvd] open %s (%u bytes)%s%c", fst_strings + stringOff(entrynum), fileInfo->length,
+                o ? " from mod" : "", 10);
+    }
     return 1;
 }
 
@@ -340,7 +471,23 @@ static s32 do_read(DVDFileInfo* fileInfo, void* addr, s32 length, s32 offset)
         length = (s32) (fileInfo->length - offset);
     }
     if (length > 0) {
-        disc_read((u64) fileInfo->startAddr + (u32) offset, addr, (u32) length);
+        const Override* o = NULL;
+        u32 i;
+        for (i = 0; i < n_overrides; i++) {
+            if (overrides[i].start == fileInfo->startAddr) {
+                o = &overrides[i];
+                break;
+            }
+        }
+        if (trace_dvd()) {
+            fprintf(stderr, "[dvd] read %s @%x+%d (%d bytes)%s" "%c", o ? o->path : "disc",
+                    fileInfo->startAddr, offset, length, o ? " (mod)" : "", 10);
+        }
+        if (o != NULL) {
+            override_read(o, (u32) offset, addr, (u32) length);
+        } else {
+            disc_read((u64) fileInfo->startAddr + (u32) offset, addr, (u32) length);
+        }
     }
     return length;
 }

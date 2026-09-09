@@ -6,6 +6,10 @@ rem   pc\build.cmd msvc         force cl.exe (build\pc-msvc)
 rem   pc\build.cmd clang        force clang-cl (build\pc)
 rem   pc\build.cmd [msvc|clang] run    build, then run the game
 rem   pc\build.cmd [msvc|clang] clean  delete the build directory
+rem The disc image supplies the font tables the sources include: set
+rem MELEE_ISO=<path> or keep GALE01.iso in the repository or its parent
+rem directory. Without it the GameCube build (configure.py + ninja) must have
+rem produced build\GALE01\include.
 setlocal
 set ROOT=%~dp0..
 set TOOLCHAIN=auto
@@ -62,8 +66,23 @@ if errorlevel 1 exit /b 1
 
 where cmake >nul 2>nul || set "PATH=%VSPATH%\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;%VSPATH%\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%"
 
+if not defined MELEE_ISO (
+    if exist "%ROOT%\GALE01.iso" set "MELEE_ISO=%ROOT%\GALE01.iso"
+)
+if not defined MELEE_ISO (
+    if exist "%ROOT%\..\GALE01.iso" set "MELEE_ISO=%ROOT%\..\GALE01.iso"
+)
+if not defined MELEE_ISO (
+    if exist "%ROOT%\build\pc\GALE01.iso" set "MELEE_ISO=%ROOT%\build\pc\GALE01.iso"
+)
+set "ISO_ARG="
+if defined MELEE_ISO (
+    set "ISO_ARG=-DMELEE_ISO=%MELEE_ISO%"
+    echo font tables from %MELEE_ISO%
+)
+
 if not exist "%BUILD%\build.ninja" (
-    cmake -S "%ROOT%\pc" -B "%BUILD%" -G Ninja -DCMAKE_BUILD_TYPE=Debug %CMAKE_EXTRA% || exit /b 1
+    cmake -S "%ROOT%\pc" -B "%BUILD%" -G Ninja -DCMAKE_BUILD_TYPE=Debug %CMAKE_EXTRA% %ISO_ARG% || exit /b 1
 )
 ninja -C "%BUILD%" || exit /b 1
 

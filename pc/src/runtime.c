@@ -284,6 +284,56 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep)
 
 extern void pc_ax_shutdown(void);
 
+/// Address of a global by name ("stage_info" or "stage_info+0x1c"), 0 if
+/// the symbols do not resolve it.
+uintptr_t pc_symbol_address(const char* spec)
+{
+    char name[256];
+    const char* plus = strchr(spec, '+');
+    uintptr_t offset = 0;
+    size_t n = plus != NULL ? (size_t) (plus - spec) : strlen(spec);
+    struct {
+        SYMBOL_INFO info;
+        char pad[256];
+    } sym;
+    if (n >= sizeof(name)) {
+        return 0;
+    }
+    memcpy(name, spec, n);
+    name[n] = '\0';
+    if (plus != NULL) {
+        offset = (uintptr_t) strtoul(plus + 1, NULL, 0);
+    }
+    pc_symbol_name(NULL); /* initializes the symbol handler */
+    memset(&sym, 0, sizeof(sym));
+    sym.info.SizeOfStruct = sizeof(SYMBOL_INFO);
+    sym.info.MaxNameLen = 255;
+    if (!SymFromName(GetCurrentProcess(), name, &sym.info)) {
+        return 0;
+    }
+    return (uintptr_t) sym.info.Address + offset;
+}
+
+const char* pc_exe_dir(void)
+{
+    static char dir[MAX_PATH + 1];
+    if (dir[0] == '\0') {
+        DWORD n = GetModuleFileNameA(NULL, dir, sizeof(dir));
+        char* slash;
+        if (n == 0 || n >= sizeof(dir)) {
+            strcpy(dir, ".");
+            return dir;
+        }
+        slash = strrchr(dir, '\\');
+        if (slash != NULL) {
+            *slash = '\0';
+        } else {
+            strcpy(dir, ".");
+        }
+    }
+    return dir;
+}
+
 int pc_ptr_readable(const void* p, size_t bytes)
 {
     MEMORY_BASIC_INFORMATION mbi;

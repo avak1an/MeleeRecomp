@@ -577,6 +577,7 @@ typedef struct TexEntry {
     u32 lut_hash; /* palettes are rewritten in place (player colours, ...) */
     GLuint tex;
     u32 last_frame;
+    u8 has_mips; /* mip levels generated from level 0 */
 } TexEntry;
 
 static u32 hash_bytes(const void* p, size_t n)
@@ -963,6 +964,28 @@ static GLuint bind_texture(const PCTexObj* t)
     }
     e->last_frame = frame_no;
     glBindTexture(GL_TEXTURE_2D, e->tex);
+    /* the console's mip levels are on disc too, but generating them from
+     * level 0 is close enough and needs no extra decoding */
+    if (t->mipmap && t->min_filt >= GX_NEAR_MIP_NEAR && !e->has_mips && pc_glGenerateMipmap != NULL) {
+        pc_glGenerateMipmap(GL_TEXTURE_2D);
+        e->has_mips = 1;
+    }
+    {
+        GLenum min_filter;
+        switch (e->has_mips ? t->min_filt : (t->min_filt == GX_NEAR ? GX_NEAR : GX_LINEAR)) {
+        case GX_NEAR: min_filter = GL_NEAREST; break;
+        case GX_NEAR_MIP_NEAR: min_filter = GL_NEAREST_MIPMAP_NEAREST; break;
+        case GX_LIN_MIP_NEAR: min_filter = GL_LINEAR_MIPMAP_NEAREST; break;
+        case GX_NEAR_MIP_LIN: min_filter = GL_NEAREST_MIPMAP_LINEAR; break;
+        case GX_LIN_MIP_LIN: min_filter = GL_LINEAR_MIPMAP_LINEAR; break;
+        default: min_filter = GL_LINEAR; break;
+        }
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLint) min_filter);
+    }
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, gl_wrap(t->wrap_s));
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, gl_wrap(t->wrap_t));
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, t->mag_filt == GX_NEAR ? GL_NEAREST : GL_LINEAR);
+    return 0;
 params:
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, gl_wrap(t->wrap_s));
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, gl_wrap(t->wrap_t));
@@ -979,12 +1002,13 @@ typedef struct ShaderKey {
     u8 alpha_comp0, alpha_op, alpha_comp1;
     u8 swap_table[4][4];
     u8 texmap_valid[8];
+    u8 fog_type;
 } ShaderKey;
 
 typedef struct Shader {
     ShaderKey key;
     GLuint prog;
-    GLint u_proj, u_tex[8], u_kcolor, u_tevreg, u_aref;
+    GLint u_proj, u_tex[8], u_kcolor, u_tevreg, u_aref, u_fog, u_fogcolor;
     GLint a_pos, a_col0, a_col1, a_tex[8];
     int used;
 } Shader;
@@ -1216,10 +1240,12 @@ static Shader* get_shader(void)
         "attribute vec2 a_tex0, a_tex1, a_tex2, a_tex3, a_tex4, a_tex5, a_tex6, a_tex7;\n"
         "varying vec4 v_col0, v_col1;\n"
         "varying vec2 v_tex0, v_tex1, v_tex2, v_tex3, v_tex4, v_tex5, v_tex6, v_tex7;\n"
+        "varying float v_depth;\n"
         "void main() {\n"
         "    vec4 p = u_proj * vec4(a_pos, 1.0);\n"
         "    p.z = p.z * 2.0 + p.w;\n" /* GX clip depth [-w,0] -> GL [-w,w] */
         "    gl_Position = p;\n"
+        "    v_depth = -a_pos.z;\n" /* eye-space distance, for fog */
         "    v_col0 = a_col0; v_col1 = a_col1;\n"
         "    v_tex0 = a_tex0; v_tex1 = a_tex1; v_tex2 = a_tex2; v_tex3 = a_tex3;\n"
         "    v_tex4 = a_tex4; v_tex5 = a_tex5; v_tex6 = a_tex6; v_tex7 = a_tex7;\n"
@@ -1237,6 +1263,7 @@ static Shader* get_shader(void)
     for (i = 0; i < 8; i++) {
         key.texmap_valid[i] = gx.texmap[i].image != NULL;
     }
+    key.fog_type = gx.fog_type;
     for (s = 0; s < num_shaders; s++) {
         if (memcmp(&shaders[s].key, &key, sizeof(key)) == 0) {
             return &shaders[s];
@@ -1257,8 +1284,11 @@ static Shader* get_shader(void)
     emit("uniform vec4 u_kcolor[4];\n"
          "uniform vec4 u_tevreg[4];\n"
          "uniform vec4 u_aref;\n"
+         "uniform vec4 u_fog;\n" /* start, end, unused, unused */
+         "uniform vec4 u_fogcolor;\n"
          "varying vec4 v_col0, v_col1;\n"
          "varying vec2 v_tex0, v_tex1, v_tex2, v_tex3, v_tex4, v_tex5, v_tex6, v_tex7;\n"
+         "varying float v_depth;\n"
          "void main() {\n"
          "    vec4 prev = u_tevreg[0];\n"
          "    vec4 reg0 = u_tevreg[1];\n"
@@ -1287,6 +1317,20 @@ static Shader* get_shader(void)
             emit("    if (!(%s %s %s)) discard;\n", c0, op, c1);
         }
     }
+    if (key.fog_type != GX_FOG_NONE && !debug_flat) {
+        /* the fog factor from eye distance, the way the console's fog
+         * unit derives it from depth; the exponential curves use the
+         * hardware's fixed steepness of 8 */
+        emit("    float fz = clamp((v_depth - u_fog.x) / max(u_fog.y - u_fog.x, 0.0001), 0.0, 1.0);\n");
+        switch (key.fog_type) {
+        case GX_FOG_EXP: emit("    float ff = 1.0 - exp2(-8.0 * fz);\n"); break;
+        case GX_FOG_EXP2: emit("    float ff = 1.0 - exp2(-8.0 * fz * fz);\n"); break;
+        case GX_FOG_REVEXP: emit("    float ff = exp2(-8.0 * (1.0 - fz));\n"); break;
+        case GX_FOG_REVEXP2: emit("    float ff = exp2(-8.0 * (1.0 - fz) * (1.0 - fz));\n"); break;
+        default: emit("    float ff = fz;\n"); break;
+        }
+        emit("    prev.rgb = mix(prev.rgb, u_fogcolor.rgb, ff);\n");
+    }
     if (debug_flat) {
         emit("    gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);\n}\n");
     } else {
@@ -1305,6 +1349,8 @@ static Shader* get_shader(void)
     sh->u_kcolor = pc_glGetUniformLocation(sh->prog, "u_kcolor");
     sh->u_tevreg = pc_glGetUniformLocation(sh->prog, "u_tevreg");
     sh->u_aref = pc_glGetUniformLocation(sh->prog, "u_aref");
+    sh->u_fog = pc_glGetUniformLocation(sh->prog, "u_fog");
+    sh->u_fogcolor = pc_glGetUniformLocation(sh->prog, "u_fogcolor");
     sh->a_pos = pc_glGetAttribLocation(sh->prog, "a_pos");
     sh->a_col0 = pc_glGetAttribLocation(sh->prog, "a_col0");
     sh->a_col1 = pc_glGetAttribLocation(sh->prog, "a_col1");
@@ -1482,6 +1528,11 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
     {
         float aref[4] = { gx.alpha_ref0 / 255.0f, gx.alpha_ref1 / 255.0f, 0, 0 };
         pc_glUniform4fv(sh->u_aref, 1, aref);
+    }
+    if (sh->key.fog_type != GX_FOG_NONE) {
+        float fog[4] = { gx.fog_start, gx.fog_end, gx.fog_near, gx.fog_far };
+        pc_glUniform4fv(sh->u_fog, 1, fog);
+        pc_glUniform4fv(sh->u_fogcolor, 1, gx.fog_color);
     }
     for (t = 0; t < 8; t++) {
         if (sh->u_tex[t] >= 0 && gx.texmap[t].image != NULL) {

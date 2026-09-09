@@ -85,7 +85,8 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
             pc_debug_watch = (const unsigned int*) stage_info.map_ptcl;
         }
         if (pc_debug_gx) {
-            OSReport("[gx] stage grkind %d (arg1 %d)\n", stage_info.grkind, arg1);
+            OSReport("[gx] stage grkind %d (arg1 %d); on_check_shadow_render %p at %p\n", stage_info.grkind,
+                     arg1, (void*) stage_info.on_check_shadow_render, (void*) &stage_info.on_check_shadow_render);
         }
         pc_debug_watch_install();
         pc_swap_stage_data(temp_r3->unk4, arg1 == 0 ? stage_info.param : NULL,

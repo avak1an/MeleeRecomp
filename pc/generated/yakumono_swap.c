@@ -322,6 +322,18 @@ void pc_swap_yakumono_gronett(void* p)
     swap_words(b + 0x0, 26);
 }
 
+/* grpstadium.c: grPStadium_YakumonoParam, 0x54 bytes */
+void pc_swap_yakumono_grpstadium(void* p)
+{
+    u8* b = (u8*) p;
+    if (p == NULL || !pc_swap_once(p)) {
+        return;
+    }
+    swap_words(b + 0x0, 7);
+    swap_words(b + 0x20, 10);
+    pc_swap16_range(b + 0x48, 0xA);
+}
+
 /* grpushon.c: grPushon_YakumonoParam, 0x214 bytes */
 void pc_swap_yakumono_grpushon(void* p)
 {

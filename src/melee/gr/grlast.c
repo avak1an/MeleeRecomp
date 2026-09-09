@@ -1,3 +1,7 @@
+#ifdef TARGET_PC
+#include <pc_endian.h>
+#include <pc_hsd_swap.h>
+#endif
 #include "grlast.h"
 
 #include <math.h>
@@ -230,6 +234,12 @@ StageData grNLa_StageData = {
 static void grLast_OnInit(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    /* four material indices, see the uses below */
+    if (pc_swap_once(yakumono_param)) {
+        pc_swap32_range(yakumono_param, 16);
+    }
+#endif
     stage_info.unk8C.b4 = 1;
     stage_info.unk8C.b5 = 1;
     grLast_8021A7F4(0);

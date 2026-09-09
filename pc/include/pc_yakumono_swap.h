@@ -26,6 +26,7 @@ void pc_swap_yakumono_groldkongo(void* p);
 void pc_swap_yakumono_groldpupupu(void* p);
 void pc_swap_yakumono_groldyoshi(void* p);
 void pc_swap_yakumono_gronett(void* p);
+void pc_swap_yakumono_grpstadium(void* p);
 void pc_swap_yakumono_grpushon(void* p);
 void pc_swap_yakumono_grrcruise(void* p);
 void pc_swap_yakumono_grshrineroute(void* p);
