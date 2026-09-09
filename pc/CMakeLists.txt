@@ -7,7 +7,7 @@
 #   ninja -C build/pc
 #
 # Use pc/build.cmd on Windows, which sets up the 32-bit MSVC environment.
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.21)
 project(melee_pc C)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
@@ -197,9 +197,13 @@ target_compile_options(melee-launcher PRIVATE /W3 /O2 /D_CRT_SECURE_NO_WARNINGS)
 # The launcher binary is committed (pc/dist) and runs on machines without a
 # development setup: static release C runtime, no debug CRT dependency.
 set_property(TARGET melee-launcher PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
-add_custom_command(TARGET melee-launcher POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:melee-launcher>
-            ${CMAKE_CURRENT_SOURCE_DIR}/dist/melee-launcher.exe
+# Runs on every build (a relink alone would skip it when the launcher is
+# up to date but the dist copy was moved aside, see build_game in launcher.c).
+add_custom_target(melee-launcher-dist ALL
+    COMMAND ${CMAKE_COMMAND} -DSRC=$<TARGET_FILE:melee-launcher>
+            -DDST=${CMAKE_CURRENT_SOURCE_DIR}/dist/melee-launcher.exe
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/copy_launcher.cmake
+    DEPENDS melee-launcher
     COMMENT "Copying the launcher to pc/dist")
 target_link_libraries(melee-launcher PRIVATE comctl32 comdlg32 shell32 ole32 user32 gdi32 advapi32)
 target_link_options(melee-launcher PRIVATE

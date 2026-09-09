@@ -10,6 +10,7 @@
 #include "pc_gl.h"
 #include "pc_gx.h"
 #include "pc_runtime.h"
+#include <pc_version.h>
 
 #include <stdio.h>
 #include <stdint.h>
@@ -21,7 +22,9 @@ int melee_main(void);
 static void usage(void)
 {
     fprintf(stderr,
+            "melee " PC_PORT_NAME " " PC_PORT_VERSION "\n"
             "usage: melee [--iso PATH] [--frames N] [--realtime] [--quiet-stubs]\n"
+            "  --version       print the port's version and exit\n"
             "  --iso PATH      GameCube disc image (GALE01 .iso/.gcm). Default: $MELEE_ISO\n"
             "                  or GALE01.iso in the current or parent directory\n"
             "  --frames N      exit after N video frames (default 0 = run until a\n"
@@ -127,6 +130,9 @@ int main(int argc, char** argv)
         } else if (strcmp(argv[i], "--quiet-stubs") == 0) {
             pc_config.log_stubs = false;
             pc_config.quiet_stubs = true;
+        } else if (strcmp(argv[i], "--version") == 0) {
+            printf("%s %s\n", PC_PORT_NAME, PC_PORT_VERSION);
+            return 0;
         } else if (strcmp(argv[i], "--headless") == 0) {
             pc_config.headless = true;
         } else if (strcmp(argv[i], "--screenshots") == 0 && i + 1 < argc) {
@@ -177,7 +183,7 @@ int main(int argc, char** argv)
         if (!pc_config.fast) {
             pc_config.realtime = true; /* a window runs at the game's speed */
         }
-        if (!pc_window_open(640, 480, "Super Smash Bros. Melee")) {
+        if (!pc_window_open(640, 480, "Super Smash Bros. Melee (" PC_PORT_NAME " " PC_PORT_VERSION ")")) {
             fprintf(stderr, "[pc] continuing without rendering\n");
         }
     }

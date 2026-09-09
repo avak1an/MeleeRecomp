@@ -1,3 +1,6 @@
 # The repository ignores *.exe; the launcher build is committed on purpose
-# (see README.md here).
+# (see README.md here). Its settings file and the copy a build moves aside
+# are not.
 !melee-launcher.exe
+launcher.ini
+melee-launcher.old.exe

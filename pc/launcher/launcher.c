@@ -17,7 +17,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#define APP_TITLE "Super Smash Bros. Melee PC"
+#include "../include/pc_version.h"
+
+#define APP_TITLE "Super Smash Bros. Melee PC " PC_PORT_VERSION
 #define INI_NAME "launcher.ini"
 
 enum {
@@ -66,6 +68,7 @@ static HINSTANCE app;
 static HWND main_wnd;
 static HFONT ui_font, bold_font;
 static char exe_dir[MAX_PATH];
+static char exe_path[MAX_PATH]; /* this program's own file */
 static char ini_path[MAX_PATH];
 static char extract_dir[MAX_PATH];
 static HANDLE child; /* running game, extraction or build */
@@ -766,6 +769,18 @@ static void build_game(void)
     save_settings();
     /* pc\build.cmd reads MELEE_ISO for the font tables the sources include */
     SetEnvironmentVariableA("MELEE_ISO", iso);
+    {
+        /* The build copies the new launcher to <source>\pc\dist. When that
+         * is this running program, Windows will not let it be overwritten,
+         * but a running program may be renamed: move it aside (the next
+         * start deletes the old copy). */
+        char dist[MAX_PATH], old[MAX_PATH];
+        snprintf(dist, sizeof(dist), "%s\\pc\\dist\\melee-launcher.exe", src);
+        if (_stricmp(dist, exe_path) == 0) {
+            snprintf(old, sizeof(old), "%s\\melee-launcher.old.exe", exe_dir);
+            MoveFileExA(exe_path, old, MOVEFILE_REPLACE_EXISTING);
+        }
+    }
     snprintf(cmd, sizeof(cmd), "cmd.exe /S /C \"\"%s\\pc\\build.cmd\" || pause\"", src);
     if (run_child(cmd, src, 1, 2)) {
         set_status("Building the game from source; the console window shows the progress.");
@@ -1015,7 +1030,8 @@ static void build_ui(void)
 
     make("BUTTON", "Play", BS_DEFPUSHBUTTON, 16, y, 120, 32, IDC_PLAY);
     SendMessageA(ctl(IDC_PLAY), WM_SETFONT, (WPARAM) bold_font, TRUE);
-    make("STATIC", "", 0, 148, y + 8, 376, 32, IDC_STATUS);
+    make("STATIC", "", 0, 148, y + 8, 296, 32, IDC_STATUS);
+    make("STATIC", PC_PORT_NAME " " PC_PORT_VERSION, SS_RIGHT, 444, y + 8, 80, 16, 0);
     y += 44;
 
     /* settings */
@@ -1197,10 +1213,17 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     (void) cmdline;
 
     app = inst;
+    GetModuleFileNameA(NULL, exe_path, sizeof(exe_path));
     GetModuleFileNameA(NULL, exe_dir, sizeof(exe_dir));
     slash = strrchr(exe_dir, '\\');
     if (slash != NULL) {
         *slash = '\0';
+    }
+    {
+        /* the copy a previous build moved aside (see build_game) */
+        char old[MAX_PATH];
+        snprintf(old, sizeof(old), "%s\\melee-launcher.old.exe", exe_dir);
+        DeleteFileA(old);
     }
     snprintf(ini_path, sizeof(ini_path), "%s\\%s", exe_dir, INI_NAME);
 

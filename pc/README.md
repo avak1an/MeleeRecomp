@@ -7,6 +7,9 @@ compatible with it.
 
 ## Status
 
+Version: **v1.0-beta** (`pc/include/pc_version.h`, shown by the launcher,
+the game window title and `melee.exe --version`).
+
 **Milestone 1 (build scaffold) - done.** All 907 game units, the 76 HSD
 engine units, and three pure-C SDK units compile and link into
 `build/pc/melee.exe`.
