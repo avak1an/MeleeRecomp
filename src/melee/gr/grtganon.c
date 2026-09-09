@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grtganon.h"
 
 #include <melee/mp/forward.h>
@@ -52,6 +55,9 @@ void grTGanon_802246D8(bool unused)
 void grTGanon_802246DC(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grtganon(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
 

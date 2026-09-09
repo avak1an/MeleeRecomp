@@ -1197,6 +1197,32 @@ struct Fighter {
     /*  fp+58C */ u32 x58C;
     /*  fp+590 */ FigaTree* x590;
     /*  fp+594 */ union {
+#ifdef TARGET_PC
+        /* x594_s32 is loaded from disc data, so the bit-field views keep the
+         * console bit numbering (bit 0 = most significant) on the host word */
+        struct {
+            u32 pc_pad_lo : 24;
+            u32 x594_b7 : 1;
+            u32 x594_b6 : 1;
+            u32 x594_b5 : 1;
+            u32 x594_b4 : 1;
+            u32 x594_b3 : 1;
+            u32 x594_b2 : 1;
+            u32 x594_b1_loop : 1;
+            u32 x594_b0 : 1;
+        };
+        struct {
+            u32 pc_pad_ : 6;
+            u32 x7 : 3;
+            u32 x0 : 7;
+        } x596_bits;
+        struct {
+            u32 x597_bits : 6; // FighterKind of this fighter's x590 FigaTree
+            u32 x594_pad2 : 3;
+            u32 x594_bits : 13;
+            u32 x594_pad : 10;
+        };
+#else
         struct {
             /* fp+594:0 */ u8 x594_b0 : 1;
             /* fp+594:1 */ u8 x594_b1_loop : 1;
@@ -1217,6 +1243,7 @@ struct Fighter {
             u32 x594_pad2 : 3;
             u32 x597_bits : 6; // FighterKind of this fighter's x590 FigaTree
         };
+#endif
         /* fp+594 */ s32 x594_s32;
     };
     /*  fp+598 */ FigaTree* x598;
@@ -1806,8 +1833,14 @@ struct Fighter {
 ASSERT_SIZE(struct Fighter, 0x23EC);
 
 struct gmScriptEventDefault {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value1 : 26;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 value1 : 26;
+#endif
 };
 
 struct ftData_UnkCountStruct {

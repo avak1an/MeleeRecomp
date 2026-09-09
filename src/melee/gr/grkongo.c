@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grkongo.h"
 
 #include <melee/mp/forward.h>
@@ -155,6 +158,9 @@ void grKongo_801D523C(void)
     u8* temp_r5;
 
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grkongo(yakumono_param);
+#endif
     temp_r5 = (u8*) &stage_info.unk8C;
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;

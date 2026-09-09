@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grcorneria.h"
 
 #include <placeholder.h>
@@ -493,6 +496,9 @@ void grCorneria_801DD350(void)
     u8 _pad2[12];
 
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grcorneria(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     grCorneria_801DD534(7);
@@ -1817,6 +1823,17 @@ int grCorneria_801E0A74(const f32* arg0)
             return 4;
         }
     }
+#ifdef TARGET_PC
+    {
+        int k;
+        OSReport("[pc] grCorneriaGetPosMapKind2: x=%g scale=%g map x:", *arg0, Ground_801C0498());
+        for (k = 0; k < 12; k++) {
+            HSD_GObj* g = Ground_GetMapGObj(k);
+            OSReport(" [%d]=%g", k, g != NULL && g->hsd_obj != NULL ? HSD_JObjGetTranslationX(g->hsd_obj) : -99999.0f);
+        }
+        OSReport("\n");
+    }
+#endif
     HSD_ASSERTREPORT(0x9CB, 0, "grcorneria.c    grCorneriaGetPosMapKind2\n");
     return -1;
 }

@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "granime.h"
 #include "grdisplay.h"
 #include "grlib.h"
@@ -144,6 +147,9 @@ void grBattle_OnDemoInit(int arg0)
 void grBattle_OnInit(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grbattle(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 1;
     stage_info.unk8C.b5 = 1;
 

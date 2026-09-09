@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grtmewtwo.h"
 
 #include <Runtime/platform.h>
@@ -101,6 +104,9 @@ void grTMewtwo_802221D8(bool arg0) {}
 void grTMewtwo_802221DC(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grtmewtwo(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
     grTMewtwo_80222284(0);

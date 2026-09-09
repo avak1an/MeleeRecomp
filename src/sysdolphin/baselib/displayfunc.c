@@ -278,6 +278,15 @@ MtxPtr _HSD_mkEnvelopeModelNodeMtx(HSD_JObj* m, MtxPtr mtx)
 void HSD_JObjDispSub(HSD_JObj* jobj, MtxPtr vmtx, MtxPtr pmtx,
                      HSD_TrspMask trsp_mask, u32 rendermode)
 {
+#ifdef TARGET_PC
+    {
+        extern int pc_debug_in_fighter;
+        extern int pc_debug_fighter_counts[4];
+        if (pc_debug_in_fighter) {
+            pc_debug_fighter_counts[0]++;
+        }
+    }
+#endif
     HSD_DObj* dobj;
     u32 dobj_trsp;
 

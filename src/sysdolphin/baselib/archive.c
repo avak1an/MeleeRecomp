@@ -1,6 +1,8 @@
 #include "archive.h"
 #ifdef TARGET_PC
 #include <pc_hsd_swap.h>
+#include "pc_runtime.h"
+#include <stdio.h>
 #endif
 
 #include <string.h>
@@ -42,6 +44,7 @@ static void pc_archive_swap(u8* src, size_t file_size)
     /* A freshly loaded file: any "already swapped" records inside its
      * memory belong to a previous file at the same address. */
     pc_swap_forget_range(src, file_size);
+    pc_swap_note_archive(src, file_size);
     for (i = 0; i < 6; i++) {
         header[i] = pc_bswap32(header[i]);
     }
@@ -49,6 +52,21 @@ static void pc_archive_swap(u8* src, size_t file_size)
     nb_reloc = header[2];
     nb_public = header[3];
     nb_extern = header[4];
+    if (pc_debug_gx) {
+        fprintf(stderr, "[gx] archive %p size %u (header says %u): data %u, %u reloc, %u public, %u extern\n",
+                (void*) src, (unsigned) file_size, header[0], data_size, nb_reloc, nb_public, nb_extern);
+    }
+    if (header[0] != file_size || sizeof(HSD_ArchiveHeader) + data_size +
+                                          (nb_reloc + 2 * nb_public + 2 * nb_extern) * 4 > file_size) {
+        fprintf(stderr, "[pc] archive at %p: header (size %u, data %u, %u relocs) does not fit the %u "
+                        "byte buffer, not swapped\n",
+                (void*) src, header[0], data_size, nb_reloc, (unsigned) file_size);
+        pc_print_backtrace();
+        for (i = 0; i < 6; i++) {
+            header[i] = pc_bswap32(header[i]); /* leave the buffer as found */
+        }
+        return;
+    }
     offset = sizeof(HSD_ArchiveHeader) + data_size;
     table = (u32*) (src + offset);
     for (i = 0; i < nb_reloc + 2 * nb_public + 2 * nb_extern; i++) {
@@ -57,6 +75,8 @@ static void pc_archive_swap(u8* src, size_t file_size)
     for (i = 0; i < nb_reloc; i++) {
         u32* slot = (u32*) (src + sizeof(HSD_ArchiveHeader) + table[i]);
         *slot = pc_bswap32(*slot);
+        pc_swap_note_reloc_slot(slot);
+        pc_swap_note_reloc_target(slot, src + sizeof(HSD_ArchiveHeader) + *slot);
     }
 }
 #endif

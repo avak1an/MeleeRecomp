@@ -15,6 +15,8 @@ typedef struct PCConfig {
     bool log_stubs;      ///< print the first call of each stubbed SDK function
     bool realtime;       ///< pace VIWaitForRetrace to 60 Hz
     bool autoplay;       ///< synthesize Start/A presses on port 1 to push through prompts
+    const char* input_script; ///< file of scripted port-1 inputs (see pad.c)
+    unsigned seed;       ///< if nonzero, the game's RNG seed (else the clock)
     bool headless;       ///< no window, no rendering
     const char* screenshot_dir; ///< if set, dump a BMP of every 60th frame here
     const char* iso;     ///< path of the disc image (NULL = auto-detect)
@@ -24,6 +26,12 @@ extern PCConfig pc_config;
 
 /// Set when MELEE_GX_DEBUG is in the environment; engine code may log.
 extern int pc_debug_gx;
+
+/// Debug aid: a word to watch while swapping; pc_debug_watch_check() reports
+/// every change of *pc_debug_watch since the previous check.
+extern const unsigned int* pc_debug_watch;
+void pc_debug_watch_check(const char* tag);
+void pc_debug_watch_install(void);
 
 /// Number of VIWaitForRetrace calls so far.
 extern uint32_t pc_frame_count;
@@ -36,6 +44,8 @@ __declspec(noreturn) void pc_exit(int status);
 
 /// Print a symbolized stack trace of the calling thread to stderr.
 void pc_print_backtrace(void);
+/// Symbol name for a code address ("func+0x12"), in a static buffer.
+const char* pc_symbol_name(const void* addr);
 
 /// Print the most recent function entries (only when built with
 /// MELEE_TRACE_FUNCS; otherwise prints nothing).

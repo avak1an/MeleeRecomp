@@ -1,4 +1,8 @@
 #include "fighter.h"
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#include "pc_runtime.h"
+#endif
 
 #include <math.h>
 #include <placeholder.h>
@@ -180,6 +184,9 @@ void Fighter_LoadCommonData(void)
 {
     void** pData;
     lbArchive_LoadSymbols("PlCo.dat", (void**) &pData, "ftLoadCommonData", 0);
+#ifdef TARGET_PC
+    pc_swap_ft_common(pData);
+#endif
 
     // copy 23 4-byte chunks from pData to p_ftCommonData in reverse order,
     // equivalent to this: for(i=0; i<23; i++)
@@ -1260,6 +1267,18 @@ void Fighter_ChangeMotionState(Fighter_GObj* gobj, FtMotionId msid,
                 } else {
                     ftData_80085CD8(fp, fp, fp->anim_id);
                 }
+#ifdef TARGET_PC
+                pc_swap_script(unk_struct_x18->xC, PC_SCRIPT_FIGHTER);
+                if (pc_debug_gx) {
+                    u32* w = (u32*) unk_struct_x18->xC;
+                    int k;
+                    OSReport("[gx] fighter script start %p (msid %d):", (void*) w, msid);
+                    for (k = 0; w != NULL && k < 12; k++) {
+                        OSReport(" %08x", w[k]);
+                    }
+                    OSReport("\n");
+                }
+#endif
                 fp->x3E4_fighterCmdScript.u = unk_struct_x18->xC;
                 fp->x3E4_fighterCmdScript.loop_count = 0;
 

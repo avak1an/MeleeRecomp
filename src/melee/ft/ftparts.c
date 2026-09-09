@@ -716,6 +716,12 @@ u32 ftParts_8007506C(enum FighterKind ftkind, int part)
     struct Fighter_804D6540_t* temp_r3;
 
     temp_r3 = Fighter_804D6540[ftkind];
+#ifdef TARGET_PC
+    if (temp_r3 != NULL && temp_r3->x4 != 0 && temp_r3->x0 == NULL) {
+        OSReport("[pc] ftParts_8007506C: kind %d entry %p has x4=%d but no table\n", ftkind,
+                 (void*) temp_r3, temp_r3->x4);
+    }
+#endif
     if (temp_r3 != NULL && temp_r3->x4 != 0) {
         var_r3 = temp_r3->x0;
         for (i = 0; i < temp_r3->x4; i++, var_r3++) {

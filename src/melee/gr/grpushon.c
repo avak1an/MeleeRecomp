@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grpushon.h"
 
 #include <Runtime/platform.h>
@@ -119,6 +122,9 @@ void grPushOn_802182C4(bool arg) {}
 void grPushOn_802182C8(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grpushon(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
     grPushOn_802183E4(0);

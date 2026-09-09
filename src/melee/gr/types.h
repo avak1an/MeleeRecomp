@@ -135,6 +135,23 @@ typedef struct StageCallbacks {
     /*  +C */ void (*callback3)(Ground_GObj*);
     /* +10 */ union {
         /* +10 */ u32 flags;
+#ifdef TARGET_PC
+        /* The stage tables initialise this union through `flags` with
+         * big-endian bit constants (0x80000000 is flags_b0). On a
+         * little-endian host the bits live in the last byte, lowest bit
+         * last. */
+        struct {
+            u8 pc_pad[3];
+            u8 flags_b7 : 1;
+            u8 flags_b6 : 1;
+            u8 flags_b5 : 1;
+            u8 flags_b4 : 1;
+            u8 flags_b3 : 1;
+            u8 flags_b2 : 1;
+            u8 flags_b1 : 1;
+            u8 flags_b0 : 1;
+        };
+#else
         struct {
             /* +10:0 */ u8 flags_b0 : 1;
             /* +10:1 */ u8 flags_b1 : 1;
@@ -145,6 +162,7 @@ typedef struct StageCallbacks {
             /* +10:6 */ u8 flags_b6 : 1;
             /* +10:7 */ u8 flags_b7 : 1;
         };
+#endif
     };
 } StageCallbacks;
 

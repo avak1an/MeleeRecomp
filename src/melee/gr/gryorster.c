@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "gryorster.h"
 
 #include <Runtime/platform.h>
@@ -82,6 +85,9 @@ void grYorster_80201FA0(bool unused)
 void grYorster_80201FA4(void)
 {
     grYt_804D6A20.x0 = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_gryorster(grYt_804D6A20.x0);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
     grYorster_8020203C(0);

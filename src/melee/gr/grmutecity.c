@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grmutecity.h"
 
 #include <Runtime/platform.h>
@@ -364,6 +367,9 @@ void grMuteCity_801EFC68(bool arg) {}
 void grMuteCity_801EFC6C(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grmutecity(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 0;
     grMuteCity_801EFD0C(0);

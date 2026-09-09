@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "groldyoshi.h"
 
 #include <Runtime/platform.h>
@@ -69,6 +72,9 @@ void grOldYoshi_8020E798(bool arg) {}
 void grOldYoshi_8020E79C(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_groldyoshi(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     grOldYoshi_8020E854(0);

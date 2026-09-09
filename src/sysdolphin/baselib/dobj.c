@@ -1,4 +1,7 @@
 #include "dobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include "aobj.h"
 #include "class.h"
@@ -177,6 +180,14 @@ void HSD_DObjAnimAll(HSD_DObj* dobj)
 
 static int DObjLoad(HSD_DObj* dobj, HSD_DObjDesc* desc)
 {
+#ifdef TARGET_PC
+    if (pc_swap_ptr_ok(desc) && (!pc_swap_ptr_ok(desc->next) || !pc_swap_ptr_ok(desc->mobjdesc) ||
+        !pc_swap_ptr_ok(desc->pobjdesc) || !pc_swap_ptr_ok(desc->class_name)))
+    {
+        OSReport("[pc] bad HSD_DObjDesc at %p: class=%p next=%p mobjdesc=%p pobjdesc=%p\n",
+                 desc, desc->class_name, desc->next, desc->mobjdesc, desc->pobjdesc);
+    }
+#endif
     dobj->next = HSD_DObjLoadDesc(desc->next);
     dobj->mobj = HSD_MObjLoadDesc(desc->mobjdesc);
     dobj->pobj = HSD_PObjLoadDesc(desc->pobjdesc);
@@ -302,6 +313,15 @@ void forceStringAllocation(
 
 void HSD_DObjDisp(HSD_DObj* dobj, Mtx vmtx, Mtx pmtx, u32 rendermode)
 {
+#ifdef TARGET_PC
+    {
+        extern int pc_debug_in_fighter;
+        extern int pc_debug_fighter_counts[4];
+        if (pc_debug_in_fighter) {
+            pc_debug_fighter_counts[1]++;
+        }
+    }
+#endif
     HSD_PObj* p;
 
     HSD_MObjSetCurrent(dobj->mobj);

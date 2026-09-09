@@ -140,6 +140,15 @@ void lb_8000FD48(HSD_JObj* jobj, DynamicsDesc* desc, size_t max_count)
 {
     struct DynamicsData* prev;
     PAD_STACK(0x10);
+#ifdef TARGET_PC
+    {
+        extern int pc_debug_gx;
+        if (pc_debug_gx) {
+            OSReport("[gx] lb_8000FD48 jobj=%p desc=%p max_count=%u cur_data=%p", jobj, desc,
+                     (unsigned) max_count, cur_data);
+        }
+    }
+#endif
 
     if (desc == NULL) {
         return;

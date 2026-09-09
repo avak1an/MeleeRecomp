@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grbigblueroute.h"
 
 #include <Runtime/platform.h>
@@ -166,6 +169,9 @@ void grBigBlueRoute_8020B864(bool arg)
 void grBigBlueRoute_8020B89C(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grbigblueroute(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     grBigBlueRoute_8020B9D4(0);

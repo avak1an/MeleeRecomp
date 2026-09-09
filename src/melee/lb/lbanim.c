@@ -62,6 +62,17 @@ HSD_FObj* fn_8001E60C(FigaTrack* track, s8 frames)
             track++;
         }
     }
+#ifdef TARGET_PC
+    if (fobj == NULL) {
+        extern int pc_debug_gx;
+        OSReport("[pc] figatree: no track usable at %p for %d frame(s): types", (void*) track, frames);
+        for (i = 0; i < frames; i++) {
+            OSReport(" %u", track[i].obj_type);
+        }
+        OSReport("\n");
+        return first;
+    }
+#endif
     fobj->next = NULL;
     return first;
 }

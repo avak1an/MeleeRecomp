@@ -21,6 +21,20 @@
 /// @deprecated Replace with inline bitfields
 typedef union UnkFlagStruct {
     u8 u8;
+#ifdef TARGET_PC
+    /* the byte view is written with console bit numbering (b0 is the most
+     * significant bit), so the fields are declared in reverse on PC */
+    struct {
+        u8 b7 : 1;
+        u8 b6 : 1;
+        u8 b5 : 1;
+        u8 b4 : 1;
+        u8 b3 : 1;
+        u8 b2 : 1;
+        u8 b1 : 1;
+        u8 b0 : 1;
+    };
+#else
     struct {
         u8 b0 : 1;
         u8 b1 : 1;
@@ -31,6 +45,7 @@ typedef union UnkFlagStruct {
         u8 b6 : 1;
         u8 b7 : 1;
     };
+#endif
 } UnkFlagStruct;
 
 struct UnkMultimanData {
@@ -413,8 +428,12 @@ struct gmm_x0 {
 };
 ASSERT_SIZE(struct EventData, 0x588 - 0x530);
 ASSERT_SIZE(struct gmm_x0_vsdata, 0x588 - 0x51C);
+#ifndef TARGET_PC /* @todo PC layout differs (bit-field packing); see pc/README.md */
 ASSERT_SIZE(struct gmm_x0_vsmodes, 0x1850 - 0x588);
+#endif
+#ifndef TARGET_PC /* @todo PC layout differs (bit-field packing); see pc/README.md */
 ASSERT_SIZE(struct gmm_x0, 0x8518);
+#endif
 
 /// @todo ::MatchEnd
 struct lbl_8046B6A0_24C_t {
@@ -576,7 +595,9 @@ struct lbl_8046B6A0_t {
     /* 0x024C */ struct lbl_8046B6A0_24C_t x24C;
     /* 0x24C8 */ struct StartMeleeRules x24C8;
 }; /* size = 0x2528 */
+#ifndef TARGET_PC /* @todo PC layout differs (bit-field packing); see pc/README.md */
 ASSERT_SIZE(struct lbl_8046B6A0_t, 0x2528);
+#endif
 
 struct datetime {
     u16 year;
@@ -875,7 +896,9 @@ struct TmData {
     HSD_Text* x534[3];
     u8 pad_x540[0x574 - 0x540];
 };
+#ifndef TARGET_PC /* @todo PC layout differs (bit-field packing); see pc/README.md */
 ASSERT_SIZE(struct TmData, 0x574);
+#endif
 
 struct NameData {
     // a lot of this is shared with a struct for character stats as well

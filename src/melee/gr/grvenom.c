@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grvenom.h"
 
 #include <Runtime/platform.h>
@@ -446,6 +449,9 @@ void grVenom_80203B18(void)
         s32 flag;
 
         yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+        pc_swap_yakumono_grvenom(yakumono_param);
+#endif
         grVenom_80203EAC(4);
         stage_info.unk8C.b4 = false;
         flag = true;

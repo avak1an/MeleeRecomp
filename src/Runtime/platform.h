@@ -152,7 +152,7 @@ typedef bool (*Predicate)(void);
 #define STATIC_ASSERT(cond) _Static_assert((cond), "(" #cond ") failed")
 #endif
 
-#if defined(MUST_MATCH) || defined(LINT)
+#if defined(MUST_MATCH) || defined(LINT) || defined(TARGET_PC)
 #define ASSERT_SIZE(expr, size) STATIC_ASSERT(sizeof(expr) == size)
 #define ASSERT_OFFSET(type, member, offset)                                   \
     STATIC_ASSERT(offsetof(type, member) == offset)
@@ -176,6 +176,9 @@ typedef bool (*Predicate)(void);
 #pragma section(".pcadj$f", read, write)
 #pragma section(".pcadj$g", read, write)
 #pragma section(".pcadj$h", read, write)
+#pragma section(".pcadj$i", read, write)
+#pragma section(".pcadj$j", read, write)
+#pragma section(".pcadj$k", read, write)
 /* __declspec(allocate) wants a single string literal (no concatenation). */
 #define PC_ADJ_SECTION_a ".pcadj$a"
 #define PC_ADJ_SECTION_b ".pcadj$b"
@@ -185,6 +188,9 @@ typedef bool (*Predicate)(void);
 #define PC_ADJ_SECTION_f ".pcadj$f"
 #define PC_ADJ_SECTION_g ".pcadj$g"
 #define PC_ADJ_SECTION_h ".pcadj$h"
+#define PC_ADJ_SECTION_i ".pcadj$i"
+#define PC_ADJ_SECTION_j ".pcadj$j"
+#define PC_ADJ_SECTION_k ".pcadj$k"
 #define PC_ADJACENT(k) __declspec(allocate(PC_ADJ_SECTION_##k))
 #else
 #define PC_ADJACENT(k)

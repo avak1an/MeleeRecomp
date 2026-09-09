@@ -56,10 +56,22 @@ static u32 reg_hash(uintptr_t p)
 /// Returns true (and records p) if p has not been seen before. Descriptors
 /// outside the emulated main memory are static data compiled into the game
 /// (already in host order) and are never swapped.
+bool pc_swap_ptr_ok(const void* ptr)
+{
+    uintptr_t p = (uintptr_t) ptr;
+    return ptr == NULL ||
+           (p >= (uintptr_t) pc_mem_base() && p < (uintptr_t) pc_mem_base() + pc_mem_size());
+}
+
 static bool once(const void* ptr)
 {
     uintptr_t p = (uintptr_t) ptr;
     u32 i;
+    if (pc_debug_watch != NULL) {
+        char tag[32];
+        snprintf(tag, sizeof(tag), "once %p", ptr);
+        pc_debug_watch_check(tag);
+    }
     if (p < (uintptr_t) pc_mem_base() || p >= (uintptr_t) pc_mem_base() + pc_mem_size()) {
         return false;
     }
@@ -82,6 +94,162 @@ static bool once(const void* ptr)
     }
 }
 
+bool pc_swap_once(const void* p)
+{
+    return once(p);
+}
+
+bool pc_swap_is_done(const void* ptr)
+{
+    uintptr_t p = (uintptr_t) ptr;
+    u32 i;
+    if (reg == NULL) {
+        return false;
+    }
+    for (i = reg_hash(p);; i = (i + 1) & (REG_SIZE - 1)) {
+        if (reg[i] == 0) {
+            return false;
+        }
+        if (reg[i] == p) {
+            return true;
+        }
+    }
+}
+
+/* Pointer slots relocated by HSD_ArchiveParse. A few descriptor fields hold
+ * either a pointer or a plain integer (HSD_AObjDesc::obj_id); only the
+ * latter must be swapped, and this set tells them apart. */
+static uintptr_t* reloc_reg;
+static u32 reloc_used;
+
+/* Relocation targets (the objects the slots point at), kept as (target,
+ * slot) pairs so a swapper can find where the next referenced object
+ * starts after a given address. Sorted lazily. */
+#define MAX_RELOC_TARGETS (1u << 18)
+static struct {
+    uintptr_t target, slot;
+} * reloc_targets;
+static u32 reloc_target_count;
+static bool reloc_targets_sorted;
+
+static int cmp_target(const void* a, const void* b)
+{
+    uintptr_t ta = *(const uintptr_t*) a, tb = *(const uintptr_t*) b;
+    return ta < tb ? -1 : ta > tb ? 1 : 0;
+}
+
+void pc_swap_note_reloc_target(const void* slot, const void* target)
+{
+    if (reloc_targets == NULL) {
+        reloc_targets = calloc(MAX_RELOC_TARGETS, sizeof(*reloc_targets));
+    }
+    if (reloc_target_count < MAX_RELOC_TARGETS) {
+        reloc_targets[reloc_target_count].target = (uintptr_t) target;
+        reloc_targets[reloc_target_count].slot = (uintptr_t) slot;
+        reloc_target_count++;
+        reloc_targets_sorted = false;
+    }
+}
+
+/* Extents of the parsed archives, so an unsized block never runs past the
+ * end of its file into whatever was allocated after it. */
+#define MAX_ARCHIVES 256
+static struct {
+    uintptr_t lo, hi;
+} archives[MAX_ARCHIVES];
+static u32 archive_count;
+
+void pc_swap_note_archive(const void* base, size_t size)
+{
+    uintptr_t lo = (uintptr_t) base;
+    u32 i;
+    for (i = 0; i < archive_count; i++) {
+        if (archives[i].lo == lo) {
+            archives[i].hi = lo + size;
+            return;
+        }
+    }
+    if (archive_count < MAX_ARCHIVES) {
+        archives[archive_count].lo = lo;
+        archives[archive_count].hi = lo + size;
+        archive_count++;
+    }
+}
+
+const void* pc_swap_next_object(const void* start, const void* limit)
+{
+    uintptr_t s = (uintptr_t) start, l = (uintptr_t) limit;
+    u32 lo, hi;
+    for (lo = 0; lo < archive_count; lo++) {
+        if (s >= archives[lo].lo && s < archives[lo].hi && archives[lo].hi < l) {
+            l = archives[lo].hi;
+            limit = (const void*) l;
+        }
+    }
+    if (reloc_targets == NULL || reloc_target_count == 0) {
+        return limit;
+    }
+    if (!reloc_targets_sorted) {
+        qsort(reloc_targets, reloc_target_count, sizeof(*reloc_targets), cmp_target);
+        reloc_targets_sorted = true;
+    }
+    /* first target > start */
+    lo = 0;
+    hi = reloc_target_count;
+    while (lo < hi) {
+        u32 mid = (lo + hi) / 2;
+        if (reloc_targets[mid].target <= s) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+    if (lo < reloc_target_count && reloc_targets[lo].target < l) {
+        return (const void*) reloc_targets[lo].target;
+    }
+    return limit;
+}
+
+void pc_swap_note_reloc_slot(const void* ptr)
+{
+    uintptr_t p = (uintptr_t) ptr;
+    u32 i;
+    if (reloc_reg == NULL) {
+        reloc_reg = (uintptr_t*) calloc(REG_SIZE, sizeof(uintptr_t));
+    }
+    if (reloc_used > REG_SIZE / 2) {
+        fprintf(stderr, "[pc] relocation registry full (%u entries)\n", reloc_used);
+        pc_exit(6);
+    }
+    for (i = reg_hash(p);; i = (i + 1) & (REG_SIZE - 1)) {
+        if (reloc_reg[i] == 0) {
+            reloc_reg[i] = p;
+            reloc_used++;
+            return;
+        }
+        if (reloc_reg[i] == p) {
+            return;
+        }
+    }
+}
+
+bool pc_swap_is_reloc_slot(const void* ptr)
+{
+    uintptr_t p = (uintptr_t) ptr;
+    u32 i;
+    if (reloc_reg == NULL) {
+        return false;
+    }
+    for (i = reg_hash(p);; i = (i + 1) & (REG_SIZE - 1)) {
+        if (reloc_reg[i] == 0) {
+            return false;
+        }
+        if (reloc_reg[i] == p) {
+            return true;
+        }
+    }
+}
+
 void pc_swap_forget_range(void* base, size_t size)
 {
     uintptr_t lo = (uintptr_t) base, hi = lo + size;
@@ -97,6 +265,35 @@ void pc_swap_forget_range(void* base, size_t size)
         for (i = 0; i < REG_SIZE; i++) {
             if (old[i] != 0 && !(old[i] >= lo && old[i] < hi)) {
                 once((const void*) old[i]);
+            }
+        }
+        free(old);
+    }
+    {
+        u32 n = 0;
+        for (i = 0; i < archive_count; i++) {
+            if (!(archives[i].lo >= lo && archives[i].lo < hi)) {
+                archives[n++] = archives[i];
+            }
+        }
+        archive_count = n;
+    }
+    if (reloc_targets != NULL) {
+        u32 n = 0;
+        for (i = 0; i < reloc_target_count; i++) {
+            if (!(reloc_targets[i].slot >= lo && reloc_targets[i].slot < hi)) {
+                reloc_targets[n++] = reloc_targets[i];
+            }
+        }
+        reloc_target_count = n;
+    }
+    if (reloc_reg != NULL) {
+        uintptr_t* old = reloc_reg;
+        reloc_reg = (uintptr_t*) calloc(REG_SIZE, sizeof(uintptr_t));
+        reloc_used = 0;
+        for (i = 0; i < REG_SIZE; i++) {
+            if (old[i] != 0 && !(old[i] >= lo && old[i] < hi)) {
+                pc_swap_note_reloc_slot((const void*) old[i]);
             }
         }
         free(old);
@@ -140,17 +337,28 @@ void pc_swap_spline(HSD_Spline* spline)
     pc_swap16(&spline->numcv);
     pc_swapf(&spline->tension);
     pc_swapf(&spline->totalLength);
-    if (spline->cv != NULL) {
-        for (i = 0; i < spline->numcv; i++) {
+    if (spline->numcv < 0 || spline->numcv > 4096) {
+        fprintf(stderr, "[pc] swap: implausible spline with %d control points, skipping\n", spline->numcv);
+        return;
+    }
+    /* numcv control points (a Bezier spline stores three per segment plus
+     * one), numcv cumulative segment lengths and numcv - 1 segment
+     * polynomials of five coefficients. */
+    if (spline->cv != NULL && once(spline->cv)) {
+        int ncv = spline->type == 1 ? 3 * (spline->numcv - 1) + 1 : spline->numcv;
+        for (i = 0; i < ncv; i++) {
             swap_vec3(&spline->cv[i]);
         }
     }
-    if (spline->segLength != NULL) {
+    pc_debug_watch_check("spline cv");
+    if (spline->segLength != NULL && once(spline->segLength)) {
         pc_swap32_range(spline->segLength, (size_t) spline->numcv * sizeof(f32));
     }
-    if (spline->segPoly != NULL) {
-        pc_swap32_range(spline->segPoly, (size_t) spline->numcv * 5 * sizeof(f32));
+    pc_debug_watch_check("spline segLength");
+    if (spline->segPoly != NULL && spline->numcv > 1 && once(spline->segPoly)) {
+        pc_swap32_range(spline->segPoly, (size_t) (spline->numcv - 1) * 5 * sizeof(f32));
     }
+    pc_debug_watch_check("spline segPoly");
 }
 
 void pc_swap_robjdesc(HSD_RObjDesc* desc)
@@ -290,7 +498,10 @@ void pc_swap_aobjdesc(HSD_AObjDesc* desc)
     }
     pc_swap32(&desc->flags);
     pc_swapf(&desc->end_frame);
-    pc_swap32(&desc->obj_id);
+    /* obj_id is either an object id or a relocated HSD_Joint pointer */
+    if (!pc_swap_is_reloc_slot(&desc->obj_id)) {
+        pc_swap32(&desc->obj_id);
+    }
 }
 
 void pc_swap_fobjdesc(HSD_FObjDesc* desc)
@@ -491,6 +702,122 @@ void pc_swap_sis_message(u8* p)
         default:
             p += 1;
             break;
+        }
+    }
+}
+
+/* --- Particle data banks --------------------------------------------------
+ * The particle system (particle.c, psInitDataBankLocate) uses its own raw
+ * bank format: a command bank of offsets to HSD_PSCmdList headers, a
+ * texture bank of HSD_PSTexGroup descriptors and a form bank of
+ * HSD_PSFormGroup tables. Everything is 32-bit words except the version and
+ * the palette fields; the command bytecode after each header is read
+ * byte-wise by the interpreter and is left alone. */
+static void swap_ps_cmdlist(u8* cmd)
+{
+    if (!once(cmd)) {
+        return;
+    }
+    pc_swap16_range(cmd, 8);       /* type, texGroup, genLife, life */
+    pc_swap32_range(cmd + 8, 0x34); /* kind and the twelve floats */
+}
+
+void pc_swap_ps_banks(void* cmdBank, void* texBank, s32* formBank)
+{
+    u32* w = (u32*) cmdBank;
+    u32 num_groups = 0;
+    u32 i;
+
+    if (w != NULL) {
+        bool fresh = once(w);
+        if (pc_debug_gx) {
+            fprintf(stderr, "[gx] particle banks cmd=%p tex=%p form=%p words %08x %08x %08x%s\n",
+                    cmdBank, texBank, (void*) formBank, w[0], w[1], w[2],
+                    fresh ? "" : " (seen before)");
+        }
+        if (!fresh) {
+            w = NULL;
+        }
+    }
+    if (w != NULL) {
+        u16 version;
+        pc_swap16(w);
+        version = *(u16*) w;
+        pc_swap32(&w[1]);
+        pc_swap32(&w[2]);
+        if (version == 0) {
+            u32 n = w[1];
+            for (i = 1; i < n; i++) {
+                pc_swap32(&w[2 + i]);
+            }
+            for (i = 0; i < n; i++) {
+                if (w[2 + i] != 0) {
+                    swap_ps_cmdlist((u8*) cmdBank + w[2 + i]);
+                }
+            }
+        } else if (version >= 0x40 && version < 0x44) {
+            u32 nb = w[2];
+            for (i = 0; i < nb; i++) {
+                pc_swap32(&w[3 + i]);
+            }
+            for (i = 0; i < nb; i++) {
+                if (w[3 + i] != 0) {
+                    swap_ps_cmdlist((u8*) cmdBank + w[3 + i]);
+                }
+            }
+        }
+    }
+
+    if (pc_debug_gx && cmdBank != NULL) {
+        fprintf(stderr, "[gx]   after cmd swap: %08x\n", *(u32*) cmdBank);
+    }
+    w = (u32*) texBank;
+    if (w != NULL && once(w)) {
+        pc_swap32(&w[0]);
+        num_groups = w[0];
+        for (i = 1; i <= num_groups; i++) {
+            pc_swap32(&w[i]);
+        }
+        for (i = 1; i <= num_groups; i++) {
+            u32* g;
+            u32 num, fmt, entries;
+            u16 palnum, palflag;
+            if (w[i] == 0) {
+                continue;
+            }
+            g = (u32*) ((u8*) texBank + w[i]);
+            pc_swap32_range(g, 20); /* num fmt tlutfmt width height */
+            pc_swap16_range(g + 5, 4); /* palnum palflag */
+            num = g[0];
+            fmt = g[1];
+            palnum = ((u16*) (g + 5))[0];
+            palflag = ((u16*) (g + 5))[1];
+            entries = num;
+            if (fmt == 8 || fmt == 9 || fmt == 10) {
+                entries += (palflag & 1) ? 1 : (palnum != 0 ? palnum : num);
+            }
+            pc_swap32_range(g + 6, entries * 4);
+        }
+    } else if (w != NULL) {
+        num_groups = w[0];
+    }
+
+    if (pc_debug_gx && cmdBank != NULL) {
+        fprintf(stderr, "[gx]   after tex swap: %08x\n", *(u32*) cmdBank);
+    }
+    if (formBank != NULL && once(formBank)) {
+        pc_swap32(&formBank[0]);
+        for (i = 1; i <= num_groups; i++) {
+            pc_swap32(&formBank[i]);
+        }
+        for (i = 1; i <= num_groups; i++) {
+            u32* fg;
+            if (formBank[i] == 0) {
+                continue;
+            }
+            fg = (u32*) ((u8*) formBank + formBank[i]);
+            pc_swap32(&fg[0]);
+            pc_swap32_range(fg + 1, fg[0] * 4);
         }
     }
 }

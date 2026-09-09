@@ -23,6 +23,51 @@
 
 PCConfig pc_config;
 uint32_t pc_frame_count;
+const unsigned int* pc_debug_watch = NULL;
+static unsigned int pc_debug_watch_last;
+static const unsigned int* pc_debug_watch_last_ptr;
+static char pc_debug_watch_prev_tag[128];
+
+void (*pc_swap_hook)(const void* p, size_t bytes) = NULL;
+
+/// --watch: report any swap helper whose range covers the watched word.
+static void watch_swap_hook(const void* p, size_t bytes)
+{
+    uintptr_t lo = (uintptr_t) p, hi = lo + bytes, w = (uintptr_t) pc_debug_watch;
+    if (w + 4 > lo && w < hi) {
+        fprintf(stderr, "[pc] watch %p: swap of %u byte(s) at %p\n", (const void*) w,
+                (unsigned) bytes, p);
+        pc_print_backtrace();
+    }
+}
+
+void pc_debug_watch_install(void)
+{
+    if (pc_debug_watch != NULL) {
+        pc_swap_hook = watch_swap_hook;
+    }
+}
+
+void pc_debug_watch_check(const char* tag)
+{
+    if (pc_debug_watch == NULL) {
+        return;
+    }
+    if (pc_debug_watch != pc_debug_watch_last_ptr) {
+        pc_debug_watch_last_ptr = pc_debug_watch;
+        pc_debug_watch_last = *pc_debug_watch;
+        fprintf(stderr, "[pc] watch %p = %08x (%s)\n", (const void*) pc_debug_watch,
+                pc_debug_watch_last, tag);
+    } else if (*pc_debug_watch != pc_debug_watch_last) {
+        fprintf(stderr, "[pc] watch %p changed %08x -> %08x (between \"%s\" and \"%s\")\n",
+                (const void*) pc_debug_watch, pc_debug_watch_last, *pc_debug_watch,
+                pc_debug_watch_prev_tag, tag);
+        pc_print_backtrace();
+        pc_debug_watch_last = *pc_debug_watch;
+    }
+    strncpy(pc_debug_watch_prev_tag, tag, sizeof(pc_debug_watch_prev_tag) - 1);
+}
+
 int pc_debug_gx;
 
 /* --- Memory ---------------------------------------------------------------
@@ -95,6 +140,31 @@ static void print_stub_summary(void)
     }
 }
 
+const char* pc_symbol_name(const void* addr)
+{
+    static char name[96];
+    HANDLE proc = GetCurrentProcess();
+    static int sym_ready;
+    union {
+        SYMBOL_INFO info;
+        char buf[sizeof(SYMBOL_INFO) + 256];
+    } sym;
+    DWORD64 disp = 0;
+    if (!sym_ready) {
+        SymSetOptions(SYMOPT_UNDNAME | SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
+        sym_ready = SymInitialize(proc, NULL, TRUE) ? 1 : -1;
+    }
+    memset(&sym, 0, sizeof(sym));
+    sym.info.SizeOfStruct = sizeof(SYMBOL_INFO);
+    sym.info.MaxNameLen = 255;
+    if (sym_ready > 0 && SymFromAddr(proc, (DWORD64) (uintptr_t) addr, &disp, &sym.info)) {
+        snprintf(name, sizeof(name), "%s+0x%x", sym.info.Name, (unsigned) disp);
+    } else {
+        snprintf(name, sizeof(name), "%p", addr);
+    }
+    return name;
+}
+
 void pc_print_backtrace(void)
 {
     void* frames[48];
@@ -137,10 +207,9 @@ void pc_print_backtrace(void)
 /* Hardware exceptions (access violations from mis-swapped data, mostly).
  * Walk the stack from the exception context so the faulting frame is the
  * first one printed, then leave through pc_exit. */
-static void print_exception_backtrace(CONTEXT* ctx)
+static void print_exception_backtrace(CONTEXT* ctx, HANDLE thread)
 {
     HANDLE proc = GetCurrentProcess();
-    HANDLE thread = GetCurrentThread();
     STACKFRAME64 frame;
     CONTEXT c = *ctx;
     int i;
@@ -205,7 +274,7 @@ static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep)
                 (unsigned) er->ExceptionInformation[1]);
     }
     fprintf(stderr, "\n");
-    print_exception_backtrace(ep->ContextRecord);
+    print_exception_backtrace(ep->ContextRecord, GetCurrentThread());
     fprintf(stderr, "[pc] exiting after %u frame(s), status 7\n", pc_frame_count);
     print_stub_summary();
     fflush(stderr);
@@ -225,8 +294,47 @@ __declspec(noreturn) void pc_exit(int status)
     exit(status);
 }
 
+/* Watchdog: a helper thread that reports where the game is stuck when no
+ * frame has completed for a while (MELEE_WATCHDOG seconds, default 20). */
+static HANDLE main_thread;
+
+static DWORD WINAPI watchdog_main(LPVOID arg)
+{
+    uint32_t last = pc_frame_count;
+    unsigned quiet = 0, limit = 20;
+    const char* env = getenv("MELEE_WATCHDOG");
+    (void) arg;
+    if (env != NULL && atoi(env) > 0) {
+        limit = (unsigned) atoi(env);
+    }
+    for (;;) {
+        Sleep(1000);
+        if (pc_frame_count != last) {
+            last = pc_frame_count;
+            quiet = 0;
+            continue;
+        }
+        if (++quiet >= limit) {
+            CONTEXT ctx;
+            memset(&ctx, 0, sizeof(ctx));
+            ctx.ContextFlags = CONTEXT_FULL;
+            SuspendThread(main_thread);
+            if (GetThreadContext(main_thread, &ctx)) {
+                fprintf(stderr, "[pc] watchdog: no frame completed for %u s (frame %u); main thread is at:\n",
+                        quiet, (unsigned) pc_frame_count);
+                print_exception_backtrace(&ctx, main_thread);
+            }
+            fflush(stderr);
+            ExitProcess(8);
+        }
+    }
+}
+
 void pc_runtime_init(void)
 {
+    DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &main_thread, 0,
+                    FALSE, DUPLICATE_SAME_ACCESS);
+    CreateThread(NULL, 0, watchdog_main, NULL, 0, NULL);
     /* The game tells main memory from ARAM by address (main memory is
      * 0x80000000 and up on the console), so map the arena at the console's
      * address. That needs the /LARGEADDRESSAWARE 32-bit process the linker
@@ -359,6 +467,15 @@ __declspec(noreturn) void OSPanic(char* file, int line, char* msg, ...)
 static OSTime host_ticks(void)
 {
     LARGE_INTEGER now;
+    static OSTime virtual_calls;
+    if (!pc_config.realtime) {
+        /* Unpaced runs (headless tests, scripted routes) use a clock locked
+         * to the frame counter so alarms and timeouts fire on the same frame
+         * every run regardless of host speed. Each query also advances it a
+         * little so loops that spin on the tick counter still terminate. */
+        virtual_calls += 40;
+        return (OSTime) pc_frame_count * (OSTime) (__OSBusClock / 4 / 60) + virtual_calls;
+    }
     QueryPerformanceCounter(&now);
     /* convert host counter to GameCube timer ticks (bus clock / 4) */
     return (OSTime) ((now.QuadPart - qpc_start.QuadPart) * (OSTime) (__OSBusClock / 4) /
@@ -370,6 +487,12 @@ OSTick OSGetTick(void)
     return (OSTick) host_ticks();
 }
 
+/// The game seeds its RNG from the tick counter at boot; --seed overrides.
+unsigned pc_game_seed(void)
+{
+    return pc_config.seed != 0 ? pc_config.seed : (unsigned) host_ticks();
+}
+
 OSTime OSGetTime(void)
 {
     return host_ticks();
@@ -377,11 +500,11 @@ OSTime OSGetTime(void)
 
 void OSTicksToCalendarTime(OSTime ticks, OSCalendarTime* td)
 {
-    /* The console counts ticks since 2000-01-01; the game only prints this,
-     * so report the host's wall clock instead. */
-    time_t now = time(NULL);
-    struct tm* t = localtime(&now);
-    (void) ticks;
+    /* The console counts ticks since 2000-01-01 00:00:00. Derive the
+     * calendar from the ticks so unpaced runs stay repeatable (the virtual
+     * clock starts at that date); real-time runs also start there. */
+    time_t secs = (time_t) 946684800 + (time_t) (ticks / (OSTime) (__OSBusClock / 4));
+    struct tm* t = gmtime(&secs);
     memset(td, 0, sizeof(*td));
     if (t != NULL) {
         td->sec = t->tm_sec;
@@ -393,6 +516,7 @@ void OSTicksToCalendarTime(OSTime ticks, OSCalendarTime* td)
         td->wday = t->tm_wday;
         td->yday = t->tm_yday;
     }
+    td->msec = (int) ((ticks / (OSTime) (__OSBusClock / 4000)) % 1000);
 }
 
 /* Interrupt masking has no meaning here; the game only pairs these calls. */

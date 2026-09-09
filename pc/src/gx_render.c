@@ -139,6 +139,12 @@ static u32 frame_no;
 static int stats_draws, stats_verts;
 static int debug_log;  /* MELEE_GX_DEBUG: log the first draws of a frame */
 static int debug_flat; /* MELEE_GX_FLAT: magenta fragments, no alpha test */
+int pc_debug_in_fighter;      /* set by the fighter draw routine: 1 + kind while its model is drawn */
+static int fighter_draws;     /* draws issued for fighters this frame */
+int pc_debug_fighter_counts[4]; /* jobj / dobj / pobj / display-list calls while drawing fighters */
+static int debug_nocull;      /* MELEE_GX_NOCULL: never cull faces */
+static int debug_noalpha;     /* MELEE_GX_NOALPHA: skip the alpha test */
+static u32 debug_log_frame;   /* MELEE_GX_LOG_FRAME=N: log every draw of frame N */
 
 /* --- Helpers ------------------------------------------------------------ */
 
@@ -1199,7 +1205,7 @@ static Shader* get_shader(void)
         case GX_AOP_XNOR: op = "=="; break;
         default: op = "&&"; break;
         }
-        if (!debug_flat) {
+        if (!debug_flat && !debug_noalpha) {
             emit("    if (!(%s %s %s)) discard;\n", c0, op, c1);
         }
     }
@@ -1252,7 +1258,7 @@ static void apply_raster_state(void)
     glScissor((GLint) (gx.scissor[0] * sx), (GLint) ((EFB_H - (int) gx.scissor[1] - (int) gx.scissor[3]) * sy),
               (GLsizei) (gx.scissor[2] * sx), (GLsizei) (gx.scissor[3] * sy));
 
-    if (gx.cull == GX_CULL_NONE) {
+    if (gx.cull == GX_CULL_NONE || debug_nocull) {
         glDisable(GL_CULL_FACE);
     } else {
         glEnable(GL_CULL_FACE);
@@ -1334,8 +1340,14 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
         p = decode_vertex(p, vat, big, &v);
         transform_vertex(&v, &glverts[i]);
     }
-    if (debug_log && stats_draws < 8) {
+    if (pc_debug_in_fighter) {
+        fighter_draws++;
+    }
+    if ((debug_log && stats_draws < 8) || (debug_log_frame != 0 && pc_frame_count == debug_log_frame)) {
         const GLVertex* g = &glverts[0];
+        if (pc_debug_in_fighter) {
+            fprintf(stderr, "[gx] (fighter kind %d) ", pc_debug_in_fighter - 1);
+        }
         float x = g->pos[0], y = g->pos[1], z = g->pos[2];
         float cx = gx.proj[0][0] * x + gx.proj[0][1] * y + gx.proj[0][2] * z + gx.proj[0][3];
         float cy = gx.proj[1][0] * x + gx.proj[1][1] * y + gx.proj[1][2] * z + gx.proj[1][3];
@@ -1518,6 +1530,9 @@ void GXBegin(GXPrimitive type, GXVtxFmt vtxfmt, u16 nverts)
 
 void GXCallDisplayList(void* list, u32 nbytes)
 {
+    if (pc_debug_in_fighter) {
+        pc_debug_fighter_counts[3]++;
+    }
     const u8* p = (const u8*) list;
     const u8* end = p + nbytes;
     static int logged;
@@ -2189,7 +2204,10 @@ static void save_screenshot(void)
     }
     fclose(f);
     free(pixels);
-    fprintf(stderr, "[pc] wrote %s (%d draws, %d vertices)\n", path, stats_draws, stats_verts);
+    fprintf(stderr,
+            "[pc] wrote %s (%d draws, %d vertices, %d fighter draws; fighter jobj %d dobj %d pobj %d dl %d)\n",
+            path, stats_draws, stats_verts, fighter_draws, pc_debug_fighter_counts[0],
+            pc_debug_fighter_counts[1], pc_debug_fighter_counts[2], pc_debug_fighter_counts[3]);
 }
 
 void GXCopyDisp(void* dest, GXBool clear)
@@ -2209,6 +2227,8 @@ void GXCopyDisp(void* dest, GXBool clear)
     }
     stats_draws = 0;
     stats_verts = 0;
+    fighter_draws = 0;
+    memset(pc_debug_fighter_counts, 0, sizeof(pc_debug_fighter_counts));
 }
 
 void GXSetTexCopySrc(u16 left, u16 top, u16 wd, u16 ht)
@@ -2322,6 +2342,9 @@ void pc_gx_render_init(void)
     debug_log = getenv("MELEE_GX_DEBUG") != NULL;
     pc_debug_gx = debug_log;
     debug_flat = getenv("MELEE_GX_FLAT") != NULL;
+    debug_nocull = getenv("MELEE_GX_NOCULL") != NULL;
+    debug_noalpha = getenv("MELEE_GX_NOALPHA") != NULL;
+    debug_log_frame = getenv("MELEE_GX_LOG_FRAME") != NULL ? (u32) strtoul(getenv("MELEE_GX_LOG_FRAME"), NULL, 0) : 0;
     rendering = pc_window_ready();
     if (rendering) {
         glEnable(GL_DEPTH_TEST);

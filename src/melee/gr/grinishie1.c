@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grinishie1.h"
 
 #include <Runtime/platform.h>
@@ -232,6 +235,9 @@ extern struct block_table_struct grI1_803E49B8[BLOCK_COUNT];
 void grInishie1_801FA90C(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grinishie1(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     setupStageCallbacks(0);

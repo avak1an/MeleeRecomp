@@ -325,6 +325,34 @@ struct ColorOverlay_UnkInner {
 };
 
 union ColorOverlay_x8_t {
+#ifdef TARGET_PC
+    /* script words are swapped to host order on PC: the colour bytes are
+     * read from the other end and the bit-fields keep console order */
+    struct {
+        u8 a, b, g, r;
+    } light_color;
+    struct {
+        s32 yz : 13;
+        s32 x : 13;
+        s32 unk : 6;
+    } light_rot1;
+    struct {
+        s32 yz : 12;
+        s32 x : 12;
+        u32 x0_7 : 1;
+        u32 light_enable : 1;
+        u32 x0_5 : 1;
+        u32 x0_4 : 1;
+        u32 x0_3 : 1;
+        u32 x0_2 : 1;
+        u32 x0_1 : 1;
+        u32 x0_0 : 1;
+    } light_rot2;
+    struct {
+        u32 timer : 26;
+        u32 unk : 6;
+    } unk;
+#else
     GXColor light_color;
     struct {
         s32 unk : 6;
@@ -347,6 +375,7 @@ union ColorOverlay_x8_t {
         u32 unk : 6;
         u32 timer : 26;
     } unk;
+#endif
 };
 ASSERT_SIZE(union ColorOverlay_x8_t, 0x4);
 
@@ -520,249 +549,615 @@ struct lbColl_8000A10C_arg0_t {
 };
 
 struct Command_00 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value : 26;
+    u32 code : 6;
+#else
     u32 code : 6;
     u32 value : 26;
+#endif
 };
 struct Command_02 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value : 26;
+    u32 code : 6;
+#else
     u32 code : 6;
     u32 value : 26;
+#endif
 };
 struct Command_03 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value : 26;
+    u32 code : 6;
+#else
     u32 code : 6;
     u32 value : 26;
+#endif
 };
 struct Command_04 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
     u32 x;
+#else
+    u32 x;
+#endif
 };
 struct Command_05 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
     union CmdUnion* ptr;
+#else
+    union CmdUnion* ptr;
+#endif
 };
 struct Command_07 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
     union CmdUnion* ptr;
+#else
+    union CmdUnion* ptr;
+#endif
 };
 struct Command_09 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 param_2 : 18;
+    u32 param_1 : 8;
+    u32 id : 6;
+#else
     u32 id : 6;
     u32 param_1 : 8;
     u32 param_2 : 18;
+#endif
 };
 struct unk0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk2 : 18;  ///< Bits 14~31
+    u32 unk1 : 8;   ///< Bits 6~13
+    u32 opcode : 6; ///< Bits 0~5
+#else
     u32 opcode : 6; ///< Bits 0~5
     u32 unk1 : 8;   ///< Bits 6~13
     u32 unk2 : 18;  ///< Bits 14~31
+#endif
 };
 struct unk1 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 pc_pad_ : 19;
+    u32 unk2 : 1;   ///< Bit 12
+    u32 unk1 : 4;   ///< Bits 8~11
+    u32 unk0 : 2;   ///< Bits 6~7
+    u32 opcode : 6; ///< Bits 0~5
+#else
     u32 opcode : 6; ///< Bits 0~5
     u32 unk0 : 2;   ///< Bits 6~7
     u32 unk1 : 4;   ///< Bits 8~11
     u32 unk2 : 1;   ///< Bit 12
+#endif
 };
 struct set_throw_flags {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 hit_idx : 26; ///< Bits 6~31
+    u32 opcode : 6;   ///< Bits 0~5
+#else
     u32 opcode : 6;   ///< Bits 0~5
     u32 hit_idx : 26; ///< Bits 6~31
+#endif
 };
 struct unk3 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s32 unk1 : 25; ///< Bits 7~31
+    s32 unk0 : 7;  ///< Bits 0~6
+#else
     s32 unk0 : 7;  ///< Bits 0~6
     s32 unk1 : 25; ///< Bits 7~31
+#endif
 };
 struct unk4 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 pc_pad_ : 18;
+    u32 unk1 : 8;   ///< Bits 6~13
+    u32 opcode : 6; ///< Bits 0~5
+#else
     u16 opcode : 6; ///< Bits 0~5
     u16 unk1 : 8;   ///< Bits 6~13
+#endif
 };
 struct unk5 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s32 unk1 : 18; ///< Bits 14~31
+    s32 unk0 : 14; ///< Bits 0~13
+#else
     s32 unk0 : 14; ///< Bits 0~13
     s32 unk1 : 18; ///< Bits 14~31
+#endif
 };
 struct unk6 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 pc_pad_ : 25;
+    u32 unk1 : 1;   ///< Bit 6
+    u32 opcode : 6; ///< Bits 0~5
+#else
     u8 opcode : 6; ///< Bits 0~5
     u8 unk1 : 1;   ///< Bit 6
+#endif
 };
 struct set_airborne_state {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 state : 26; ///< Bits 6~31
+    u32 opcode : 6; ///< Bits 0~5
+#else
     u32 opcode : 6; ///< Bits 0~5
     u32 state : 26; ///< Bits 6~31
+#endif
 }; ///< #ftAction_80071998
 struct unk8 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
     int unk0;
+#else
+    int unk0;
+#endif
 };
 struct part_anim {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk3 : 12;
+    s32 unk2 : 7;
+    s32 unk1 : 7;
+    s32 opcode : 6;
+#else
     s32 opcode : 6;
     s32 unk1 : 7;
     s32 unk2 : 7;
     u32 unk3 : 12;
+#endif
 };
 struct unk9 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk2 : 13;
+    u32 unk1 : 13;
+    s32 unk0 : 6;
+#else
     s32 unk0 : 6;
     u32 unk1 : 13;
     u32 unk2 : 13;
+#endif
 };
 struct unk10 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk3 : 13;
+    u32 unk2 : 12;
+    u32 unk1 : 1;
+    s32 unk0 : 6;
+#else
     s32 unk0 : 6;
     u32 unk1 : 1;
     u32 unk2 : 12;
     u32 unk3 : 13;
+#endif
 };
 struct unk11 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk1 : 26;
+    s32 unk0 : 6;
+#else
     s32 unk0 : 6;
     u32 unk1 : 26;
+#endif
 };
 struct unk12 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk3 : 14;
+    u32 unk2 : 10;
+    u32 unk1 : 2;
+    u32 unk0 : 6;
+#else
     u32 unk0 : 6;
     u32 unk1 : 2;
     u32 unk2 : 10;
     u32 unk3 : 14;
+#endif
 };
 struct unk13 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk2 : 18;
+    u32 unk1 : 8;
+    u32 unk0 : 6;
+#else
     u32 unk0 : 6;
     u32 unk1 : 8;
     u32 unk2 : 18;
+#endif
 };
 struct unk14 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 pc_pad_ : 18;
+    u32 unk1 : 8;
+    u32 unk0 : 6;
+#else
     u32 unk0 : 6;
     u32 unk1 : 8;
+#endif
 };
 struct unk15 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk1 : 26;
+    u32 unk0 : 6;
+#else
     u32 unk0 : 6;
     u32 unk1 : 26;
+#endif
 }; ///< #ftAction_80072B14
 struct unk16 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s32 unk4 : 25;
+    s32 unk3 : 1;
+    u32 unk0 : 6;
+#else
     u32 unk0 : 6;
     s32 unk3 : 1;
     s32 unk4 : 25;
+#endif
 }; ///< #ftAction_80072B3C
 struct unk17 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s32 unk1 : 26;
+    u32 unk0 : 6;
+#else
     u32 unk0 : 6;
     s32 unk1 : 26;
+#endif
 }; ///< #ftAction_80072B94
 struct unk18 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s32 damage_amount : 26;
+    u32 unk0 : 6;
+#else
     u32 unk0 : 6;
     s32 damage_amount : 26;
+#endif
 }; ///< #ftAction_80072BF4
 struct unk19 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk1 : 26;
+    u32 unk0 : 6;
+#else
     u32 unk0 : 6;
     u32 unk1 : 26;
+#endif
 }; ///< #ftAction_80072C6C
 struct unk20 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk1 : 26;
+    u32 unk0 : 6;
+#else
     u32 unk0 : 6;
     u32 unk1 : 26;
+#endif
 }; ///< #ftAction_80072CB0
 struct unk21 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 pc_pad_ : 17;
+    u32 unk2 : 8;
+    u32 unk1 : 1;
+    u32 unk0 : 6;
+#else
     u32 unk0 : 6;
     u32 unk1 : 1;
     u32 unk2 : 8;
+#endif
 }; ///< #ftAction_800730B8
 struct set_hitbox_damage {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value : 23;
+    u32 idx : 3;
+    u32 opcdoe : 6;
+#else
     u32 opcdoe : 6;
     u32 idx : 3;
     u32 value : 23;
+#endif
 }; ///< #ftAction_8007162C
 struct set_hitbox_scale {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value : 23;
+    u32 idx : 3;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 idx : 3;
     u32 value : 23;
+#endif
 }; ///< #ftAction_8007169C
 struct set_hitbox_x42_b57 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value : 1;
+    u32 type : 1;
+    u32 idx : 24;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 idx : 24;
     u32 type : 1;
     u32 value : 1;
+#endif
 }; ///< #ftAction_80071708
 struct set_cmd_var {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value : 24;
+    u32 idx : 2;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 idx : 2;
     u32 value : 24;
+#endif
 }; ///< #ftAction_80071708
 struct set_hurt_state {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 state : 18;
+    u32 bone_idx : 8;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 bone_idx : 8;
     u32 state : 18;
+#endif
 }; ///< #ftAction_80071A9C
 struct set_jab_combo {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 disabled : 26;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 disabled : 26;
+#endif
 }; ///< #ftAction_80071AE8
 struct set_jab_rapid {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 state : 26;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 state : 26;
+#endif
 }; ///< #ftAction_80071B28
 struct set_dobj_flags {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s32 value : 19;
+    s32 idx : 7;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     s32 idx : 7;
     s32 value : 19;
+#endif
 }; ///< #ftAction_80071D40
 struct set_throw_hitbox_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 damage : 23;
+    u32 idx : 3;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 idx : 3;
     u32 damage : 23;
+#endif
 }; ///< #ftAction_80071E04
 struct set_throw_hitbox_1 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 pc_pad_ : 5;
+    u32 hit_x28 : 9;
+    u32 hit_x24 : 9;
+    u32 unk0 : 9;
+#else
     u32 unk0 : 9;
     u32 hit_x24 : 9;
     u32 hit_x28 : 9;
+#endif
 }; ///< #ftAction_80071E04
 struct set_throw_hitbox_2 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 pc_pad_ : 12;
+    u32 sfx_kind : 4;
+    u32 sfx_severity : 3;
+    u32 element : 4;
+    u32 hit_x2C : 9;
+#else
     u32 hit_x2C : 9;
     u32 element : 4;
     u32 sfx_severity : 3;
     u32 sfx_kind : 4;
+#endif
 }; ///< #ftAction_80071E04
 struct unk27 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value : 26;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 value : 26;
+#endif
 }; ///< #ftAction_80071F34
 struct set_article_vis {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value : 26;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 value : 26;
+#endif
 }; ///< #ftAction_80071F78
 struct set_fighter_vis {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 value : 26;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 value : 26;
+#endif
 }; ///< #ftAction_80071FA0
 struct set_tex_anim {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s32 frame : 11;
+    s32 idx2 : 7;
+    s32 idx : 7;
+    u32 b : 1;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 b : 1;
     s32 idx : 7;
     s32 idx2 : 7;
     s32 frame : 11;
+#endif
 }; ///< #ftAction_800726F4
 struct unk31 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk1 : 16;
+    u32 unk0 : 10;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 unk0 : 10;
     u32 unk1 : 16;
+#endif
 }; ///< #ftAction_80073008
 struct unk32 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk1 : 13;
+    u32 unk0 : 13;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 unk0 : 13;
     u32 unk1 : 13;
+#endif
 }; ///< #ftAction_80073008
 struct unk33 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk1 : 13;
+    u32 unk0 : 13;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 unk0 : 13;
     u32 unk1 : 13;
+#endif
 }; ///< #it_8027990C
 struct spawn_gfx_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unk1 : 15;
+    u32 useUnkBone : 1;
+    u32 destroyOnStateChange : 1;
+    u32 useCommonBoneIDs : 1;
+    u32 boneId : 8;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 boneId : 8;
     u32 useCommonBoneIDs : 1;
     u32 destroyOnStateChange : 1;
     u32 useUnkBone : 1;
     u32 unk1 : 15;
+#endif
 };
 struct spawn_gfx_1 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unkFloat : 16;
+    u32 gfxID : 16;
+#else
     u32 gfxID : 16;
     u32 unkFloat : 16;
+#endif
 };
 struct spawn_gfx_2 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s16 offsetY : 16;
+    s16 offsetZ : 16;
+#else
     s16 offsetZ : 16;
     s16 offsetY : 16;
+#endif
 };
 struct spawn_gfx_3 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u16 rangeZ : 16;
+    s16 offsetX : 16;
+#else
     s16 offsetX : 16;
     u16 rangeZ : 16;
+#endif
 };
 struct spawn_gfx_4 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u16 rangeX : 16;
+    u16 rangeY : 16;
+#else
     u16 rangeY : 16;
     u16 rangeX : 16;
+#endif
 };
 struct spawn_hitbox_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 damage : 10;
+    u32 use_common_bone_ids : 1;
+    u32 bone : 8;
+    u32 only_hit_grabbed : 1;
+    u32 hit_group : 3;
+    u32 id : 3;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 id : 3;
     u32 hit_group : 3;
@@ -770,16 +1165,40 @@ struct spawn_hitbox_0 {
     u32 bone : 8;
     u32 use_common_bone_ids : 1;
     u32 damage : 10;
+#endif
 };
 struct spawn_hitbox_1 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s32 z_offset : 16;
+    u32 size : 16;
+#else
     u32 size : 16;
     s32 z_offset : 16;
+#endif
 };
 struct spawn_hitbox_2 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s32 x_offset : 16;
+    s32 y_offset : 16;
+#else
     s32 y_offset : 16;
     s32 x_offset : 16;
+#endif
 };
 struct spawn_hitbox_3 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 rebound : 1;
+    u32 clank : 1;
+    u32 ignore_fighter_scale : 1;
+    u32 ignore_thrown_fighters : 1;
+    u32 item_hit_interaction : 1;
+    u32 weight_set_knockback : 9;
+    u32 knockback_growth : 9;
+    u32 angle : 9;
+#else
     u32 angle : 9;
     u32 knockback_growth : 9;
     u32 weight_set_knockback : 9;
@@ -788,8 +1207,19 @@ struct spawn_hitbox_3 {
     u32 ignore_fighter_scale : 1;
     u32 clank : 1;
     u32 rebound : 1;
+#endif
 };
 struct spawn_hitbox_4 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 hit_aerial : 1;
+    u32 hit_grounded : 1;
+    u32 hit_sfx_kind : 5;
+    u32 hit_sfx_severity : 3;
+    s32 shield_damage : 8;
+    u32 element : 5;
+    u32 base_knockback : 9;
+#else
     u32 base_knockback : 9;
     u32 element : 5;
     s32 shield_damage : 8;
@@ -797,8 +1227,22 @@ struct spawn_hitbox_4 {
     u32 hit_sfx_kind : 5;
     u32 hit_grounded : 1;
     u32 hit_aerial : 1;
+#endif
 };
 struct spawn_hitbox_5 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 pc_pad_ : 16;
+    u32 x1_b7 : 1;
+    u32 x1_b6 : 1;
+    u32 x1_b5 : 1;
+    u32 x1_b4 : 1;
+    u32 x1_b3 : 1;
+    u32 x1_b2 : 1;
+    u32 x1_b1 : 1;
+    u32 x1_b0 : 1;
+    u32 x0 : 8;
+#else
     u32 x0 : 8;
     u32 x1_b0 : 1;
     u32 x1_b1 : 1;
@@ -808,15 +1252,36 @@ struct spawn_hitbox_5 {
     u32 x1_b5 : 1;
     u32 x1_b6 : 1;
     u32 x1_b7 : 1;
+#endif
 };
 struct it_create_hitbox_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 damage : 13;
+    u32 bone : 7;
+    u32 hit_group : 3;
+    u32 id : 3;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 id : 3;
     u32 hit_group : 3;
     u32 bone : 7;
     u32 damage : 13;
+#endif
 };
 struct it_create_hitbox_4 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 x40_b2 : 1;
+    u32 x40_b3 : 1;
+    u32 sfx_kind : 4;
+    u32 sfx_severity : 3;
+    s32 shield_damage : 8;
+    u32 x40_b0 : 1;
+    u32 element : 5;
+    u32 base_knockback : 9;
+#else
     u32 base_knockback : 9;
     u32 element : 5;
     u32 x40_b0 : 1;
@@ -825,6 +1290,7 @@ struct it_create_hitbox_4 {
     u32 sfx_kind : 4;
     u32 x40_b3 : 1;
     u32 x40_b2 : 1;
+#endif
 };
 struct spawn_hitbox_skip {
     u8 _0[0xF];
@@ -835,87 +1301,213 @@ struct spawn_hitbox_skip {
     u32 xF_b4 : 1;
 };
 struct sound_effect_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 unknown : 18;
+    u32 behavior : 8;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 behavior : 8;
     u32 unknown : 18;
+#endif
 };
 struct sound_effect_1 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
     u32 sfx_id;
+#else
+    u32 sfx_id;
+#endif
 };
 struct sound_effect_2 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 panning : 8;
+    u32 volume : 8;
+    u32 padding : 16;
+#else
     u32 padding : 16;
     u32 volume : 8;
     u32 panning : 8;
+#endif
 };
 struct pseudo_random_sfx_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 random_range : 6;
+    u32 behavior : 4;
+    u32 panning : 8;
+    u32 volume : 8;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 volume : 8;
     u32 panning : 8;
     u32 behavior : 4;
     u32 random_range : 6;
+#endif
 };
 struct pseudo_random_sfx_1 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
     u32 sfx_id;
+#else
+    u32 sfx_id;
+#endif
 };
 struct stage_sfx_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 pitch_select : 8;
+    u32 x2_b0_7 : 8;
+    u32 sfx_base : 10;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 sfx_base : 10;
     u32 x2_b0_7 : 8;
     u32 pitch_select : 8;
+#endif
 };
 struct stage_sfx_1 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
     u32 sfx_id;
+#else
+    u32 sfx_id;
+#endif
 };
 struct stage_sfx_2 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 x2_b0_15 : 16;
+    u32 x0_b0_15 : 16;
+#else
     u32 x0_b0_15 : 16;
     u32 x2_b0_15 : 16;
+#endif
 };
 struct stage_sfx_3 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 x3_b0_7 : 8;
+    u32 x2_b0_7 : 8;
+    u32 x0_b0_15 : 16;
+#else
     u32 x0_b0_15 : 16;
     u32 x2_b0_7 : 8;
     u32 x3_b0_7 : 8;
+#endif
 };
 struct footstep_fx_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 x3_b0_7 : 8;
+    u32 x2_b0_7 : 8;
+    u32 x1_b7 : 1;
+    u32 use_alt_bone : 1;
+    u32 boneId : 8;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 boneId : 8;
     u32 use_alt_bone : 1;
     u32 x1_b7 : 1;
     u32 x2_b0_7 : 8;
     u32 x3_b0_7 : 8;
+#endif
 };
 struct unk_fx_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 x3_b0_7 : 8;
+    u32 x2_b0_7 : 8;
+    u32 x1_b0_7 : 8;
+    u32 x0_b6_7 : 2;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 x0_b6_7 : 2;
     u32 x1_b0_7 : 8;
     u32 x2_b0_7 : 8;
     u32 x3_b0_7 : 8;
+#endif
 };
 struct smash_charge_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 charge_rate : 16;
+    u32 charge_frames : 10;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 charge_frames : 10;
     u32 charge_rate : 16;
+#endif
 };
 struct smash_charge_1 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 x1_b0_23 : 24;
+    u32 color_anim : 8;
+#else
     u32 color_anim : 8;
     u32 x1_b0_23 : 24;
+#endif
 };
 struct wind_fx_0 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    u32 bone : 8;
+    u32 x0_b6_17 : 18;
+    u32 opcode : 6;
+#else
     u32 opcode : 6;
     u32 x0_b6_17 : 18;
     u32 bone : 8;
+#endif
 };
 struct wind_fx_1 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s16 x : 16;
+    s16 timer : 16;
+#else
     s16 timer : 16;
     s16 x : 16;
+#endif
 };
 struct wind_fx_2 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s16 mag : 16;
+    s16 y : 16;
+#else
     s16 y : 16;
     s16 mag : 16;
+#endif
 };
 struct wind_fx_3 {
+#ifdef TARGET_PC
+    /* console bit-field order (MSB first) on little-endian, host-order words */
+    s16 decay : 16;
+    s16 angle : 16;
+#else
     s16 angle : 16;
     s16 decay : 16;
+#endif
 };
+
+/* Script words are byte-swapped to host order on PC, so raw half-word and
+ * byte reads inside a command word must index from the other end. */
+#ifdef TARGET_PC
+#define CMD_HALF(i) ((i) ^ 1)
+#define CMD_BYTE(i) ((i) ^ 3)
+#else
+#define CMD_HALF(i) (i)
+#define CMD_BYTE(i) (i)
+#endif
 
 struct CommandInfo {
     f32 timer;       // 0x00
@@ -1016,6 +1608,7 @@ struct CommandInfo {
     u32 loop_count_dup;  // 0x14
     u32 unk_x18;         // 0x18
 };
+ASSERT_SIZE(union CmdUnion, 4);
 
 struct LbShadow {
     u8 x0_b0 : 1;

@@ -1,4 +1,13 @@
 #include "grdatfiles.h"
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#include <stdlib.h>
+#include <pc_hsd_swap.h>
+#include <pc_endian.h>
+extern const unsigned int* pc_debug_watch;
+void pc_debug_watch_install(void);
+extern int pc_debug_gx;
+#endif
 
 #include "ground.h"
 #include "types.h"
@@ -69,6 +78,20 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
                 HSD_ArchiveGetPublicAddress(sp14, "quake_model_set");
         }
         temp_r3->unk0 = sp14;
+#ifdef TARGET_PC
+        /* debugging aid (slow): MELEE_WATCH_PTCL=1 catches swaps that reach
+         * into the particle bank */
+        if (getenv("MELEE_WATCH_PTCL") != NULL) {
+            pc_debug_watch = (const unsigned int*) stage_info.map_ptcl;
+        }
+        if (pc_debug_gx) {
+            OSReport("[gx] stage grkind %d (arg1 %d)\n", stage_info.grkind, arg1);
+        }
+        pc_debug_watch_install();
+        pc_swap_stage_data(temp_r3->unk4, arg1 == 0 ? stage_info.param : NULL,
+                           arg1 == 0 ? stage_info.coll_data : NULL,
+                           arg1 == 0 ? (void**) stage_info.itemdata : NULL);
+#endif
         if (stage_info.map_ptcl != NULL && stage_info.map_texg != NULL) {
             if (phi_r28 != 0) {
                 psInitDataBankLoad(0x40, stage_info.map_ptcl,
@@ -100,10 +123,27 @@ void grDatFiles_801C6228(UnkStageDat* arg0)
 {
     if (arg0 != NULL && arg0->unk28 != NULL && arg0->unk2C != 0) {
         s32 i;
+#ifdef TARGET_PC
+        if (pc_debug_gx) {
+            for (i = 0; i < arg0->unk2C; i++) {
+                OSReport("[gx] x28[%d] = %p (flag %08x)", i, arg0->unk28[i], arg0->unk28[i] != NULL ? arg0->unk28[i]->unk4 : 0);
+            }
+        }
+#endif
         for (i = 0; i < arg0->unk2C; i++) {
             UnkStageDatInternal* temp_r4 = arg0->unk28[i];
             if (temp_r4 != NULL) {
+#ifdef TARGET_PC
+                /* joint or material descriptors still in disc byte order
+                 * until their loader swaps them: set the bit accordingly */
+                if (!pc_swap_is_done(temp_r4)) {
+                    temp_r4->unk4 |= PC_BSWAP32(0x4000000);
+                } else {
+                    temp_r4->unk4 |= 0x4000000;
+                }
+#else
                 temp_r4->unk4 |= 0x4000000;
+#endif
             }
         }
     }

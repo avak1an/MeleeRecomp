@@ -1,3 +1,9 @@
+#include <sysdolphin/baselib/dobj.h>
+#include <sysdolphin/baselib/mobj.h>
+#include <sysdolphin/baselib/jobj.h>
+#ifdef TARGET_PC
+extern int pc_debug_in_fighter; /* renderer debug tag, see pc/src/gx_render.c */
+#endif
 #include "ftdrawcommon.h"
 
 #include <Runtime/platform.h>
@@ -247,7 +253,13 @@ void ftDrawCommon_800805C8(HSD_GObj* gobj, s32 arg1, bool arg2)
 
         mtx = ftDrawCommon_8008051C_inline(gobj, &sp54, &v, sp18, sp78);
 
+#ifdef TARGET_PC
+        pc_debug_in_fighter = 1 + fighter->kind;
+#endif
         HSD_JObjDispAll(GET_JOBJ(gobj), mtx, HSD_GObj_80390EB8(arg1), 0);
+#ifdef TARGET_PC
+        pc_debug_in_fighter = 0;
+#endif
         if (ftData_UnkMtxFunc0[fighter->kind] != NULL) {
             ftData_UnkMtxFunc0[fighter->kind](gobj, arg1, mtx);
         }
@@ -376,10 +388,63 @@ static inline void ftDrawCommon_80080E18_inline2(HSD_GObj* gobj, Fighter* old)
     HSD_JObjSetTranslate(jobj, pos);
 }
 
+#ifdef TARGET_PC
+extern int pc_debug_in_fighter;
+static void pc_dump_jobj_tree(HSD_JObj* jobj, int* njobj, int* nhidden, int* ndobj, int* ndhidden,
+                              float* alpha_min, float* alpha_max, int depth)
+{
+    for (; jobj != NULL; jobj = jobj->next) {
+        HSD_DObj* d;
+        (*njobj)++;
+        if (jobj->flags & JOBJ_HIDDEN) {
+            (*nhidden)++;
+        }
+        if (!(jobj->flags & JOBJ_INSTANCE) && !(jobj->flags & JOBJ_PTCL) && !(jobj->flags & JOBJ_SPLINE)) {
+            for (d = jobj->u.dobj; d != NULL; d = d->next) {
+                (*ndobj)++;
+                if (d->flags & 1) {
+                    (*ndhidden)++;
+                }
+                if (d->mobj != NULL && d->mobj->mat != NULL) {
+                    float a = d->mobj->mat->alpha;
+                    if (a < *alpha_min) *alpha_min = a;
+                    if (a > *alpha_max) *alpha_max = a;
+                }
+            }
+        }
+        if (depth < 64) {
+            pc_dump_jobj_tree(jobj->child, njobj, nhidden, ndobj, ndhidden, alpha_min, alpha_max, depth + 1);
+        }
+    }
+}
+#endif
+
 void ftDrawCommon_80080E18(HSD_GObj* gobj, int arg1)
 {
     Fighter* fp = gobj->user_data;
 
+#ifdef TARGET_PC
+    {
+        extern int pc_debug_gx;
+        extern unsigned int pc_frame_count;
+        if (pc_debug_gx && (pc_frame_count % 60) == 0) {
+            int nj = 0, nh = 0, nd = 0, ndh = 0;
+            float amin = 1e9f, amax = -1e9f;
+            HSD_JObj* root = GET_JOBJ(gobj);
+            pc_dump_jobj_tree(root, &nj, &nh, &nd, &ndh, &amin, &amax, 0);
+            OSReport("[gx] fighter %d tree: %d jobjs (%d hidden), %d dobjs (%d hidden), alpha %g..%g, root flags %08x "
+                     "pos %g %g %g scale %g %g %g\n",
+                     fp->kind, nj, nh, nd, ndh, amin, amax, root != NULL ? root->flags : 0,
+                     root != NULL ? root->translate.x : 0.f, root != NULL ? root->translate.y : 0.f,
+                     root != NULL ? root->translate.z : 0.f, root != NULL ? root->scale.x : 0.f,
+                     root != NULL ? root->scale.y : 0.f, root != NULL ? root->scale.z : 0.f);
+            OSReport("[gx] fighter %d draw: hidden %d visible %d cam mode %d pass %d model %d invisible %d x221E_b5 %d "
+                     "flag byte %02x\n",
+                     fp->kind, fp->x221F_b3, ftLib_80086A8C(gobj), Camera_80031060(), arg1, fp->x21FC_flag.b7,
+                     fp->invisible, fp->x221E_b5, *(u8*) &fp->x21FC_flag);
+        }
+    }
+#endif
     if (!fp->x221F_b3 && ftLib_80086A8C(gobj)) {
         switch (Camera_80031060()) {
         case 1:

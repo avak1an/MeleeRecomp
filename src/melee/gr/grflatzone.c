@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grflatzone.h"
 
 #include "grdisplay.h"
@@ -128,6 +131,9 @@ void grFlatzone_80216E78(void)
     u8* temp_r5;
 
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grflatzone(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     grFlatzone_80216F48(0);

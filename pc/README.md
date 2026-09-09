@@ -23,10 +23,21 @@ character-select screen in a window, with correct text, textures, models
 and layout. See "Renderer" below for what it covers and what it does not
 yet.
 
+**Milestone 3b (in-game rendering) — matches render.** The title
+screen's attract demo (reached by the scripted route in
+`pc/scripts/title-demo.txt`) plays complete four-player CPU matches: stages
+(Great Bay, Corneria, Brinstar, Peach's Castle, Yoshi's Story, ... whatever
+the demo picks), skinned and animated fighters, items, stage hazards, the
+camera and the HUD all render; the demo returns to the title and starts the
+next match. This needed the game-side data swaps for stages, fighters,
+items and animation scripts (see "Changes to shared sources"), plus a
+deterministic clock so headless runs repeat exactly. Fog, indirect
+texturing, mipmaps and destination alpha are still missing from the
+renderer, and a few in-match effects are only contained rather than fixed
+(see "Known gaps").
+
 Planned milestones:
 
-3b. **In-game rendering.** Stages and fighters (skinning, shape animation,
-   fog, EFB effects), plus the remaining game-side data swaps those need.
 4. **Audio, saves, polish.** AX mixing, THP video decoding, memory-card
    files on disk, window and input options.
 
@@ -53,8 +64,17 @@ trips DMA-alignment asserts sooner or later.
 ## Running
 
 ```
-build\pc\melee.exe [--iso PATH] [--frames N] [--realtime] [--autoplay] [--quiet-stubs]
+build\pc\melee.exe [--iso PATH] [--frames N] [--realtime] [--autoplay] [--input FILE] [--seed N] [--quiet-stubs]
 ```
+
+A typical check that a change did not break the match:
+
+```
+build\pc\melee.exe --headless --quiet-stubs --input pc\scripts	itle-demo.txt --seed 3 --frames 3000
+```
+
+Status 0 means two demo matches played out; a crash prints a symbolized
+backtrace and a hang is reported by the watchdog (status 8).
 
 - `--iso PATH`: the NTSC 1.02 disc image (`GALE01`). Without it the runtime
   reads `$MELEE_ISO`, then looks for `GALE01.iso` in the current and parent
@@ -64,6 +84,14 @@ build\pc\melee.exe [--iso PATH] [--frames N] [--realtime] [--autoplay] [--quiet-
 - `--realtime`: pace the loop to 60 Hz (default: as fast as possible).
 - `--autoplay`: tap Start and A on port 1 every 150 frames, which pushes a
   headless run through prompts and menus.
+- `--input FILE`: scripted controller input for port 1. Each line is
+  `<first frame> <last frame> <buttons|-> [stick x y]`, buttons joined by
+  `+` (`A B X Y Z L R START UP DOWN LEFT RIGHT`). `pc/scripts/title-demo.txt`
+  skips the memory-card prompt and lets the title screen start its attract
+  demo, which reaches a full match at frame 925: the standard in-game
+  regression route. Scripted and headless runs ignore the host keyboard.
+- `--seed N`: seed the game's random generator (the clock otherwise). With a
+  script, the same seed replays the same match, stage and all.
 - `--quiet-stubs`: don't log the first call of each SDK stub.
 - `--headless`: no window; run the game logic only (what the regression
   runs use).
@@ -122,6 +150,19 @@ L/R, Space = Z, Enter = Start, numpad 8/2/4/6 = D-pad).
 
 ### Debugging aids
 
+- `MELEE_GX_NOCULL=1` / `MELEE_GX_NOALPHA=1` disable face culling / the
+  alpha test; `MELEE_GX_LOG_FRAME=N` logs every draw of frame N with its
+  state and first vertex (draws issued while a fighter model is displayed
+  are tagged, and each screenshot line reports how many).
+- `--watch 0xADDR` reports every swap helper that touches the word at ADDR
+  and every change of it seen at descriptor swaps, GObj processes and
+  render callbacks, naming the callback before and after. The binary is
+  linked with `/DYNAMICBASE:NO` so static addresses are the same from run
+  to run; print an address in one run (`MELEE_GX_DEBUG=1`), watch it in the
+  next. `MELEE_WATCH_PTCL=1` watches the stage particle bank automatically.
+- `MELEE_WATCHDOG=N` (default 20) prints the main thread's stack and exits
+  with status 8 when no frame completes for N seconds: the way to find
+  where a run spins.
 - `MELEE_TRACE_CARD=1` logs the memory-card command queue.
 - A build configured with `-DMELEE_TRACE_FUNCS=ON` (clang only) records every
   function entry in a ring buffer and prints the last 96 on a crash, and
@@ -238,14 +279,58 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - `mncharsel.c` + `Runtime/platform.h`: `PC_ADJACENT(k)` places the six
   statics that `CSS_ALL` views as one block into a linker-ordered section;
   the scene entry verifies the layout.
+- Game-side data swaps (`pc/src/game_swap.c`, hooked where each table is
+  loaded): stage `map_head`/`grGroundParam`/`coll_data`/`itemdata`, the
+  per-stage `yakumono_param` blocks (swappers generated from the struct
+  declarations by `pc/tools/gen_struct_swap.py` into
+  `pc/generated/yakumono_swap.c`; rerun it after editing a stage struct),
+  fighter data (`ftData`, the PlCo common tables, figatrees, wait-anim and
+  part tables, per-character attributes at `PUSH_ATTRS`), item articles
+  (ItCo tables and stage items; the item-specific attribute blocks have no
+  recorded size and are bounded by the next referenced object in the file),
+  bone dynamics and stage hazard descriptors.
+- Animation command scripts (fighter subactions, item states, colour
+  overlays) are streams of bit-packed 32-bit words: they are byte-swapped
+  in place by a walker that knows each command's length (the tables the
+  interpreters use), following subroutine and goto pointers, and the
+  command structs in `lb/types.h` are declared in console bit order on PC.
+  Raw half-word/byte reads inside a command word go through
+  `CMD_HALF`/`CMD_BYTE`.
+- Bit-fields that mirror disc data or are written through a byte/word view
+  with console bit numbering are declared in reverse under `TARGET_PC`:
+  `StageCallbacks::flags`, `LightOverrideEntry`, `ItemAttr`,
+  `UnkFlagStruct`, `Fighter` x594, `ColorOverlay_x8_t`.
+- `ASSERT_SIZE`/`ASSERT_OFFSET` are active on PC (they were compiled out
+  before); the four settings structs in `gm/types.h` whose PC layout still
+  differs are excluded with a `@todo`.
+- Console-only idioms fixed under `TARGET_PC`: `granime.c` (a no-argument
+  callback that relied on r3 still holding the object), `itspawn.c` (the
+  second item pick table addressed as "the memory after the spawner"),
+  `ftmaterial.c` (two templates read as the data following the class
+  info), `Command_*`/`CmdUnion` (the union must stay 4 bytes: mixed
+  bit-field base types are widened to `u32`), `lbarq.c`/`synth.c` (spin
+  loops now pump completions), `item.c` (state tables with non-pointer
+  words in the material/shape slots).
+- `pad.c`: scripted and headless runs ignore the host keyboard and
+  controllers; `runtime.c`: a frame-locked clock and calendar in unpaced
+  runs, so the same `--seed` replays the same match.
 
 ## Known gaps (deliberate, for later milestones)
 
-- Game-specific data structures loaded from disc (character select, stages,
-  fighters, items, menus) are not swapped yet; the first one is what stops
-  the current autoplay run.
+- Only the data the demo matches touch has been swapped. Stages whose
+  parameter block is typed `void*`/`int*` (Pokemon Stadium, Hyrule Temple,
+  the trophy and target-test stages), item-specific attribute blocks with
+  sub-word fields, and the remaining stage-specific tables are found the
+  same way: run a route, fix the first bad read.
+- Particle lists occasionally end up with a corrupt link after item hit
+  effects; the walker drops the rest of the list and logs
+  `particle list ... is corrupt` instead of crashing. Root cause not found.
+- Sound-effect banks are loaded but their records are not swapped; unload
+  walks are skipped and banks wrap instead of asserting (audio is
+  milestone 4).
 - Four more "index past a global" idioms exist (`gm_19EF.c`, `soundtest.c`)
   that assume console link order.
-- Bit-fields in structs mirroring disc data are laid out LSB-first.
+- The settings structs `gmm_x0`, `lbl_8046B6A0_t`, `TmData` differ in size
+  on PC (bit-field packing); nothing reads them from disc yet.
 - `char` signedness and paired-single float rounding are not matched.
 - THP video, AX audio mixing, memory-card saves and threads are stubs.

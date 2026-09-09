@@ -44,7 +44,8 @@ set(SDK_SOURCES
 
 # PC runtime: hand-written replacements for the SDK plus generated stubs.
 file(GLOB PC_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c)
-set(PC_GENERATED ${CMAKE_CURRENT_SOURCE_DIR}/generated/stubs.c)
+set(PC_GENERATED ${CMAKE_CURRENT_SOURCE_DIR}/generated/stubs.c
+                 ${CMAKE_CURRENT_SOURCE_DIR}/generated/yakumono_swap.c)
 
 add_executable(melee
     ${MELEE_SOURCES}
@@ -154,7 +155,7 @@ endif()
 
 # /LARGEADDRESSAWARE lets the 32-bit process map the console's main-memory
 # range (0x80000000+), which the game uses to tell main memory from ARAM.
-target_link_options(melee PRIVATE /SUBSYSTEM:CONSOLE /STACK:0x400000 /LARGEADDRESSAWARE)
+target_link_options(melee PRIVATE /SUBSYSTEM:CONSOLE /STACK:0x400000 /LARGEADDRESSAWARE /DYNAMICBASE:NO)
 target_link_libraries(melee PRIVATE dbghelp xinput9_1_0 opengl32 gdi32 user32)
 set_target_properties(melee PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}

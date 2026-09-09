@@ -1242,6 +1242,15 @@ static void PObjDispShapeAnim(HSD_PObj* pobj, u32 rendermode)
 
 void HSD_PObjDisp(HSD_PObj* pobj, Mtx vmtx, Mtx pmtx, u32 rendermode)
 {
+#ifdef TARGET_PC
+    {
+        extern int pc_debug_in_fighter;
+        extern int pc_debug_fighter_counts[4];
+        if (pc_debug_in_fighter) {
+            pc_debug_fighter_counts[2]++;
+        }
+    }
+#endif
     switch (pobj->flags & (POBJ_CULLFRONT | POBJ_CULLBACK)) {
     case 0x0:
         HSD_StateSetCullMode(GX_CULL_NONE);

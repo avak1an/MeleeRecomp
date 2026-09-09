@@ -1,4 +1,7 @@
 #include "ftdata.h"
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 
 #include <Runtime/platform.h>
 
@@ -1568,6 +1571,11 @@ void ftData_8008572C(FighterKind kind)
     if (gFtDataList[kind] == NULL) {
         lbArchive_80017040(NULL, ftData_803C1F40[kind].a, &gFtDataList[kind],
                            ftData_803C1F40[kind].b, 0);
+#ifdef TARGET_PC
+        pc_swap_ftdata(gFtDataList[kind], ftData_Table_Unk0[kind].count,
+                       ftData_UnkIntPairs[kind].count,
+                       CostumeListsForeachCharacter[kind].numCostumes);
+#endif
     }
 }
 
@@ -1771,6 +1779,9 @@ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
                     }
                 }
                 fp->x590 = HSD_ArchiveGetPublicAddress(&sp14, temp_r3->x0);
+#ifdef TARGET_PC
+                pc_swap_figatree(fp->x590);
+#endif
             } else {
                 fp->x590 = NULL;
             }

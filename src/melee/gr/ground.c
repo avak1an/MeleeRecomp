@@ -1176,10 +1176,18 @@ f32 Ground_801C20D0(void)
 
 typedef struct LightOverrideEntry {
     /* 0x0 */ HSD_LightDesc* desc;
+#ifdef TARGET_PC
+    /* disc data: the console compiler packs bit-fields MSB first */
+    /* 0x4 */ u8 _ : 5;
+    /* 0x4 */ u8 c : 1;
+    /* 0x4 */ u8 b : 1;
+    /* 0x4 */ u8 a : 1;
+#else
     /* 0x4 */ u8 a : 1;
     /* 0x4 */ u8 b : 1;
     /* 0x4 */ u8 c : 1;
     /* 0x4 */ u8 _ : 5;
+#endif
     /* 0x5 */ u8 _pad[3];
 } LightOverrideEntry;
 
@@ -1651,6 +1659,15 @@ bool Ground_801C2ED0(HSD_JObj* jobj, s32 arg1)
         cur = temp_r3->unk4->unk8[arg1].unk20;
         max = temp_r3->unk4->unk8[arg1].unk24;
         for (i = 0; i < max; i++, cur++) {
+#ifdef TARGET_PC
+            {
+                extern int pc_debug_gx;
+                if (pc_debug_gx) {
+                    OSReport("[gx] coll joint: model %d entry %d/%d at %p: x=%d y=%d z=%d\n",
+                             arg1, i, max, cur, cur->x, cur->y, cur->z);
+                }
+            }
+#endif
             mpLib_800552B0(cur->x, jobj, cur->z);
             mpLib_80055E9C(cur->x);
             mpLib_80057424(cur->x);
@@ -2523,6 +2540,16 @@ bool Ground_801C43C4(void* arg0)
                 }
             }
         }
+#ifdef TARGET_PC
+        {
+            int k;
+            OSReport("[pc] shadow entry lookup failed: arg0=%p max=%d entries:", arg0, max);
+            for (k = 0; k < max && k < 16; k++) {
+                OSReport(" %p/%02x", tmp->unk20[k].unk0, ((u8*) &tmp->unk20[k])[4]);
+            }
+            OSReport("\n");
+        }
+#endif
         HSD_ASSERT(3652, 0);
     }
     return false;

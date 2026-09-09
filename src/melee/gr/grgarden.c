@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grgarden.h"
 
 #include <Runtime/platform.h>
@@ -74,6 +77,9 @@ void grGarden_80202B6C(bool arg) {}
 void grGarden_80202B70(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grgarden(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
     grGarden_80202C78(0);

@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include "camera.h"
 
 #include <Runtime/platform.h>
@@ -4020,6 +4021,18 @@ static void fn_800301D0(HSD_GObj* gobj, int arg1)
         prio8_a = gxlink_prio8();
         prio1_a = gxlink_prio1();
         gobj->gxlink_prios = prio1_a | prio8_a;
+#ifdef TARGET_PC
+        {
+            extern int pc_debug_gx;
+            extern unsigned int pc_frame_count;
+            if (pc_debug_gx && pc_frame_count % 60 == 0) {
+                OSReport("[gx] camera pass: prio1 %08x%08x prio8 %08x%08x stored %08x%08x (field at +%u, sizeof gobj %u)\n",
+                         (u32) (prio1_a >> 32), (u32) prio1_a, (u32) (prio8_a >> 32), (u32) prio8_a,
+                         (u32) (gobj->gxlink_prios >> 32), (u32) gobj->gxlink_prios,
+                         (unsigned) offsetof(HSD_GObj, gxlink_prios), (unsigned) sizeof(HSD_GObj));
+            }
+        }
+#endif
         HSD_GObj_80390ED0(gobj, 7);
 
         render_gxlink_pass(gobj, 1, 7);
@@ -4455,11 +4468,38 @@ void Camera_StopQuake(CmQuakeKind kind)
 
 enum_t Camera_80031060(void)
 {
+#ifdef TARGET_PC
+    /* debugging: report the first time the mode is seen changed by
+     * something other than Camera_80031074 */
+    {
+        extern int pc_debug_gx;
+        extern unsigned int pc_frame_count;
+        static u8 last_seen = 0xFF;
+        u8 now = ((u8*) &game_camera)[0x398];
+        if (pc_debug_gx && now != last_seen) {
+            OSReport("[gx] camera %p flag bytes 0x398.. = %02x %02x %02x %02x at frame %u (mode %d pass %d; "
+                     "offsets x380 %x sizeof %x)\n", (void*) &game_camera, now, ((u8*) &game_camera)[0x399],
+                     ((u8*) &game_camera)[0x39A], ((u8*) &game_camera)[0x39B], pc_frame_count,
+                     game_camera.x398_b6_b7, game_camera.x399_b0_b1,
+                     (unsigned) offsetof(Camera, x380), (unsigned) sizeof(Camera));
+            last_seen = now;
+        }
+    }
+#endif
     return game_camera.x398_b6_b7;
 }
 
 void Camera_80031074(u8 arg0)
 {
+#ifdef TARGET_PC
+    {
+        extern int pc_debug_gx;
+        if (pc_debug_gx) {
+            OSReport("[gx] camera mode set to %d (byte 0x398 was %02x)\n", arg0,
+                     ((u8*) &game_camera)[0x398]);
+        }
+    }
+#endif
     game_camera.x398_b6_b7 = arg0;
 }
 

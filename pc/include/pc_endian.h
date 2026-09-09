@@ -20,15 +20,25 @@
     ((uint32_t) (((uint32_t) (x) >> 24) | (((uint32_t) (x) >> 8) & 0xFF00u) |                    \
                  (((uint32_t) (x) << 8) & 0xFF0000u) | ((uint32_t) (x) << 24)))
 
+/// Debug hook: when set, every swap helper reports the range it is about to
+/// swap. Installed by `--watch ADDR` to find the code that rewrites a word.
+extern void (*pc_swap_hook)(const void* p, size_t bytes);
+
 static __inline void pc_swap16(void* p)
 {
     uint16_t* v = (uint16_t*) p;
+    if (pc_swap_hook != NULL) {
+        pc_swap_hook(p, 2);
+    }
     *v = PC_BSWAP16(*v);
 }
 
 static __inline void pc_swap32(void* p)
 {
     uint32_t* v = (uint32_t*) p;
+    if (pc_swap_hook != NULL) {
+        pc_swap_hook(p, 4);
+    }
     *v = PC_BSWAP32(*v);
 }
 
@@ -37,6 +47,9 @@ static __inline void pc_swap16_range(void* p, size_t bytes)
 {
     uint16_t* v = (uint16_t*) p;
     size_t n = bytes / 2, i;
+    if (pc_swap_hook != NULL) {
+        pc_swap_hook(p, bytes);
+    }
     for (i = 0; i < n; i++) {
         v[i] = PC_BSWAP16(v[i]);
     }
@@ -47,6 +60,9 @@ static __inline void pc_swap32_range(void* p, size_t bytes)
 {
     uint32_t* v = (uint32_t*) p;
     size_t n = bytes / 4, i;
+    if (pc_swap_hook != NULL) {
+        pc_swap_hook(p, bytes);
+    }
     for (i = 0; i < n; i++) {
         v[i] = PC_BSWAP32(v[i]);
     }

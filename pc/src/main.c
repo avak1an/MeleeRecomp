@@ -12,6 +12,7 @@
 #include "pc_runtime.h"
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,6 +29,10 @@ static void usage(void)
             "  --realtime      pace the main loop to 60 Hz\n"
             "  --autoplay      press Start and A on port 1 every couple of seconds\n"
             "                  (pushes headless runs through prompts)\n"
+            "  --input FILE    scripted port-1 input: lines of\n"
+            "                  <first frame> <last frame> <buttons|-> [stickX stickY]\n"
+            "                  buttons: A B X Y Z L R START UP DOWN LEFT RIGHT joined by +\n"
+            "  --seed N        fixed RNG seed (default: the clock), for repeatable runs\n"
             "  --quiet-stubs   do not log the first call of each SDK stub\n"
             "  --headless      no window; run the game logic only\n"
             "  --screenshots DIR  save a BMP of every 60th frame into DIR\n"
@@ -53,6 +58,13 @@ int main(int argc, char** argv)
             pc_config.realtime = true;
         } else if (strcmp(argv[i], "--autoplay") == 0) {
             pc_config.autoplay = true;
+        } else if (strcmp(argv[i], "--input") == 0 && i + 1 < argc) {
+            pc_config.input_script = argv[++i];
+        } else if (strcmp(argv[i], "--watch") == 0 && i + 1 < argc) {
+            pc_debug_watch = (const unsigned int*) (uintptr_t) strtoul(argv[++i], NULL, 0);
+            pc_debug_watch_install();
+        } else if (strcmp(argv[i], "--seed") == 0 && i + 1 < argc) {
+            pc_config.seed = (unsigned) strtoul(argv[++i], NULL, 0);
         } else if (strcmp(argv[i], "--quiet-stubs") == 0) {
             pc_config.log_stubs = false;
         } else if (strcmp(argv[i], "--headless") == 0) {

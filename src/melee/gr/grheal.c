@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grheal.h"
 
 #include <Runtime/platform.h>
@@ -141,6 +144,9 @@ void grHeal_8021EF38(bool arg0) {}
 void grHeal_8021EF3C(void)
 {
     grHeal_804D6AF0[0] = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grheal(grHeal_804D6AF0[0]);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
 

@@ -258,6 +258,15 @@ static int TObjLoad(HSD_TObj* tobj, HSD_TObjDesc* td)
 {
 #ifdef TARGET_PC
     pc_swap_tobjdesc(td);
+    if (pc_swap_ptr_ok(td) && (!pc_swap_ptr_ok(td->next) || !pc_swap_ptr_ok(td->imagedesc) ||
+        !pc_swap_ptr_ok(td->tlutdesc) || !pc_swap_ptr_ok(td->tev) ||
+        !pc_swap_ptr_ok(td->class_name)))
+    {
+        OSReport("[pc] bad HSD_TObjDesc at %p: class=%p next=%p id=%08x src=%08x "
+                 "imagedesc=%p tlutdesc=%p lod=%p tev=%p\n",
+                 td, td->class_name, td->next, td->id, td->src, td->imagedesc,
+                 td->tlutdesc, td->lod, td->tev);
+    }
 #endif
     tobj->next = HSD_TObjLoadDesc(td->next);
     tobj->id = td->id;

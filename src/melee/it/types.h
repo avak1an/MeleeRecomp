@@ -78,6 +78,19 @@ struct Item_DynamicBones {
 ASSERT_SIZE(struct Item_DynamicBones, 0x1C);
 
 struct ItemAttr {
+#ifdef TARGET_PC
+    /* disc data: the console compiler packs bit-fields MSB first, so the
+     * fields are declared in reverse for the little-endian host */
+    u8 x0_hold_kind : 3;
+    u8 x0_78 : 4;
+    u8 x0_is_heavy : 1;
+    u8 x1_8 : 1;
+    u8 x1_67_cam_kind : 2;
+    u8 x1_5 : 1;
+    u8 x1_4 : 1;
+    u8 x1_3 : 1;
+    u8 x1_1 : 2;
+#else
     u8 x0_is_heavy : 1; // 0x0, bit 0x80, is heavy item (crate)
     u8 x0_78 : 4; // Should be enum (Item_UnkKinds?) for type of action char
                   // takes when using - 0: throwable, 2: Swingable, 3:
@@ -89,6 +102,7 @@ struct ItemAttr {
     u8 x1_5 : 1;            // 0x1 0x08
     u8 x1_67_cam_kind : 2;  // 0x1 0x06, is stored to 0xdcd
     u8 x1_8 : 1;            // 0x1 0x01    char flags3; //0x2
+#endif
     u8 x3;                  // 0x3
     f32 x4_throw_speed_mul; // 0x4, speed multiplier at which this item is
                             // thrown at

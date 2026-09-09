@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "groldpupupu.h"
 
 #include <sysdolphin/baselib/forward.h>
@@ -142,6 +145,9 @@ void grOldPupupu_802107E0(void)
     PAD_STACK(8);
 
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_groldpupupu(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     grOldPupupu_802108B4(0);

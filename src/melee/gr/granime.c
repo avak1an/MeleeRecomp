@@ -510,7 +510,13 @@ void grAnime_801C6F50(HSD_AObj* aobj, void* obj, u32 flags, void* func,
 {
     switch (type) {
     case 0:
+#ifdef TARGET_PC
+        /* The console build calls this with no arguments and the callee
+         * still finds aobj in r3; on x86 it must be passed explicitly. */
+        ((void (*)(HSD_AObj*)) func)(aobj);
+#else
         ((Event) func)();
+#endif
         break;
     case 1:
         ((Callback1) func)(aobj, obj, flags, *(float*) param);

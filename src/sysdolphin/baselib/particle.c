@@ -1,4 +1,8 @@
 #include "particle.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+extern int pc_debug_gx;
+#endif
 
 #include "generator.h"
 
@@ -152,6 +156,10 @@ void psInitDataBankLoad(int bank, const int* cmdBank, const int* texBank,
         break;
     }
     default:
+#ifdef TARGET_PC
+        OSReport("[pc] particle bank %d at %p: version 0x%04x, words %08x %08x %08x\n", bank,
+                 cmdBank, version, ((u32*) cmdBank)[0], ((u32*) cmdBank)[1], ((u32*) cmdBank)[2]);
+#endif
         OSPanic(__FILE__, 207, "psInitDataBanks: unknown version\n");
     }
 }
@@ -159,6 +167,9 @@ void psInitDataBankLoad(int bank, const int* cmdBank, const int* texBank,
 void psInitDataBankLocate(HSD_Archive* cmdBank, HSD_Archive* texBank,
                           int* formBank)
 {
+#ifdef TARGET_PC
+    pc_swap_ps_banks(cmdBank, texBank, formBank);
+#endif
     s32 num;
     s32* ptr;
     s32* group;
@@ -206,6 +217,11 @@ version40:
     }
 
 done_cmd:
+#ifdef TARGET_PC
+    if (pc_debug_gx) {
+        OSReport("[gx]   after reloc: %08x num %d num2 %d\n", *(u32*) cmdBank, num, num2);
+    }
+#endif
     /* Phase 2: Fix cmdList kind bits */
     ptr = base + num;
     for (i = num; i < num2; i++) {
@@ -218,6 +234,11 @@ done_cmd:
         ptr++;
     }
 
+#ifdef TARGET_PC
+    if (pc_debug_gx) {
+        OSReport("[gx]   after kind fix: %08x\n", *(u32*) cmdBank);
+    }
+#endif
     /* Phase 3: texBank relocation */
     {
         s32 num_groups = ((s32*) texBank)[0];
@@ -3051,10 +3072,30 @@ void hsd_8039D0A0(HSD_Generator* gen)
 
     prev = NULL;
     idnum = gen->idnum;
+#ifdef TARGET_PC
+    if (gen->linkNo >= 146) {
+        OSReport("[pc] particle generator %p: link %d bank %d kind %d texGroup %d id %d\n", (void*) gen,
+                 gen->linkNo, gen->bank, gen->kind, gen->texGroup, idnum);
+    }
+#endif
     head = &data->particle[gen->linkNo];
     prt = *head;
 
     while (prt != NULL) {
+#ifdef TARGET_PC
+        if (!pc_swap_ptr_ok(prt)) {
+            /* corrupted list link: still under investigation (seen after
+             * item effects); drop the rest of the list instead of crashing */
+            OSReport("[pc] particle list %d of generator %p (bank %d kind %d id %d) is corrupt at %p\n",
+                     gen->linkNo, (void*) gen, gen->bank, gen->kind, idnum, (void*) prt);
+            if (prev == NULL) {
+                *head = NULL;
+            } else {
+                prev->next = NULL;
+            }
+            break;
+        }
+#endif
         next = prt->next;
         if (prt->idnum == idnum && prt->gen != NULL && prt->gen == gen) {
             if (prt->gen != NULL && prt->gen->userfunc != NULL &&

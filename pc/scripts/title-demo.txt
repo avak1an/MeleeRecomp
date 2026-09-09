@@ -1,0 +1,5 @@
+# Boot to the title screen and let the attract demo start on its own.
+# <first frame> <last frame> <buttons or -> [stickX stickY]
+150 151 START
+210 211 A
+300 301 START

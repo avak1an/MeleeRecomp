@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 #include "ftcoll.h"
 
 #include <Runtime/platform.h>
@@ -1292,6 +1295,13 @@ bool ftColl_80077C60(Item* item, HitCapsule* hit, Fighter* fp,
                 }
 
                 if (!fp->x221C_b4) {
+#ifdef TARGET_PC
+                    if (scaled_dmg > 500.0f) {
+                        OSReport("[pc] item %d hitbox damage %g (item mul %g at %p, mul2 %g) hit fighter %d\n",
+                                 item->kind, hit->damage, item->xC40, (void*) &item->xC40, item->xC44,
+                                 fp->kind);
+                    }
+#endif
                     if (scaled_dmg > 500.0f) {
                         HSD_ASSERTREPORT(0xB7, 0,
                                          "attack power over 500!! %f\n",
@@ -3491,6 +3501,10 @@ void ftColl_8007BAC0(Fighter_GObj* gobj)
                 if (ftCo_800C0A28(gobj, ground, type)) {
                     if (ft_80459A8C[i].active_cb(ground, gobj, (Vec3*) &desc))
                     {
+#ifdef TARGET_PC
+                        /* stage hazard parameters straight from the stage file */
+                        pc_swap_dynamics_desc(desc);
+#endif
                         if (max == 0) {
                             ftCo_800C08A0(gobj, (Fighter_GObj*) ground, desc,
                                           type);

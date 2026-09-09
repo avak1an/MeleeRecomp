@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#endif
 #include "synth.h"
 #ifdef TARGET_PC
 #include <pc_endian.h>
@@ -169,6 +172,16 @@ static void HSD_SynthSFXHeaderLoadCallback(int result, int length, void* addr,
     if (HSD_Synth_804D7738 == 0) {
         int bankID = HSD_Synth_804C2A60[0].bankID;
 
+#ifdef TARGET_PC
+        /* Audio is not implemented yet, so nothing plays from the bank
+         * memory: when the sound effect bookkeeping (partly unswapped) runs
+         * out of room, start the bank over instead of stopping the game. */
+        if (hsd_SynthSFXBankHead[bankID + 1] - hsd_SynthSFXBank[bankID] <
+            hsd_SynthSFXLoadBuf[1])
+        {
+            hsd_SynthSFXBank[bankID] = hsd_SynthSFXBankHead[bankID];
+        }
+#endif
         HSD_ASSERTREPORT(0xCD,
                          hsd_SynthSFXBankHead[bankID + 1] -
                                  hsd_SynthSFXBank[bankID] >=
@@ -319,7 +332,13 @@ void HSD_SynthSFXUnloadBank(int bank_id)
     head = &HSD_Synth_804C2AE0[bank_id];
     while (*head != NULL) {
         AXVPB* cur;
+#ifndef TARGET_PC
+        /* PC: audio is not implemented yet and the sound effect records
+         * built from the bank data are not swapped; only free the nodes */
+#ifndef TARGET_PC
         HSD_SynthSFXUnloadBank_inline(*head);
+#endif
+#endif
         cur = *head;
         *head = (*head)->next;
         HSD_AudioFree(cur);
@@ -353,7 +372,9 @@ void HSD_Synth_80388E08(int sfx_id)
             cur = *pcur;
             /// @todo AXVPB prev must be a signed int type, not a pointer
             if ((int) cur->prev == sfx_id) {
+#ifndef TARGET_PC
                 HSD_SynthSFXUnloadBank_inline(cur);
+#endif
                 *pcur = cur->next;
                 HSD_AudioFree(cur);
                 return;
@@ -436,6 +457,11 @@ void HSD_SynthSFXBankDeflag(int bank_id)
 void HSD_SynthSFXBankDeflagSync(void)
 {
     while (sfxGroupDataReaddressCounter) {
+#ifdef TARGET_PC
+        /* the counter drops from transfer callbacks, which complete from
+         * the pump here instead of an interrupt */
+        pc_pump();
+#endif
         continue;
     }
 }

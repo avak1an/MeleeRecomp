@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grcastle.h"
 
 #include <placeholder.h>
@@ -232,6 +235,9 @@ void grCastle_801CD37C(void)
 {
     PAD_STACK(4);
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grcastle(yakumono_param);
+#endif
 
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;

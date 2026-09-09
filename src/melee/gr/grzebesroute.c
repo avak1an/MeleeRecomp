@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grzebesroute.h"
 
 #include <placeholder.h>
@@ -83,6 +86,9 @@ void grZebesRoute_8020B160(bool arg) {}
 void grZebesRoute_8020B164(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grzebesroute(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
     grZebesRoute_8020B260(0);
