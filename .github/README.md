@@ -1,25 +1,3 @@
-Super Smash Bros Melee \
-[![Build Status]][actions]
-[![Discord Badge]][discord]
-[![Fuzzy Progress]][progress]
-[![Perfect Progress]][progress]
-[![Linked Progress]][progress]
-=============
-
-[<img src="https://decomp.dev/doldecomp/melee.svg?w=512&h=256" width="512" height="256">][Progress]
-
-[actions]: https://github.com/doldecomp/melee/actions/workflows/build.yml
-[discord]: https://discord.gg/hKx3FJJgrV
-[progress]: https://decomp.dev/doldecomp/melee
-
-[Build Status]: https://github.com/doldecomp/melee/actions/workflows/build.yml/badge.svg
-[Fuzzy Progress]: https://decomp.dev/doldecomp/melee.svg?mode=shield&measure=fuzzy_match_percent&label=fuzzy&category=all
-[Perfect Progress]: https://decomp.dev/doldecomp/melee.svg?mode=shield&measure=code&label=perfect&category=all
-[Linked Progress]: https://decomp.dev/doldecomp/melee.svg?mode=shield&measure=complete_code&label=linked&category=all
-[Discord Badge]: https://img.shields.io/discord/727908905392275526?color=%237289DA&logo=discord&logoColor=%23FFFFFF
-
-This repo contains a WIP decompilation of Super Smash Bros Melee (US).
-
 # About this fork: MeleeRecomp (v1.0-beta)
 
 This repository is a copy of [doldecomp/melee](https://github.com/doldecomp/melee)
@@ -75,6 +53,30 @@ repository contains no game data.
 - `pc/README.md` has the full story: status by milestone, every option,
   what the renderer and the mixer cover, the debugging aids, the changes
   made to shared sources and the known gaps.
+  
+=============
+
+Super Smash Bros Melee \
+[![Build Status]][actions]
+[![Discord Badge]][discord]
+[![Fuzzy Progress]][progress]
+[![Perfect Progress]][progress]
+[![Linked Progress]][progress]
+=============
+
+[<img src="https://decomp.dev/doldecomp/melee.svg?w=512&h=256" width="512" height="256">][Progress]
+
+[actions]: https://github.com/doldecomp/melee/actions/workflows/build.yml
+[discord]: https://discord.gg/hKx3FJJgrV
+[progress]: https://decomp.dev/doldecomp/melee
+
+[Build Status]: https://github.com/doldecomp/melee/actions/workflows/build.yml/badge.svg
+[Fuzzy Progress]: https://decomp.dev/doldecomp/melee.svg?mode=shield&measure=fuzzy_match_percent&label=fuzzy&category=all
+[Perfect Progress]: https://decomp.dev/doldecomp/melee.svg?mode=shield&measure=code&label=perfect&category=all
+[Linked Progress]: https://decomp.dev/doldecomp/melee.svg?mode=shield&measure=complete_code&label=linked&category=all
+[Discord Badge]: https://img.shields.io/discord/727908905392275526?color=%237289DA&logo=discord&logoColor=%23FFFFFF
+
+This repo contains a WIP decompilation of Super Smash Bros Melee (US).
 
 > [!TIP]
 > The DOL this repository builds can be shifted! Meaning you are able to now add and remove code as you see fit, for modding or research purposes.
