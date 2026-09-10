@@ -12,7 +12,9 @@
 #include <commdlg.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <setupapi.h>
 #include <wincrypt.h>
+#include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -36,6 +38,8 @@ enum {
     IDC_KEYMAP_EDIT,
     IDC_KEYMAP_BROWSE,
     IDC_KEYMAP_CREATE,
+    IDC_ADAPTER,
+    IDC_ADAPTER_STATUS,
     IDC_SAVES_EDIT,
     IDC_SAVES_BROWSE,
     IDC_SAVES_OPEN,
@@ -419,6 +423,113 @@ static void create_keymap(void)
         fclose(f);
     }
     ShellExecuteA(main_wnd, "open", "notepad.exe", path, NULL, SW_SHOWNORMAL);
+}
+
+/* --- GameCube adapter ----------------------------------------------------------
+ * The official adapter (USB 057E:0337) needs the WinUSB driver, which
+ * Windows does not assign by itself. Detect whether it is present with that
+ * driver (the same interface enumeration the game uses) and explain the
+ * one-time Zadig step otherwise. */
+
+static const GUID usb_device_guid = { 0xA5DCBF10, 0x6530, 0x11D2, { 0x90, 0x1F, 0x00, 0xC0, 0x4F, 0xB9, 0x51, 0xED } };
+
+/* 1 = adapter present with WinUSB, 0 = adapter present without a usable
+ * driver (as "WUP-028" in Device Manager), -1 = no adapter */
+static int adapter_state(void)
+{
+    HDEVINFO set;
+    SP_DEVICE_INTERFACE_DATA iface;
+    SP_DEVINFO_DATA dev;
+    DWORD i;
+    int state = -1;
+
+    set = SetupDiGetClassDevsA(&usb_device_guid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+    if (set != INVALID_HANDLE_VALUE) {
+        iface.cbSize = sizeof(iface);
+        for (i = 0; SetupDiEnumDeviceInterfaces(set, NULL, &usb_device_guid, i, &iface); i++) {
+            char buf[1024], lower[1024];
+            SP_DEVICE_INTERFACE_DETAIL_DATA_A* detail = (SP_DEVICE_INTERFACE_DETAIL_DATA_A*) buf;
+            size_t k;
+            detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_A);
+            if (!SetupDiGetDeviceInterfaceDetailA(set, &iface, detail, sizeof(buf), NULL, NULL)) {
+                continue;
+            }
+            for (k = 0; detail->DevicePath[k] != '\0' && k < sizeof(lower) - 1; k++) {
+                lower[k] = (char) tolower((unsigned char) detail->DevicePath[k]);
+            }
+            lower[k] = '\0';
+            if (strstr(lower, "vid_057e&pid_0337") != NULL) {
+                state = 1;
+            }
+        }
+        SetupDiDestroyDeviceInfoList(set);
+    }
+    if (state == 1) {
+        return 1;
+    }
+    /* any driver: the device is listed by hardware id whatever driver it has */
+    set = SetupDiGetClassDevsA(NULL, "USB", NULL, DIGCF_PRESENT | DIGCF_ALLCLASSES);
+    if (set != INVALID_HANDLE_VALUE) {
+        dev.cbSize = sizeof(dev);
+        for (i = 0; SetupDiEnumDeviceInfo(set, i, &dev); i++) {
+            char ids[1024];
+            DWORD type = 0;
+            if (SetupDiGetDeviceRegistryPropertyA(set, &dev, SPDRP_HARDWAREID, &type, (BYTE*) ids, sizeof(ids), NULL)) {
+                char* p;
+                for (p = ids; *p != '\0'; p++) {
+                    *p = (char) toupper((unsigned char) *p);
+                }
+                if (strstr(ids, "VID_057E&PID_0337") != NULL) {
+                    state = 0;
+                }
+            }
+        }
+        SetupDiDestroyDeviceInfoList(set);
+    }
+    return state;
+}
+
+static void refresh_adapter_status(void)
+{
+    switch (adapter_state()) {
+    case 1:
+        set_text(IDC_ADAPTER_STATUS, "Adapter detected with the WinUSB driver: ready.");
+        break;
+    case 0:
+        set_text(IDC_ADAPTER_STATUS, "Adapter detected, but it needs the WinUSB driver (click Setup).");
+        break;
+    default:
+        set_text(IDC_ADAPTER_STATUS, "No adapter detected (optional).");
+        break;
+    }
+}
+
+static void adapter_setup(void)
+{
+    int state = adapter_state();
+    char text[1200];
+    int r;
+    snprintf(text, sizeof(text),
+             "%s\n\n"
+             "The official Wii U / Switch GameCube controller adapter needs Microsoft's generic WinUSB driver, "
+             "which Windows does not assign by itself. This is the same one-time step Dolphin needs; if the "
+             "adapter already works in Dolphin through Zadig, nothing more is required.\n\n"
+             "1. Plug the adapter into a USB port (the black cable; the grey one only powers rumble).\n"
+             "2. Download and run Zadig from zadig.akeo.ie.\n"
+             "3. In Zadig, choose Options > List All Devices and select \"WUP-028\" in the list.\n"
+             "4. Make sure the driver on the right reads \"WinUSB\", then click \"Replace Driver\".\n"
+             "5. Start the game: controllers in ports 1-4 work, with rumble, and can be plugged in at any time.\n\n"
+             "The driver stays installed across reboots and only affects the adapter. Device Manager's "
+             "\"Uninstall device\" restores Windows' default.\n\n"
+             "Open the Zadig download page now?",
+             state == 1 ? "Status: adapter detected with the WinUSB driver. It is ready to use."
+             : state == 0 ? "Status: adapter detected, but it still has Windows' default driver."
+                          : "Status: no adapter detected right now (plug it in and click again to check).");
+    r = MessageBoxA(main_wnd, text, "GameCube adapter setup", MB_YESNO | MB_ICONINFORMATION);
+    if (r == IDYES) {
+        ShellExecuteA(main_wnd, "open", "https://zadig.akeo.ie/", NULL, NULL, SW_SHOWNORMAL);
+    }
+    refresh_adapter_status();
 }
 
 /* --- mods -------------------------------------------------------------------- */
@@ -967,6 +1078,9 @@ static void build_ui(void)
     make("EDIT", "", WS_BORDER | ES_AUTOHSCROLL, 100, y, 250, 22, IDC_KEYMAP_EDIT);
     make("BUTTON", "Browse...", 0, 356, y, 80, 22, IDC_KEYMAP_BROWSE);
     make("BUTTON", "Create / edit", 0, 444, y, 80, 22, IDC_KEYMAP_CREATE);
+    y += 26;
+    make("BUTTON", "GameCube adapter setup...", 0, 16, y, 170, 22, IDC_ADAPTER);
+    make("STATIC", "", 0, 194, y + 3, 330, 16, IDC_ADAPTER_STATUS);
     y += 32;
 
     heading("Saves", y);
@@ -1032,8 +1146,8 @@ static void build_ui(void)
 
     make("BUTTON", "Play", BS_DEFPUSHBUTTON, 16, y, 120, 32, IDC_PLAY);
     SendMessageA(ctl(IDC_PLAY), WM_SETFONT, (WPARAM) bold_font, TRUE);
-    make("STATIC", "", 0, 148, y + 8, 296, 32, IDC_STATUS);
-    make("STATIC", PC_PORT_NAME " " PC_PORT_VERSION, SS_RIGHT, 444, y + 8, 80, 16, 0);
+    make("STATIC", "", 0, 148, y + 8, 236, 32, IDC_STATUS);
+    make("STATIC", PC_PORT_NAME " " PC_PORT_VERSION, SS_RIGHT, 384, y + 8, 140, 16, 0);
     y += 44;
 
     /* settings */
@@ -1066,6 +1180,7 @@ static void build_ui(void)
     refresh_build_status();
     EnableWindow(ctl(IDC_EXTRACT_OPEN), extract_dir[0] != '\0' && dir_exists(extract_dir));
     mods_refresh();
+    refresh_adapter_status();
     {
         char exe[MAX_PATH];
         set_status(find_game_exe(exe, sizeof(exe)) ? "Ready." : "melee.exe was not found: build it (see \"Build from source\").");
@@ -1106,6 +1221,9 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             break;
         case IDC_KEYMAP_CREATE:
             create_keymap();
+            break;
+        case IDC_ADAPTER:
+            adapter_setup();
             break;
         case IDC_SAVES_BROWSE:
             get_text(IDC_SAVES_EDIT, buf, sizeof(buf));
@@ -1249,7 +1367,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     r.left = 0;
     r.top = 0;
     r.right = 540;
-    r.bottom = 846;
+    r.bottom = 872;
     AdjustWindowRect(&r, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
     main_wnd = CreateWindowExA(0, "MeleeLauncher", APP_TITLE, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
                                CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, inst,

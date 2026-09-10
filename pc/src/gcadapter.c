@@ -20,6 +20,7 @@
 #include <dolphin/pad.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <windows.h>
 #include <setupapi.h>
@@ -205,6 +206,26 @@ int pc_gcadapter_read(int port, PADStatus* st)
     memcpy(r, latest, sizeof(r));
     LeaveCriticalSection(&lock);
     p = r + 1 + port * 9;
+    {
+        /* MELEE_TRACE_PAD=1: the port states once, then a connected
+         * controller's raw values about once a second */
+        static int trace = -1;
+        static DWORD last_trace;
+        static int announced;
+        if (trace < 0) {
+            trace = getenv("MELEE_TRACE_PAD") != NULL;
+        }
+        if (trace && port == 0 && !announced) {
+            fprintf(stderr, "[pad] adapter ports: %02x %02x %02x %02x (0x10 wired, 0x20 wireless)\n", r[1], r[10],
+                    r[19], r[28]);
+            announced = 1;
+        }
+        if (trace && (p[0] & 0x30) && GetTickCount() - last_trace > 1000) {
+            last_trace = GetTickCount();
+            fprintf(stderr, "[pad] port %d: buttons %02x %02x stick %3u %3u c %3u %3u triggers %3u %3u\n", port + 1,
+                    p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]);
+        }
+    }
     if (!(p[0] & 0x30)) { /* neither wired (0x10) nor wireless (0x20) */
         have_origin[port] = 0;
         return 0;

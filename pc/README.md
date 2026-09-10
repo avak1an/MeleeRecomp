@@ -268,8 +268,11 @@ while the game runs. Windows has no driver for it, so, exactly as for
 Dolphin, install the WinUSB driver once with
 [Zadig](https://zadig.akeo.ie/): plug the adapter in, in Zadig choose
 "Options > List All Devices", select "WUP-028", pick "WinUSB" and click
-"Replace Driver". The startup log prints `GameCube adapter connected` when
-the game finds it; a port with a controller takes precedence over an
+"Replace Driver". The launcher's "GameCube adapter setup..." button shows the same steps,
+reports whether an adapter is present and whether it already has the
+WinUSB driver, and opens the Zadig page. The startup log prints
+`GameCube adapter connected` when the game finds it (`MELEE_TRACE_PAD=1`
+logs the port states and a controller's raw values); a port with a controller takes precedence over an
 XInput pad on the same port. Third-party adapters that emulate the
 official one (Mayflash in "Wii U" mode) work the same way.
 

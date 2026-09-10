@@ -205,7 +205,7 @@ add_custom_target(melee-launcher-dist ALL
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/copy_launcher.cmake
     DEPENDS melee-launcher
     COMMENT "Copying the launcher to pc/dist")
-target_link_libraries(melee-launcher PRIVATE comctl32 comdlg32 shell32 ole32 user32 gdi32 advapi32)
+target_link_libraries(melee-launcher PRIVATE comctl32 comdlg32 shell32 ole32 user32 gdi32 advapi32 setupapi)
 target_link_options(melee-launcher PRIVATE
     "/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'")
 set_target_properties(melee-launcher PROPERTIES
