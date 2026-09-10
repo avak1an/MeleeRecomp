@@ -955,8 +955,10 @@ static void build_ui(void)
 
     heading("Controls", y);
     y += 20;
-    make("STATIC", "XInput gamepads are ports 1-4. Without a gamepad the keyboard is port 1:", 0, 16, y, 508, 16,
-         0);
+    make("STATIC", "GameCube controllers on the official USB adapter (WinUSB driver via Zadig) or XInput", 0, 16, y,
+         508, 16, 0);
+    y += 16;
+    make("STATIC", "gamepads are ports 1-4. Without a gamepad the keyboard is port 1:", 0, 16, y, 508, 16, 0);
     y += 16;
     make("STATIC", "arrows = stick, IJKL = C stick, Z/X/C/V = A/B/X/Y, Q/E = L/R, Space = Z, Enter = Start.", 0,
          16, y, 508, 16, 0);
@@ -1247,7 +1249,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     r.left = 0;
     r.top = 0;
     r.right = 540;
-    r.bottom = 830;
+    r.bottom = 846;
     AdjustWindowRect(&r, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
     main_wnd = CreateWindowExA(0, "MeleeLauncher", APP_TITLE, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
                                CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, inst,

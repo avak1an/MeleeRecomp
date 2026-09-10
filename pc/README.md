@@ -246,8 +246,9 @@ smash detected by the tracer. Every abnormal exit prints a symbolized
 backtrace, `[pc] scene:` lines mark game-mode transitions, and the stub
 call counts at the end are the to-do list.
 
-Controllers: XInput devices map to ports 1-4. With no gamepad, the keyboard
-drives port 1 (arrows = stick, IJKL = C stick, Z/X/C/V = A/B/X/Y, Q/E =
+Controllers: GameCube controllers on the official Wii U / Switch USB
+adapter map to ports 1-4 (see below); otherwise XInput devices map to
+ports 1-4. With no gamepad, the keyboard drives port 1 (arrows = stick, IJKL = C stick, Z/X/C/V = A/B/X/Y, Q/E =
 L/R, Space = Z, Enter = Start, numpad 8/2/4/6 = D-pad). `--keymap FILE`
 changes that layout; each line is `ACTION = KEY`, for example:
 
@@ -259,6 +260,18 @@ B = J
 STICK_UP = W
 START = ENTER
 ```
+
+GameCube adapter: the official Nintendo adapter (USB id 057E:0337, the
+Wii U one and the Switch one are the same device) is supported directly,
+with rumble, and controllers can be plugged in or the adapter connected
+while the game runs. Windows has no driver for it, so, exactly as for
+Dolphin, install the WinUSB driver once with
+[Zadig](https://zadig.akeo.ie/): plug the adapter in, in Zadig choose
+"Options > List All Devices", select "WUP-028", pick "WinUSB" and click
+"Replace Driver". The startup log prints `GameCube adapter connected` when
+the game finds it; a port with a controller takes precedence over an
+XInput pad on the same port. Third-party adapters that emulate the
+official one (Mayflash in "Wii U" mode) work the same way.
 
 Keys are letters, digits, `F1`-`F24`, or names: `ENTER SPACE TAB BACKSPACE
 SHIFT LSHIFT RSHIFT CTRL LCTRL RCTRL ALT UP DOWN LEFT RIGHT INSERT DELETE
@@ -319,6 +332,7 @@ BACKSLASH RBRACKET QUOTE`. Actions not mentioned keep their default.
 | `src/gl_window.c`, `src/pc_gl.h` | Win32 window, OpenGL context and entry-point loader. |
 | `src/pc_gx.h` | Shared texture/palette object layout and the immediate-mode write interface. |
 | `src/pad.c` | XInput and keyboard controllers, keyboard layout files, autoplay, scripted input. |
+| `src/gcadapter.c` | The official GameCube controller adapter over WinUSB: report reader thread, rumble, hot-plug. |
 | `src/card.c` | Memory card: a directory of save files, with the SDK's asynchronous completion semantics. |
 | `src/ax.c` | The AX sound driver: voice pool with priority stealing, ADPCM/PCM decoding from ARAM, sample-rate conversion, volume ramps, waveOut output, the AI interface. |
 | `src/thp.c` | THP movie decoder (baseline JPEG without byte stuffing) writing GX-tiled Y/U/V planes. |
@@ -436,6 +450,11 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   menu entries on PC as the matching build does. All the settings-struct
   size asserts are active again. `pc/tools/scan_bitfields.py` finds this
   pattern.
+- `pl/player.c`: the character-to-fighter mapping is read through a struct
+  laid over two filename strings and the mapping table (original link
+  order); on PC the view is a copy filled from the three globals. Without
+  it the 1-P and VS intros picked the wrong fighters' animation archives
+  and crashed at the first match after the character select.
 - `grmutecity.c`: the car index array, the car array and the word before
   them are one block (`PC_ADJACENT`), because a sort reads one entry
   before the array and another routine views both arrays as one struct.

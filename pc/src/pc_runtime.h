@@ -82,6 +82,12 @@ void pc_stub_hit(const char* name);
 bool pc_pump(void);
 bool pc_card_pump(void);
 
+/// GameCube controllers on the official USB adapter (gcadapter.c).
+struct PADStatus;
+int pc_gcadapter_read(int port, struct PADStatus* st);
+void pc_gcadapter_rumble(int port, int command);
+int pc_gcadapter_present(void);
+
 /// Keyboard layout file for port 1 (pad.c); returns false on errors.
 int pc_pad_load_keymap(const char* path);
 

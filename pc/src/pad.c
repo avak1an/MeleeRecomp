@@ -68,6 +68,7 @@ void PADControlMotor(s32 chan, u32 command)
     if (chan < 0 || chan >= PAD_MAX_CONTROLLERS) {
         return;
     }
+    pc_gcadapter_rumble(chan, (int) command);
     memset(&vib, 0, sizeof(vib));
     if (command == 1) { /* PAD_MOTOR_RUMBLE */
         vib.wLeftMotorSpeed = 48000;
@@ -420,6 +421,9 @@ u32 PADRead(struct PADStatus* status)
             } else {
                 st->err = PAD_ERR_NO_CONTROLLER;
             }
+        } else if (pc_gcadapter_read(chan, st)) {
+            /* a GameCube controller on the official USB adapter */
+            connected |= PAD_CHAN0_BIT >> chan;
         } else if (pad_initialized && XInputGetState((DWORD) chan, &xs) == ERROR_SUCCESS) {
             read_xinput(chan, &xs.Gamepad, st);
             connected |= PAD_CHAN0_BIT >> chan;

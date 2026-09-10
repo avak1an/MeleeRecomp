@@ -1,3 +1,7 @@
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#include <stdio.h>
+#endif
 #include "ftdemo.h"
 
 #include <Runtime/platform.h>
@@ -138,14 +142,19 @@ void ftDemo_SetArchiveData(int pairs_idx, HSD_Archive* archive, int arr_idx)
     static int ints[5] = { 9, 10, 11, 14, 15 };
     ftData_UnkCountStruct* pair = &ftData_UnkIntPairs[pairs_idx];
     if (pair->data == NULL) {
+        const char* symbol;
         if (arr_idx >= 4) {
-            pair->data = HSD_ArchiveGetPublicAddress(
-                archive,
-                ftDemo_GetMotionFileString(pairs_idx, ints[arr_idx - 4]));
+            symbol = ftDemo_GetMotionFileString(pairs_idx, ints[arr_idx - 4]);
         } else {
-            pair->data = HSD_ArchiveGetPublicAddress(
-                archive, ((char***) ftData_803C2468)[pairs_idx][arr_idx]);
+            symbol = ((char***) ftData_803C2468)[pairs_idx][arr_idx];
         }
+        pair->data = HSD_ArchiveGetPublicAddress(archive, symbol);
+#ifdef TARGET_PC
+        if (pc_debug_gx || pair->data == NULL) {
+            fprintf(stderr, "[ft] demo archive %p for kind %d (index %d): symbol %s -> %p\n", (void*) archive,
+                    pairs_idx, arr_idx, symbol, pair->data);
+        }
+#endif
     }
 }
 
