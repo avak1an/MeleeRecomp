@@ -86,6 +86,13 @@ void itMasterHandLaser_Logic84_EvtUnk(Item_GObj* gobj, Item_GObj* arg1)
 
 void it_802F046C(Item_GObj* gobj)
 {
+#ifdef TARGET_PC
+    /* a laser that already died leaves a GObj without item data; the
+     * console's write then lands harmlessly in low memory */
+    if (gobj != NULL && GET_ITEM(gobj) == NULL) {
+        return;
+    }
+#endif
     if (gobj != NULL) {
         GET_ITEM(gobj)->xDD4_itemVar.masterhandlaser.x0 = true;
     }

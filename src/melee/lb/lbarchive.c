@@ -1,4 +1,7 @@
 #include "lbarchive.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <stdarg.h>
 #include <string.h>
@@ -148,6 +151,10 @@ void lbArchive_80016EFC(HSD_Archive* archive)
 {
     HSD_ASSERT(0xFC, archive);
     HSD_ASSERT(0xFD, archive->flags & HSD_ARCHIVE_DONT_FREE);
+#ifdef TARGET_PC
+    /* the buffer will be reused: drop its swap and relocation records */
+    pc_swap_forget_range(archive->data - 0x20, archive->header.file_size);
+#endif
     lbHeap_80015CA8(0, (u32*) (archive->data - 0x20));
     lbHeap_80015CA8(0, (u32*) archive);
 }

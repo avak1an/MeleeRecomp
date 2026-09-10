@@ -1479,6 +1479,17 @@ static bool Ground_801C24F8(StKind stkind, u32 arg1, s32* arg2)
             break;
         }
     }
+#ifdef TARGET_PC
+    if (bgm == BGM_Undefined) {
+        OSReport("[pc] Ground_801C24F8: no BGM for stage kind %d (flags %x) among %d stage params:",
+                 stkind, arg1, stage_info.param->stage_param_count);
+        for (i = 0; i < stage_info.param->stage_param_count; i++) {
+            OSReport(" %d", phi_r30_0[i].stkind);
+        }
+        OSReport("; bgm fields x4 %d x8 %d xC %d x10 %d x14 %d\n", phi_r30->x4, phi_r30->x8, phi_r30->xC,
+                 phi_r30->x10, phi_r30->x14);
+    }
+#endif
     HSD_ASSERT(2242, bgm!=BGM_Undefined);
     if (bgm == -2) {
         *arg2 = lbAudioAx_8002305C(Player_GetPlayerCharacter(0), HSD_Randi(2));

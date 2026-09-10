@@ -461,7 +461,17 @@ static inline void consume_blur_colors(GXColor color0, GXColor color1,
 void lb_80012994(HSD_ImageDesc* img, u8 alpha, u8 blur_size, f32 x, f32 y,
                  f32 scale_x, f32 scale_y, f32 color_factor)
 {
+#ifdef TARGET_PC
+    /* ((GXColor*) &tex)[-n] below addresses the console's stack
+     * temporaries; keep those writes inside this function's own storage */
+    struct {
+        GXColor scratch[48];
+        GXTexObj obj;
+    } tex_s;
+#define tex tex_s.obj
+#else
     GXTexObj tex;
+#endif
     u16 w = img->width;
     u16 h = img->height;
     f32 y_p1, x_p1, y_m1, x_m1;
@@ -670,6 +680,9 @@ void lb_80012994(HSD_ImageDesc* img, u8 alpha, u8 blur_size, f32 x, f32 y,
     lb_8001271C(&tex, x_m1, y_m2, (f32) w, (f32) h, scale_x, scale_y);
 
     HSD_StateInvalidate(2);
+#ifdef TARGET_PC
+#undef tex
+#endif
 }
 
 static HSD_Chan chan0 = {
@@ -706,7 +719,15 @@ void fn_80013614(HSD_GObj* gobj)
     u8 pad8[8];
     Mtx view_mtx;
     Mtx view_mtx2;
+#ifdef TARGET_PC
+    struct {
+        GXColor scratch[4];
+        GXTexObj obj;
+    } tex_s; /* see lb_80012994 */
+#define tex_obj tex_s.obj
+#else
     GXTexObj tex_obj;
+#endif
 
     if (data->callback != NULL) {
         data->callback(gobj);
@@ -797,6 +818,9 @@ void fn_80013614(HSD_GObj* gobj)
         }
         HSD_StateInvalidate(2);
     }
+#ifdef TARGET_PC
+#undef tex_obj
+#endif
 }
 
 void fn_800138AC(void* ptr)
@@ -882,6 +906,11 @@ HSD_GObj* lb_800138EC(HSD_ImageDesc* img, GObj_RenderFunc render_func,
     } else {
         GObj_SetupGXLinkMax(gobj, render_func, prio);
     }
+#ifdef TARGET_PC
+    /* the console build returns gobj through r3 by accident of register
+     * allocation; callers (gmregclear.c) use it */
+    return gobj;
+#endif
 }
 
 HSD_CObj* lb_80013B14(HSD_CameraDescPerspective* desc)

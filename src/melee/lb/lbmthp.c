@@ -1,5 +1,8 @@
 #include "lbmthp.h"
 #ifdef TARGET_PC
+#include <stdlib.h>
+#endif
+#ifdef TARGET_PC
 #include <pc_endian.h>
 #endif
 
@@ -570,6 +573,12 @@ void lbMthp_8001F578(void)
     MoviePlayer.unk_7C = MoviePlayer.unk_78;
     MoviePlayer.unk_84 = MoviePlayer.unk_80;
     OSRestoreInterrupts(intr);
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_MOVIE") != NULL) {
+        OSReport("[pc] movie: tick %u frame %u decoded %u shown %u buffer %u\n", MoviePlayer.unk_80,
+                 MoviePlayer.unk_78, MoviePlayer.unk_88, MoviePlayer.unk_90, MoviePlayer.unk_8C);
+    }
+#endif
 }
 
 int lbMthp_8001F5C4(void)

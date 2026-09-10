@@ -1,4 +1,8 @@
 #include "ftanim.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#include <stdlib.h>
+#endif
 
 #include <placeholder.h>
 
@@ -977,6 +981,13 @@ void ftAnim_80070010(Fighter* fp, Fighter_Part start, float t, float t_inv,
 void ftAnim_80070108(Fighter* fp, Fighter_Part start, float t, float t_inv,
                      HSD_Joint* joint)
 {
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_NAN") != NULL && joint != NULL) {
+        OSReport("[pc] ftAnim_80070108: joint %p flags %08x scale %g pos %g swapped %d (table %p entry2 %p)\n", joint,
+                 joint->flags, joint->scale.x, joint->position.x, pc_swap_is_done(joint), fp->ft_data->x20->x0,
+                 fp->ft_data->x20->x0[2]);
+    }
+#endif
     int i = start; // r31
     s32 sp1C = 0;
 

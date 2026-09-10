@@ -1,4 +1,7 @@
 #include "gmresultplayer.h"
+#ifdef TARGET_PC
+#include <stdlib.h>
+#endif
 
 #include <placeholder.h>
 
@@ -1059,6 +1062,15 @@ static inline void fn_80178BB4_init_players(ResultsData* data,
                 ckind = match_end->player_standings[(*i)].ckind;
                 cid = match_end->player_standings[(*i)].ftkind;
                 is_big_loser = match_end->player_standings[(*i)].is_big_loser;
+#ifdef TARGET_PC
+                if (getenv("MELEE_TRACE_ANIM") != NULL) {
+                    OSReport("[pc] results slot %d: ckind %d ftkind %d big_loser %d outcome %d canceled %d teams %d "
+                             "-> tex %d\n",
+                             (int) *i, ckind, cid, is_big_loser, match_end->outcome,
+                             gm_WasMatchCanceled(match_end->outcome), match_end->is_teams,
+                             (int) gm_80168B34((CharacterKind) ckind, cid, 0));
+                }
+#endif
 
                 if (gm_WasMatchCanceled(match_end->outcome) == 0 &&
                     match_end->is_teams == 0 && (s32) is_big_loser == 0)

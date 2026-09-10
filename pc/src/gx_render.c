@@ -864,6 +864,9 @@ static void dump_texture(const PCTexObj* t, const u32* pixels, u32 w, u32 h)
     if (dir == NULL) {
         return;
     }
+    if (t->image == NULL || pixels == NULL) {
+        return;
+    }
     snprintf(path, sizeof(path), "%s/tex_%p_%ux%u_f%u.ppm", dir, t->image, w, h, t->format);
     f = fopen(path, "wb");
     if (f != NULL) {
@@ -1490,6 +1493,21 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
                 gx.texmap[0].tlut_name < 20 ? gx.tlut[gx.texmap[0].tlut_name].n_entries : 0, gx.num_chans, gx.num_texgen, gx.vp[0], gx.vp[1], gx.vp[2], gx.vp[3], gx.cull,
                 gx.z_enable, gx.z_func, gx.z_update, gx.blend_mode, gx.alpha_comp0, gx.alpha_ref0,
                 gx.alpha_op, gx.alpha_comp1, gx.proj_type);
+        if (gx.num_texgen > 0) {
+            const TexGen* tg = &gx.texgen[0];
+            fprintf(stderr, "[gx]   texgen0: src=%u type=%u mtx=%u pt=%u", tg->src, tg->type, tg->mtx, tg->pt_mtx);
+            if (tg->mtx < MTX_ROWS - 2) {
+                const float(*m)[4] = (const float(*)[4]) gx.mtx[tg->mtx];
+                fprintf(stderr, " m=[%.3f %.3f %.3f %.3f | %.3f %.3f %.3f %.3f]", m[0][0], m[0][1], m[0][2], m[0][3],
+                        m[1][0], m[1][1], m[1][2], m[1][3]);
+            }
+            if (tg->pt_mtx != GX_PTIDENTITY && tg->pt_mtx + 3 <= MTX_ROWS) {
+                const float(*m)[4] = (const float(*)[4]) gx.mtx[tg->pt_mtx];
+                fprintf(stderr, " pt=[%.3f %.3f %.3f %.3f | %.3f %.3f %.3f %.3f]", m[0][0], m[0][1], m[0][2], m[0][3],
+                        m[1][0], m[1][1], m[1][2], m[1][3]);
+            }
+            fprintf(stderr, " v0tex=(%.2f %.2f)\n", glverts[0].tex[0][0], glverts[0].tex[0][1]);
+        }
         {
             u32 a;
             fprintf(stderr, "[gx]   vcd:");
@@ -2377,7 +2395,7 @@ void GXCopyDisp(void* dest, GXBool clear)
         return;
     }
     imm_flush();
-    if (pc_config.screenshot_dir != NULL && frame_no % 60 == 0) {
+    if (pc_config.screenshot_dir != NULL && pc_config.screenshot_every > 0 && frame_no % (u32) pc_config.screenshot_every == 0) {
         save_screenshot();
     }
     pc_window_present();
@@ -2440,10 +2458,41 @@ void GXCopyTex(void* dest, GXBool clear)
         pc_window_viewport(&vx, &vy, &vw, &vh);
         sx = (float) vw / EFB_W;
         sy = (float) vh / EFB_H;
-        glBindTexture(GL_TEXTURE_2D, e->tex);
-        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, vx + (GLint) (tex_copy.left * sx),
-                         vy + (GLint) ((EFB_H - tex_copy.top - tex_copy.ht) * sy), (GLsizei) (tex_copy.wd * sx),
-                         (GLsizei) (tex_copy.ht * sy), 0);
+        /* GX textures start at the top row, GL framebuffers at the bottom
+         * one: read the region back and flip it, so the copy samples like
+         * the console's (the 1-P pause panel and the results screens draw
+         * text into such copies) */
+        GLint rx = vx + (GLint) (tex_copy.left * sx);
+        GLint ry = vy + (GLint) ((EFB_H - tex_copy.top - tex_copy.ht) * sy);
+        GLsizei rw = (GLsizei) (tex_copy.wd * sx), rh = (GLsizei) (tex_copy.ht * sy);
+        static u8* buf;
+        static size_t cap;
+        size_t row = (size_t) rw * 4, need = row * (size_t) rh;
+        if (rw > 0 && rh > 0) {
+            if (need > cap) {
+                free(buf);
+                buf = (u8*) malloc(need);
+                cap = buf != NULL ? need : 0;
+            }
+            if (buf != NULL) {
+                GLsizei y;
+                glPixelStorei(GL_PACK_ALIGNMENT, 1);
+                glReadPixels(rx, ry, rw, rh, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+                for (y = 0; y < rh / 2; y++) {
+                    u8* a = buf + (size_t) y * row;
+                    u8* b = buf + (size_t) (rh - 1 - y) * row;
+                    size_t k;
+                    for (k = 0; k < row; k += 4) {
+                        u32 t = *(u32*) (a + k);
+                        *(u32*) (a + k) = *(u32*) (b + k);
+                        *(u32*) (b + k) = t;
+                    }
+                }
+                glBindTexture(GL_TEXTURE_2D, e->tex);
+                glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rw, rh, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+            }
+        }
     }
     if (clear) {
         do_clear();

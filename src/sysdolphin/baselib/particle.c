@@ -1,6 +1,7 @@
 #include "particle.h"
 #ifdef TARGET_PC
 #include <pc_hsd_swap.h>
+#include "pc_runtime.h"
 extern int pc_debug_gx;
 #endif
 
@@ -52,6 +53,9 @@ typedef struct {
 /* 4D78EC */ u32 hsd_804D78EC = 0;
 /* 4D78F0 */ HSD_CObj* psCamera = NULL;
 /* 4D78F4 */ u32 hsd_804D78F4 = 0;
+#ifdef TARGET_PC
+struct pc_particle_block pc_particle_block; /* see particle.h */
+#else
 static HSD_JObj* hsd_804D08E8[8];
 /* 4D0908 */ HSD_Particle* hsd_804D0908[16];
 /* 4D0948 */ u32* hsd_804D0948[65];
@@ -61,6 +65,7 @@ static HSD_JObj* hsd_804D08E8[8];
 /* 4D0D58 */ int psCmdListArray[65];
 /* 4D0E5C */ HSD_PSCmdList** ptclref_804D0E5C[65];
 /* 4D0F60 */ struct hsd_804D0F60_t hsd_804D0F60;
+#endif
 
 typedef struct PSNode {
     /* 0x00 */ struct PSNode* child;
@@ -3086,8 +3091,9 @@ void hsd_8039D0A0(HSD_Generator* gen)
         if (!pc_swap_ptr_ok(prt)) {
             /* corrupted list link: still under investigation (seen after
              * item effects); drop the rest of the list instead of crashing */
-            OSReport("[pc] particle list %d of generator %p (bank %d kind %d id %d) is corrupt at %p\n",
-                     gen->linkNo, (void*) gen, gen->bank, gen->kind, idnum, (void*) prt);
+            OSReport("[pc] particle list %d of generator %p (bank %d kind %d id %d) is corrupt at %p (slot %p, frame %u)\n",
+                     gen->linkNo, (void*) gen, gen->bank, gen->kind, idnum, (void*) prt,
+                     prev == NULL ? (void*) head : (void*) &prev->next, pc_frame_count);
             if (prev == NULL) {
                 *head = NULL;
             } else {

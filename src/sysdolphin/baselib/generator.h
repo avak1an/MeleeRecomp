@@ -32,7 +32,12 @@ struct hsd_804D0F60_t {
 /* 39F6CC */ HSD_Generator* hsd_8039F6CC(s32 linkNo, s32 bank, s32 gfx_id,
                                          HSD_JObj*);
 
+#ifdef TARGET_PC
+#include <sysdolphin/baselib/particle.h>
+#define hsd_804D0F60 (*(struct hsd_804D0F60_t*) &pc_particle_block.alloc_data)
+#else
 /* 4D0F60 */ extern struct hsd_804D0F60_t hsd_804D0F60;
+#endif
 /* 4D0F90 */ extern struct hsd_804D0F60_t hsd_804D0F90;
 /* 4D78FC */ extern HSD_Generator* hsd_804D78FC;
 /* 4D7900 */ extern void (*hsd_804D7900)(HSD_Generator*);

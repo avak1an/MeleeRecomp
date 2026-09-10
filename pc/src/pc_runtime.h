@@ -19,7 +19,11 @@ typedef struct PCConfig {
     const char* input_script; ///< file of scripted port-1 inputs (see pad.c)
     unsigned seed;       ///< if nonzero, the game's RNG seed (else the clock)
     bool headless;       ///< no window, no rendering
-    const char* screenshot_dir; ///< if set, dump a BMP of every 60th frame here
+    const char* screenshot_dir; ///< if set, dump a BMP of every Nth frame here
+    int screenshot_every;
+    int kill_slots; /* --kill: bit mask of player slots to KO repeatedly (0 = off) */
+    int kill_frame; /* --kill: first frame */
+    int kill_every; /* --kill: repeat period in frames */       ///< N for the above (default 60)
     const char* iso;     ///< path of the disc image (NULL = auto-detect)
     const char* save_dir; ///< memory card files (NULL = "saves")
     bool quiet_stubs;    ///< --quiet-stubs: also silences informational prints

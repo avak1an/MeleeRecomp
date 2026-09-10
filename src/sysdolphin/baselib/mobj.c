@@ -165,6 +165,15 @@ static int MObjLoad(HSD_MObj* mobj, HSD_MObjDesc* desc)
                  desc->pedesc);
     }
 #endif
+#ifdef TARGET_PC
+    if (desc->texdesc != NULL && pc_swap_ptr_ok(desc->texdesc) &&
+        (!pc_swap_ptr_ok(desc->texdesc->class_name) || !pc_swap_ptr_ok(desc->texdesc->next)))
+    {
+        OSReport("[pc] bad HSD_TObjDesc at %p (mobjdesc %p): class=%p next=%p id=%08x src=%08x\n",
+                 desc->texdesc, desc, desc->texdesc->class_name, desc->texdesc->next,
+                 desc->texdesc->id, desc->texdesc->src);
+    }
+#endif
     mobj->rendermode = desc->rendermode;
     mobj->tobj = HSD_TObjLoadDesc(desc->texdesc);
     mobj->mat = HSD_MaterialAlloc();

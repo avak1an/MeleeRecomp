@@ -3502,8 +3502,8 @@ void ftColl_8007BAC0(Fighter_GObj* gobj)
                     if (ft_80459A8C[i].active_cb(ground, gobj, (Vec3*) &desc))
                     {
 #ifdef TARGET_PC
-                        /* stage hazard parameters straight from the stage file */
-                        pc_swap_dynamics_desc(desc);
+                        /* the hit description, straight from the stage file */
+                        pc_swap_hazard_hit(desc);
 #endif
                         if (max == 0) {
                             ftCo_800C08A0(gobj, (Fighter_GObj*) ground, desc,

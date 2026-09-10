@@ -71,6 +71,11 @@ static bool once(const void* ptr)
         char tag[32];
         snprintf(tag, sizeof(tag), "once %p", ptr);
         pc_debug_watch_check(tag);
+        if (ptr == (const void*) pc_debug_watch) {
+            fprintf(stderr, "[pc] watch %p: once() called (%s)\n", ptr,
+                    pc_swap_is_done(ptr) ? "already registered" : "first time");
+            pc_print_backtrace();
+        }
     }
     if (p < (uintptr_t) pc_mem_base() || p >= (uintptr_t) pc_mem_base() + pc_mem_size()) {
         return false;
@@ -176,6 +181,18 @@ void pc_swap_note_archive(const void* base, size_t size)
     }
 }
 
+/// True when p is the start of a parsed archive that was not forgotten.
+bool pc_swap_is_archive(const void* p)
+{
+    u32 i;
+    for (i = 0; i < archive_count; i++) {
+        if (archives[i].lo == (uintptr_t) p) {
+            return true;
+        }
+    }
+    return false;
+}
+
 const void* pc_swap_next_object(const void* start, const void* limit)
 {
     uintptr_t s = (uintptr_t) start, l = (uintptr_t) limit;
@@ -208,6 +225,44 @@ const void* pc_swap_next_object(const void* start, const void* limit)
         return (const void*) reloc_targets[lo].target;
     }
     return limit;
+}
+
+/* MELEE_ARCHIVE_CHECK=1: once per frame, verify that every relocated
+ * pointer slot of the parsed archives still holds the value the parser
+ * wrote. A slot that changed was overwritten by something else (or its
+ * archive was freed and the memory reused). Reports the first few. */
+void pc_swap_verify_relocs(const char* tag)
+{
+    static int enabled = -1;
+    static int reports;
+    u32 i;
+    if (enabled < 0) {
+        enabled = getenv("MELEE_ARCHIVE_CHECK") != NULL;
+    }
+    if (!enabled || reloc_targets == NULL || reports >= 20) {
+        return;
+    }
+    /* an archive whose header no longer states its size was freed through
+     * a path without a hook and its memory reused: drop it silently */
+    for (i = 0; i < archive_count;) {
+        if (*(const u32*) archives[i].lo != (u32) (archives[i].hi - archives[i].lo)) {
+            pc_swap_forget_range((void*) archives[i].lo, archives[i].hi - archives[i].lo);
+        } else {
+            i++;
+        }
+    }
+    for (i = 0; i < reloc_target_count; i++) {
+        const uintptr_t* slot = (const uintptr_t*) reloc_targets[i].slot;
+        if (*slot != reloc_targets[i].target) {
+            fprintf(stderr, "[pc] archive check (%s): slot %p holds %08x, parser wrote %08x\n", tag,
+                    (const void*) slot, (unsigned) *slot, (unsigned) reloc_targets[i].target);
+            reloc_targets[i].target = *slot; /* report each change once */
+            if (++reports >= 20) {
+                fprintf(stderr, "[pc] archive check: further reports suppressed\n");
+                break;
+            }
+        }
+    }
 }
 
 void pc_swap_note_reloc_slot(const void* ptr)
@@ -325,6 +380,19 @@ void pc_swap_joint(HSD_Joint* joint)
     }
     if ((joint->flags & JOBJ_SPLINE) && joint->u.spline != NULL) {
         pc_swap_spline(joint->u.spline);
+    }
+}
+
+/// A whole joint descriptor tree (child/next), for trees the game reads
+/// directly instead of loading them (fighter pose blends).
+void pc_swap_joint_tree(HSD_Joint* joint)
+{
+    for (; joint != NULL; joint = joint->next) {
+        if (!pc_swap_ptr_ok(joint) || pc_swap_is_done(joint)) {
+            return;
+        }
+        pc_swap_joint(joint);
+        pc_swap_joint_tree(joint->child);
     }
 }
 
@@ -565,6 +633,12 @@ static void swap_imagedesc(HSD_ImageDesc* im)
     /* image_ptr data stays in GX texture format */
 }
 
+/// Image descriptors reached outside a TObj (sprites, EFB copies).
+void pc_swap_imagedesc(HSD_ImageDesc* im)
+{
+    swap_imagedesc(im);
+}
+
 void pc_swap_tobjdesc(HSD_TObjDesc* desc)
 {
     for (; desc != NULL; desc = desc->next) {
@@ -596,12 +670,25 @@ void pc_swap_tobjdesc(HSD_TObjDesc* desc)
 
 static void swap_vtxdesclist(HSD_VtxDescList* v)
 {
-    if (v == NULL || !once(v)) {
+    HSD_VtxDescList* head = v;
+    if (v == NULL) {
         return;
     }
-    for (;;) {
+    /* Checked per entry, not per list: a polygon's list may start in the
+     * middle of another polygon's (shared tails, e.g. MnSlMap.usd). Once an
+     * entry has been swapped the rest of its list has been too. */
+    for (; once(v);) {
         pc_swap32(&v->attr);
         if (v->attr == GX_VA_NULL) {
+            break;
+        }
+        if (v->attr > GX_VA_MAX_ATTR || v - head >= 32) {
+            /* not a vertex attribute list (or one already in host order):
+             * stop before the walk runs into the data that follows */
+            fprintf(stderr, "[pc] vertex attribute list at %p: entry %d has attribute %08x, stopping\n",
+                    (void*) head, (int) (v - head), (unsigned) v->attr);
+            pc_print_backtrace();
+            pc_swap32(&v->attr);
             break;
         }
         pc_swap32(&v->attr_type);

@@ -109,6 +109,13 @@ void it_802790C0(Item_GObj* item_gobj, CommandInfo* cmd)
     } else {
         hit->jobj = item_gobj->hsd_obj;
     }
+#ifdef TARGET_PC
+    if (item->xC3C * ((f32) cmd->u->it_create_hitbox_0.damage * item->xC40) > 500.0f) {
+        OSReport("[pc] item %d hitbox command %08x %08x at %p: damage %u, xC3C %g, xC40 %g\n", item->kind,
+                 ((u32*) cmd->u)[0], ((u32*) cmd->u)[1], cmd->u, cmd->u->it_create_hitbox_0.damage,
+                 item->xC3C, item->xC40);
+    }
+#endif
     it_80272460(hit,
                 item->xC3C *
                     ((f32) cmd->u->it_create_hitbox_0.damage * item->xC40),

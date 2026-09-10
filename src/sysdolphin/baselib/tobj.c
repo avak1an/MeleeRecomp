@@ -1,5 +1,9 @@
 #include "tobj.h"
 #ifdef TARGET_PC
+#include "pc_runtime.h"
+#include <stdlib.h>
+#endif
+#ifdef TARGET_PC
 #include <pc_hsd_swap.h>
 #endif
 
@@ -69,6 +73,12 @@ void HSD_TObjAddAnim(HSD_TObj* tobj, HSD_TexAnim* texanim)
 
     if (tobj != NULL) {
         if ((ta = lookupTextureAnim(tobj->id, texanim)) != NULL) {
+#ifdef TARGET_PC
+            if (!pc_swap_is_done(ta)) {
+                OSReport("[pc] HSD_TObjAddAnim: texanim %p (list head %p) was not swapped\n", ta, texanim);
+                pc_print_backtrace();
+            }
+#endif
             if (tobj->aobj != NULL) {
                 HSD_AObjRemove(tobj->aobj);
             }
@@ -151,6 +161,11 @@ static void TObjUpdateFunc(void* obj, enum_t type, HSD_ObjData* val)
         int n;
         HSD_ASSERT(276, tobj->imagetbl);
         n = (int) val->fv;
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_ANIM") != NULL) {
+            OSReport("[pc] TObjUpdateFunc: tobj %p image %d (%g) -> %p\n", tobj, n, val->fv, tobj->imagetbl[n]);
+        }
+#endif
         if (tobj->imagetbl[n]) {
             tobj->imagedesc = tobj->imagetbl[n];
         }
@@ -1257,6 +1272,18 @@ void HSD_TObjSetup(HSD_TObj* tobj)
             break;
 
         default:
+#ifdef TARGET_PC
+            OSReport("[pc] HSD_TObjSetup: tobj %p imagedesc %p: format %u (%ux%u, mipmap %u, "
+                     "image %p, tlut %p)\n",
+                     tobj, imagedesc, imagedesc->format, imagedesc->width, imagedesc->height,
+                     imagedesc->mipmap, imagedesc->image_ptr, tobj->tlut);
+            OSReport("[pc]   imagedesc swapped: %d; tobj imagetbl %p (entry 0 %p swapped %d), tobj id %u, aobj %p\n",
+                     pc_swap_is_done(imagedesc), tobj->imagetbl,
+                     tobj->imagetbl != NULL ? tobj->imagetbl[0] : NULL,
+                     tobj->imagetbl != NULL ? pc_swap_is_done(tobj->imagetbl[0]) : -1, tobj->id,
+                     tobj->aobj);
+            pc_print_backtrace();
+#endif
             HSD_ASSERT(0x677, 0);
         }
 

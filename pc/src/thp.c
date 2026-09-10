@@ -53,6 +53,7 @@ struct thp_state {
     u8 huff_valid;
     struct thp_huff huff[4]; /* index = (table id << 1) + class */
     u16 restart_interval;
+    u32 bad_codes; /* Huffman codes that matched no table entry (diagnostic) */
     const u8* scan_start;
     u32 magic;
 };
@@ -456,6 +457,7 @@ static int huff_decode(struct thp_state* st, const struct thp_huff* h)
         }
         code = (code << 1) | (int) get_bits(st, 1);
     }
+    st->bad_codes++;
     return 0; /* corrupt code */
 }
 
@@ -555,6 +557,7 @@ static void decode_frame(struct thp_state* st, u8* py, u8* pu, u8* pv, u32 w)
     st->pos = st->scan_start;
     st->bitbuf = 0;
     st->bitcnt = 0;
+    st->bad_codes = 0;
     for (c = 0; c < 3; c++) {
         st->comp[c].dc = 0;
     }
@@ -588,6 +591,7 @@ static void decode_frame(struct thp_state* st, u8* py, u8* pu, u8* pv, u32 w)
 }
 
 /* MELEE_THP_DUMP=DIR writes each decoded Y plane as a PGM image. */
+static const struct thp_state* dump_state;
 static void dump_plane(const u8* py, u32 w, u32 h)
 {
     static unsigned frame_no;
@@ -604,8 +608,9 @@ static void dump_plane(const u8* py, u32 w, u32 h)
             sum += py[((y >> 2) * (w >> 3) + (x >> 3)) * 32 + (y & 3) * 8 + (x & 7)];
         }
     }
-    fprintf(stderr, "[pc] THP: frame %u decoded, %ux%u, mean Y %.1f\n", frame_no, w, h,
-            (double) sum / (w * h));
+    fprintf(stderr, "[pc] THP: frame %u decoded, %ux%u, mean Y %.1f, bad codes %u, restart %u\n", frame_no, w, h,
+            (double) sum / (w * h), dump_state != NULL ? dump_state->bad_codes : 0,
+            dump_state != NULL ? dump_state->restart_interval : 0);
     snprintf(path, sizeof(path), "%s/thp%04u.pgm", dir, frame_no++);
     f = fopen(path, "wb");
     if (f == NULL) {
@@ -630,6 +635,7 @@ static void planes_changed(struct thp_state* st, void* py, void* pu, void* pv, u
     pc_gx_texture_changed(py, w * st->height);
     pc_gx_texture_changed(pu, w * st->height / 4);
     pc_gx_texture_changed(pv, w * st->height / 4);
+    dump_state = st;
     dump_plane(py, w, st->height);
 }
 

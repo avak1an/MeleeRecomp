@@ -1071,6 +1071,27 @@ void Player_SetUnk9C(s32 slot, s32 unk9C)
     player->unk9C = unk9C;
 }
 
+#ifdef TARGET_PC
+/// Debugging aid (--kill): drops a slot's fighter far below the stage so
+/// the game counts a KO, for driving matches to their end.
+void pc_debug_kill_fighter(int slot)
+{
+    HSD_GObj* gobj;
+    Fighter* fp;
+    if (slot < 0 || slot >= 6) {
+        return;
+    }
+    gobj = player_slots[slot].player_entity[player_slots[slot].transformed[0]];
+    if (gobj == NULL) {
+        return;
+    }
+    fp = GET_FIGHTER(gobj);
+    if (fp != NULL) {
+        fp->cur_pos.y = -10000.0f;
+    }
+}
+#endif
+
 HSD_GObj* Player_GetEntity(s32 slot)
 {
     StaticPlayer* player;

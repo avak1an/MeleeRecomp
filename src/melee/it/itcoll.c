@@ -2,6 +2,9 @@
 #include <stdio.h>
 #endif
 #include "itcoll.h"
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#endif
 
 #include <Runtime/platform.h>
 
@@ -1415,6 +1418,14 @@ void it_80272460(HitCapsule* hitbox, u32 damage, Item_GObj* arg_item_gobj)
 
     dmg = damage;
     arg_item = GET_ITEM(arg_item_gobj);
+#ifdef TARGET_PC
+    if (dmg > 500) {
+        OSReport("[pc] it_80272460: item %d gets hitbox damage %u (xC3C %g xC40 %g, attrs %p)\n", arg_item->kind,
+                 dmg, arg_item->xC3C, arg_item->xC40,
+                 arg_item->xC4_article_data != NULL ? arg_item->xC4_article_data->x4_specialAttributes : NULL);
+        pc_print_backtrace();
+    }
+#endif
     owner_gobj = arg_item->owner;
     if (ftLib_80086960(owner_gobj)) {
         owner = GET_FIGHTER(owner_gobj);

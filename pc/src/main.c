@@ -41,6 +41,9 @@ static void usage(void)
             "  --quiet-stubs   do not log the first call of each SDK stub\n"
             "  --headless      no window; run the game logic only\n"
             "  --screenshots DIR  save a BMP of every 60th frame into DIR\n"
+            "  --screenshot-every N  with --screenshots: every Nth frame instead\n"
+            "  --kill SLOTS@FRAME[/N]  KO the fighters of player SLOTS (e.g. 1 or 1,2,3) at\n"
+            "                  FRAME and every N (300) frames after it, to reach results\n"
             "  --saves DIR     memory card files (default: saves next to the exe)\n"
             "  --mod DIR       use the files under DIR (or DIR/files) instead of the disc's;\n"
             "                  repeatable, the first given wins. Without it, the mods listed\n"
@@ -98,6 +101,7 @@ int main(int argc, char** argv)
     pc_config.log_stubs = true;
     pc_config.volume = 100;
     pc_config.scale = 1;
+    pc_config.screenshot_every = 60;
 
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) {
@@ -137,6 +141,30 @@ int main(int argc, char** argv)
             pc_config.headless = true;
         } else if (strcmp(argv[i], "--screenshots") == 0 && i + 1 < argc) {
             pc_config.screenshot_dir = argv[++i];
+        } else if (strcmp(argv[i], "--kill") == 0 && i + 1 < argc) {
+            /* SLOTS@FRAME/N: KO those slots' fighters at FRAME and every N
+             * frames after it (debugging aid to reach match results) */
+            const char* spec = argv[++i];
+            const char* at = strchr(spec, '@');
+            const char* every = strchr(spec, '/');
+            const char* p = spec;
+            pc_config.kill_slots = 0;
+            while (*p >= '0' && *p <= '9') {
+                pc_config.kill_slots |= 1 << atoi(p);
+                while (*p >= '0' && *p <= '9') {
+                    p++;
+                }
+                if (*p == ',') {
+                    p++;
+                }
+            }
+            pc_config.kill_frame = at != NULL ? atoi(at + 1) : 0;
+            pc_config.kill_every = every != NULL ? atoi(every + 1) : 300;
+            if (pc_config.kill_every <= 0) {
+                pc_config.kill_every = 300;
+            }
+        } else if (strcmp(argv[i], "--screenshot-every") == 0 && i + 1 < argc) {
+            pc_config.screenshot_every = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--saves") == 0 && i + 1 < argc) {
             pc_config.save_dir = argv[++i];
         } else if (strcmp(argv[i], "--mod") == 0 && i + 1 < argc) {

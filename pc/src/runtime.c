@@ -140,20 +140,29 @@ static void print_stub_summary(void)
     }
 }
 
+/* One symbol-handler initialization for the whole process: a second
+ * SymInitialize fails, which used to leave whichever helper ran second
+ * without symbols. */
+static int sym_init(void)
+{
+    static int sym_ready;
+    if (!sym_ready) {
+        SymSetOptions(SYMOPT_UNDNAME | SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
+        sym_ready = SymInitialize(GetCurrentProcess(), NULL, TRUE) ? 1 : -1;
+    }
+    return sym_ready;
+}
+
 const char* pc_symbol_name(const void* addr)
 {
     static char name[96];
     HANDLE proc = GetCurrentProcess();
-    static int sym_ready;
+    int sym_ready = sym_init();
     union {
         SYMBOL_INFO info;
         char buf[sizeof(SYMBOL_INFO) + 256];
     } sym;
     DWORD64 disp = 0;
-    if (!sym_ready) {
-        SymSetOptions(SYMOPT_UNDNAME | SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
-        sym_ready = SymInitialize(proc, NULL, TRUE) ? 1 : -1;
-    }
     memset(&sym, 0, sizeof(sym));
     sym.info.SizeOfStruct = sizeof(SYMBOL_INFO);
     sym.info.MaxNameLen = 255;
@@ -170,7 +179,7 @@ void pc_print_backtrace(void)
     void* frames[48];
     USHORT n, i;
     HANDLE proc = GetCurrentProcess();
-    static int sym_ready;
+    int sym_ready = sym_init();
     union {
         SYMBOL_INFO info;
         char buf[sizeof(SYMBOL_INFO) + 256];
@@ -178,10 +187,6 @@ void pc_print_backtrace(void)
     IMAGEHLP_LINE line;
     DWORD displacement = 0;
 
-    if (!sym_ready) {
-        SymSetOptions(SYMOPT_UNDNAME | SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
-        sym_ready = SymInitialize(proc, NULL, TRUE) ? 1 : -1;
-    }
     n = CaptureStackBackTrace(1, 48, frames, NULL);
     fprintf(stderr, "[pc] backtrace (%u frames):\n", n);
     for (i = 0; i < n; i++) {
@@ -220,8 +225,7 @@ static void print_exception_backtrace(CONTEXT* ctx, HANDLE thread)
     IMAGEHLP_LINE line;
     DWORD displacement = 0;
 
-    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
-    SymInitialize(proc, NULL, TRUE);
+    sym_init();
     memset(&frame, 0, sizeof(frame));
     if (c.Eip < 0x1000) {
         /* A call through a NULL (or garbage) function pointer: the return

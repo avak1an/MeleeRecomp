@@ -1,4 +1,7 @@
 #include "granime.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <Runtime/platform.h>
 
@@ -126,6 +129,11 @@ static inline HSD_TexAnim* HSD_TexAnimFindById(HSD_TexAnim* cur, int id)
 
 void grAnime_801C6710(HSD_TObj* tobj, HSD_TexAnim* texanim)
 {
+#ifdef TARGET_PC
+    /* the stage code's own copy of HSD_TObjAddAnim: swap the list the way
+     * the HSD one does (Onett's textures come through here) */
+    pc_swap_texanim(texanim);
+#endif
     if (tobj == NULL) {
         return;
     }

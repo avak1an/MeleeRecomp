@@ -295,6 +295,23 @@ void pc_swap_ftdata(struct ftData* d, int anim_count, int alt_anim_count, int co
     }
     if (d->x20 != NULL && pc_swap_once(d->x20)) {
         pc_swapf(&d->x20->x8);
+        /* x0: a table of pose joint trees the guard / special blends read
+         * as descriptors (never loaded as JObjs); the table ends where the
+         * next referenced object starts */
+        if (d->x20->x0 != NULL && pc_swap_ptr_ok(d->x20->x0) && pc_swap_once(d->x20->x0)) {
+            HSD_Joint** tbl = d->x20->x0;
+            const u8* end = (const u8*) pc_swap_next_object(tbl, (const u8*) tbl + 16 * sizeof(*tbl));
+            int k;
+            for (k = 0; (const u8*) &tbl[k] + sizeof(*tbl) <= end && k < 16; k++) {
+                if (pc_swap_is_reloc_slot(&tbl[k])) {
+                    pc_swap_joint_tree(tbl[k]);
+                }
+            }
+            if (getenv("MELEE_TRACE_SWAP") != NULL) {
+                fprintf(stderr, "[pc] ftData %p pose table %p: %d entries (end %p)\n", (void*) d, (void*) tbl, k,
+                        (const void*) end);
+            }
+        }
     }
     if (d->x2C != NULL && pc_swap_once(d->x2C)) {
         pc_swap32(&d->x2C->dynamicsNum);
@@ -447,6 +464,22 @@ void pc_swap_dynamics_desc(struct DynamicsDesc* desc)
     }
 }
 
+/* A stage hazard's hit description (lbColl_80008D30_arg1: nine 32-bit
+ * words) that a stage's collision callback points the fighter code at. */
+void pc_swap_hazard_hit(void* hit)
+{
+    u8* b = (u8*) hit;
+    int i;
+    if (hit == NULL || !pc_swap_ptr_ok(hit) || !pc_swap_once(hit)) {
+        return;
+    }
+    for (i = 0; i < 9; i++) {
+        if (!pc_swap_is_reloc_slot(b + i * 4)) {
+            pc_swap32(b + i * 4);
+        }
+    }
+}
+
 /* --- Items ------------------------------------------------------------------ */
 
 /* the Item struct is shared with the console layout; a mismatch here would
@@ -502,6 +535,21 @@ void pc_swap_article(struct Article* a)
             for (i = 0; i < a->x14_dynamics->count; i++) {
                 pc_swap32(&a->x14_dynamics->dyn_descs[i].bone_id);
                 pc_swap_dynamics_desc(&a->x14_dynamics->dyn_descs[i].dyn_desc);
+            }
+        }
+        /* itcoll.c reads the same block as ItCollDynamics: after the bone
+         * dynamics come a hit-collision count (+8) and its descriptors
+         * (+0xC: bone id, offset, size = five words each) */
+        {
+            u8* b = (u8*) a->x14_dynamics;
+            s32* coll_count = (s32*) (b + 8);
+            u8** coll_descs = (u8**) (b + 12);
+            if (!pc_swap_is_reloc_slot(coll_count)) {
+                pc_swap32(coll_count);
+            }
+            if (*coll_descs != NULL && pc_swap_ptr_ok(*coll_descs) && sane_count(*coll_count, 32, "item hit dynamics") &&
+                pc_swap_once(*coll_descs)) {
+                pc_swap32_range(*coll_descs, (size_t) *coll_count * 5 * sizeof(u32));
             }
         }
     }
@@ -576,6 +624,9 @@ static void swap_special_blocks(void)
         /* the next object referenced from elsewhere in the file also ends
          * the block (anim joints, joints, ... that follow it) */
         end = (uintptr_t) pc_swap_next_object((void*) start, (void*) end);
+        if (getenv("MELEE_TRACE_SWAP") != NULL) {
+            fprintf(stderr, "[pc] item attribute block %p: %u bytes\n", (void*) start, (unsigned) (end - start));
+        }
         /* swap the words up to the next block, leaving relocated pointer
          * slots (a few blocks point at sub-tables) alone */
         if (pc_swap_once((void*) start)) {
@@ -721,6 +772,87 @@ void pc_swap_ext_attrs(void* attrs, size_t size)
 /* Figatree (fighter animation) archives: the archive pre-pass relocated the
  * node and track pointers; the scalars of the tree and of every track are
  * swapped here. Tracks are counted by walking the -1 terminated node list. */
+/* Trophy tables from TyDatai.dat (toy.c, tydisplay.c):
+ * - tyInitModelTbl, tyInitModelDTbl: rows of {s32 id, s32, f32 x6, s8 x4},
+ *   terminated by id == -1;
+ * - tyModelSortTbl: one row of six s16 per trophy (TY_TROPHY_COUNT);
+ * - tyExpDifferentTbl, tyNoGetUsTbl: s16 lists terminated by -1;
+ * - tyDisplayModelTbl, tyDisplayModelUsTbl: rows of {s32 id, u8, u8, pad,
+ *   f32, f32}, terminated by id == -1. */
+static void swap_s16_list(void* list)
+{
+    s16* v = (s16*) list;
+    int n;
+    if (v == NULL || !pc_swap_ptr_ok(v) || !pc_swap_once(v)) {
+        return;
+    }
+    for (n = 0; n < 1024; n++) {
+        pc_swap16(&v[n]);
+        if (v[n] == -1) {
+            break;
+        }
+    }
+}
+
+static void swap_id_rows(void* table, int row_bytes, int words)
+{
+    u8* row = (u8*) table;
+    int n;
+    if (row == NULL || !pc_swap_ptr_ok(row) || !pc_swap_once(row)) {
+        return;
+    }
+    for (n = 0; n < 1024; n++, row += row_bytes) {
+        int i;
+        for (i = 0; i < words; i++) {
+            pc_swap32(row + i * 4);
+        }
+        if (*(s32*) row == -1) {
+            break;
+        }
+    }
+    if (getenv("MELEE_TRACE_SWAP") != NULL) {
+        fprintf(stderr, "[pc] trophy table at %p: %d rows of %d bytes\n", table, n, row_bytes);
+    }
+}
+
+void pc_swap_trophy_tables(void* init_tbl, void* init_d_tbl, void* sort_tbl, void* exp_tbl,
+                           void* no_get_us_tbl, void* display_tbl, void* display_us_tbl)
+{
+    swap_id_rows(init_tbl, 0x24, 8);    /* the four s8 at the end stay */
+    swap_id_rows(init_d_tbl, 0x24, 8);
+    if (sort_tbl != NULL && pc_swap_ptr_ok(sort_tbl) && pc_swap_once(sort_tbl)) {
+        s16* v = (s16*) sort_tbl;
+        int n;
+        for (n = 0; n < 293 * 6; n++) {
+            pc_swap16(&v[n]);
+        }
+    }
+    swap_s16_list(exp_tbl);
+    swap_s16_list(no_get_us_tbl);
+    /* display rows: id, two bytes and padding, two floats */
+    {
+        void* tables[2];
+        int t;
+        tables[0] = display_tbl;
+        tables[1] = display_us_tbl;
+        for (t = 0; t < 2; t++) {
+            u8* row = (u8*) tables[t];
+            int n;
+            if (row == NULL || !pc_swap_ptr_ok(row) || !pc_swap_once(row)) {
+                continue;
+            }
+            for (n = 0; n < 1024; n++, row += 0x10) {
+                pc_swap32(row);
+                pc_swap32(row + 8);
+                pc_swap32(row + 12);
+                if (*(s32*) row == -1) {
+                    break;
+                }
+            }
+        }
+    }
+}
+
 void pc_swap_figatree(struct FigaTree* tree)
 {
     s8* node;

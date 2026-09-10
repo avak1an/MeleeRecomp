@@ -34,6 +34,7 @@ void pc_swap_dynamics_desc(struct DynamicsDesc* desc);
 struct Article;
 struct it_804D6D20_t;
 void pc_swap_article(struct Article* article);
+void pc_swap_hazard_hit(void* hit); ///< lbColl_80008D30_arg1 from a stage file
 void pc_swap_stage_article(struct Article* article); ///< one article from a stage file
 void pc_swap_item_common(struct it_804D6D20_t* root);
 
@@ -48,5 +49,7 @@ void pc_swap_ext_attrs(void* attrs, size_t size);
 /// Fighter animation tree found in a figatree archive.
 struct FigaTree;
 void pc_swap_figatree(struct FigaTree* tree);
+void pc_swap_trophy_tables(void* init_tbl, void* init_d_tbl, void* sort_tbl, void* exp_tbl,
+                           void* no_get_us_tbl, void* display_tbl, void* display_us_tbl);
 
 #endif

@@ -57,12 +57,23 @@ are swapped and the demo route was pushed through more stages, which
 found and fixed two compiler-layout differences (bit-field packing) and
 one more adjacent-globals case (Mute City).
 
-Planned milestones:
+**Milestone 6 (play-through coverage) - in progress.** Scripted routes
+now go through the VS character select (port 1 human, port 2 CPU), the
+stage select, a full timed match and its results screen, and through
+Classic mode's first seven stages including the stage-clear bonus screen,
+Break the Targets and Grab the Trophies (the `--kill` option ends matches
+without a player). These found and fixed the
+VS crash after Start (a shared vertex-attribute list tail re-swapped by
+the stage-select model load), the 1-P crash after a win (a missing return
+value and a stack-layout trick in the blur renderer), Onett's animated
+textures (the stage code's own animation walk), and the results-screen
+camera tables (another struct laid over neighbouring globals).
 
-6. **Play-through coverage.** Scripted routes through the modes the
-   attract demo never shows (1-P modes, Target Test, Home-Run Contest,
-   the trophy scenes), indirect texturing and destination alpha in the
-   renderer, save files convertible to and from real memory-card dumps.
+Planned:
+
+6. **More coverage.** Target Test, Home-Run Contest, the trophy scenes,
+   indirect texturing and destination alpha in the renderer, save files
+   convertible to and from real memory-card dumps.
 
 ## Building (Windows)
 
@@ -95,6 +106,7 @@ trips DMA-alignment asserts sooner or later.
 build\pc\melee.exe [--iso PATH] [--fullscreen] [--scale N] [--keymap FILE] [--volume N]
                     [--no-audio] [--saves DIR] [--fast] [--frames N] [--autoplay] [--input FILE]
                     [--seed N] [--quiet-stubs] [--headless] [--screenshots DIR]
+                    [--screenshot-every N] [--kill SLOTS@FRAME[/N]]
 ```
 
 Run from anywhere; with the disc image next to `melee.exe` (or in the
@@ -108,7 +120,21 @@ build\pc\melee.exe --headless --quiet-stubs --input pc\scripts\title-demo.txt --
 ```
 
 Status 0 means two demo matches played out; a crash prints a symbolized
-backtrace and a hang is reported by the watchdog (status 8).
+backtrace and a hang is reported by the watchdog (status 8). Two more
+routes cover what the demo never shows (the frame numbers assume a save
+file exists, so run the demo route once first):
+
+```
+build\pc\melee.exe --headless --quiet-stubs --input pc\scriptss-match.txt --seed 1 --frames 9500 --kill 1@700
+build\pc\melee.exe --headless --quiet-stubs --input pc\scripts\classic.txt --seed 1 --frames 40000 --kill 1,2,3@900/750
+```
+
+The first picks Mario for port 1 and a CPU for port 2 in VS mode, chooses
+Brinstar and plays the two-minute match to its results screen (scene 5
+at about frame 8000); the second plays Classic mode, winning each stage
+by KO and pressing Start through the stage-clear screens (a Start that
+lands inside a match pauses it, which is why the KOs repeat twice per
+Start period). Different seeds give different stages and opponents.
 
 - `--iso PATH`: the NTSC 1.02 disc image (`GALE01`). Without it the runtime
   reads `$MELEE_ISO`, then looks for `GALE01.iso` in the current and parent
@@ -144,7 +170,13 @@ backtrace and a hang is reported by the watchdog (status 8).
 - `--headless`: no window; run the game logic only (what the regression
   runs use).
 - `--screenshots DIR`: save a BMP of every 60th frame into DIR, with the
-  draw and vertex counts of that frame on stderr.
+  draw and vertex counts of that frame on stderr; `--screenshot-every N`
+  changes the interval (every frame with 1, for calibrating scripted
+  cursor moves).
+- `--kill SLOTS@FRAME[/N]`: drop the fighters of player slots SLOTS (`1`,
+  or `1,2,3`) below the stage at FRAME and every N frames after it (300 by
+  default). A debugging aid: with it a scripted match ends with a KO and
+  reaches the results screen or the next 1-P stage without anyone playing.
 - `--extract DIR`: write every file of the disc to `DIR/files`, in the
   disc's own folder layout, and the boot header, FST, apploader and
   `main.dol` to `DIR/sys` (the same layout the decomp's `orig/` uses), then
@@ -282,6 +314,11 @@ HOME END PAGEUP PAGEDOWN NUMPAD0`-`NUMPAD9 NUMPAD+ NUMPAD- NUMPAD* NUMPAD/
 NUMPAD. COMMA PERIOD MINUS PLUS SEMICOLON SLASH BACKTICK LBRACKET
 BACKSLASH RBRACKET QUOTE`. Actions not mentioned keep their default.
 
+EFB copies (`GXCopyTex`) are read back from the GL framebuffer and
+flipped, because GX textures start at the top row and GL framebuffers at
+the bottom; the 1-P pause panel and the results screens render text into
+such copies and drew it upside down before.
+
 ### Debugging aids
 
 - `MELEE_GX_NOCULL=1` / `MELEE_GX_NOALPHA=1` disable face culling / the
@@ -299,6 +336,15 @@ BACKSLASH RBRACKET QUOTE`. Actions not mentioned keep their default.
   with status 8 when no frame completes for N seconds: the way to find
   where a run spins.
 - `MELEE_TRACE_CARD=1` logs the memory-card command queue.
+- `MELEE_TRACE_NAN=1` names the first joint per frame whose matrix went
+  NaN, with its transform and a backtrace; `MELEE_TRACE_SHIELD=1`,
+  `MELEE_TRACE_MOVIE=1`, `MELEE_TRACE_ANIM=1` and `MELEE_TRACE_SWAP=1` log
+  the shield size inputs, the movie player's frame counters, texture
+  animation image selection and the swapped attribute/pose/trophy tables.
+- `MELEE_ARCHIVE_CHECK=1` verifies once per frame (and before every joint
+  load) that every relocated pointer slot of the parsed archives still
+  holds what the parser wrote, and names the first slots that changed:
+  the way to catch something overwriting a loaded file.
 - `MELEE_AUDIO_DUMP=FILE` writes the mixed audio of the run as a 32 kHz
   stereo WAV; `MELEE_THP_DUMP=DIR` writes every decoded movie frame's luma
   plane as a PGM image and logs its mean brightness.
@@ -423,6 +469,19 @@ drop:
 python pc\tools\gen_stubs.py --remove NameA NameB
 ```
 
+### Swap registry
+
+Every descriptor is swapped at most once, tracked by address in a hash
+set (`once()` in `hsd_swap.c`); the archive pre-pass forgets the records of
+a buffer when a new file is loaded into it, and so do `HSD_Free` and the
+archive free for a buffer that held a parsed file. Lists are checked per
+entry, not per list head, because files share list tails: the
+stage-select model's polygons point into the middle of another polygon's
+vertex-attribute list, and a walk keyed on the head alone re-swapped the
+shared entries, ran past the terminator and corrupted the descriptors
+after it (the VS-mode crash after pressing Start). A vertex-attribute walk
+that meets an attribute out of range now stops and reports it.
+
 ## Changes to shared sources
 
 All guarded by `TARGET_PC` or token-identical on GameCube:
@@ -468,6 +527,75 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - `grlast.c`: the untyped parameter block is four material indices,
   swapped on load; `grpstadium.c` got a generated swapper once the
   generator learned `u8 r, g, b;` declarations.
+- `granime.c`: the stage code has its own copy of the HSD "add animation"
+  walk; it got the texture-animation swap hook the HSD one has (Onett's
+  animated textures come through it and crashed the second Classic stage).
+- `gm_1798.c`: the results-screen camera reads its tables through a struct
+  laid over the statics that follow `gmResultPlayerColors` in link order;
+  on PC the members are macros naming the statics (`RES_*`).
+- `lbspdisplay.c`: the blur renderers write `GXColor` temporaries at
+  negative offsets from a `GXTexObj` local (the console's stack layout);
+  on PC the object sits in a struct with scratch space below it. The
+  function that creates the blur object also returns it now (the console
+  returned it through r3 by accident of register allocation; the 1-P
+  stage-clear screen uses the value). A few other functions that fell off
+  their end got the return the console produced by the same accident
+  (`gm_1601.c`, `gm_1798.c`, `itkyasarinegg.c`); `-Wreturn-type` lists the
+  remaining ones, whose callers ignore the value.
+- `gobj.h`: `HSD_GObjGetUserData(NULL)` returns NULL on PC; several
+  matching tricks evaluate `GET_FIGHTER(0)` for their stack layout, which
+  reads address 0x2C (mapped on the console).
+- `gmclassic.c`: Classic mode reads its matchup tables as the data after
+  the scene table (`(gmClassicSceneData*) gm_Mode_Classic_States`) and the
+  matchup order state as the bytes after the intro buffer
+  (`gm_804908A0`); on PC the tables are named directly and the intro
+  buffer and order state are one object. With the wrong bytes the stage
+  of the fourth Classic match came out as kind 0 (no file, no music).
+- `toy.c`/`toy.h`: the trophy code views `_Toy_804A26B8`, two text
+  buffers and `Toy_804A284C` as one 0x3F0-byte object (`toy + 0x194` is
+  the 1-P trophy flag table); on PC they are one struct. The trophy tables
+  of `TyDatai.dat` (init tables, sort table, exception lists, display
+  tables) are swapped when loaded (`pc_swap_trophy_tables`). Without both,
+  the "Grab the Trophies" bonus stage spun forever looking for a trophy
+  to place.
+- `tydisplay.c`: the trophy display code reads its three name tables
+  (joint names, material-animation names, archive names) as one
+  `TyDspNameTables` starting at the first; on PC they are one object.
+- `gm_1601.c`: the character-to-texture index function leaves its
+  result uninitialized for the regular characters (the console returns
+  the character kind because both share a register); on PC it starts from
+  the character kind. Without it the results screen named every fighter
+  after texture 0 (Captain Falcon).
+- `particle.c`/`particle.h`: the particle system reads its tables as one
+  struct starting at `hsd_804D08E8` (JObj slots, list heads, the six
+  per-bank tables and the particle allocator, in link order); on PC they
+  are one object (`pc_particle_block`). Before this the list heads came
+  from whatever the linker placed next, which is what the
+  "particle list ... is corrupt" messages (and the slowdown on Onett)
+  were.
+- `lb_00B0.c`: the joint-copy and blend helpers that read pose
+  descriptors straight from fighter data (the guard pose, special-move
+  blends) swap the descriptor first; the shield made the whole fighter
+  vanish because its joints took big-endian floats.
+- `sobjlib.c`: sprite descriptors (the opening's "Nintendo's All-Stars
+  in" caption, how-to-play captions) get their image and palette
+  descriptors swapped; the caption drew as a white rectangle before.
+- `gcadapter.c`: `PAD_MOTOR_STOP_HARD` stops the motor too; the adapter's
+  own "brake" value kept the official adapter rumbling for the whole match.
+- `itmasterhandlaser.c`: a finger-beam laser that already died leaves a
+  GObj without item data; the console's write through it lands in low
+  memory, PC skips it.
+- `ftbosslib.c`: Master Hand's attack timer divides by its CPU level,
+  which is 0 in Classic mode; the console's integer division by zero
+  yields 0 without trapping, x86 traps. Guarded on PC.
+- `ftCo_Bury.c`: the floor's hazard description (Mute City's road) is
+  swapped where the bury state reads it, as the hazard path already did.
+- `itsonans.c`: Wobbuffet's counter damage decays below zero between
+  hits and is converted to `u32`; the console's float-to-unsigned
+  conversion saturates negatives to 0, x86's returns 0xFFFFFFFF (which the
+  game rejects as "attack power over 500"). Clamped on PC. Other
+  `(u32) float` conversions of possibly negative values would differ the
+  same way; none has shown up yet.
 - Decomp quirks that only work on the console, each fixed under `TARGET_PC`:
   - `hsd_3A94.c`/`hsd_4D11.c`: three globals used as one contiguous buffer
     (`hsd_804D1138`/`hsd_804D1148`/`hsd_804D2348`) are one block on PC.
@@ -540,9 +668,9 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   by the decompiled code, so there is nothing to swap yet. Item-specific
   attribute blocks with sub-word fields and mode-specific tables are found
   the same way: run a route, fix the first bad read.
-- Particle lists occasionally end up with a corrupt link after item hit
-  effects; the walker drops the rest of the list and logs
-  `particle list ... is corrupt` instead of crashing. Root cause not found.
+- The particle list walker still drops a list and logs
+  `particle list ... is corrupt` if a link is ever bad; the cause found so
+  far (the table block above) is fixed.
 - The mixer ignores the auxiliary effect buses (reverb, chorus, delay:
   the `AXFX*` functions are still stubs), interaural delay (`ITD`) and the
   low-pass filter; sample-rate conversion is linear rather than the DSP's
@@ -552,5 +680,13 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   save-data structs.
 - Four more "index past a global" idioms exist (`gm_19EF.c`, `soundtest.c`)
   that assume console link order.
+- The console converts negative floats to `u32` as 0; x86 does not. Only
+  the site that mattered so far (Wobbuffet) is clamped.
+- Pokemon Stadium's screen renders its text through an EFB copy; the copy
+  is now the right way up, but whether the paused 1-P layout ("P1 Pause"
+  drawn over "Combatants") matches the console has not been checked.
+- Classic mode has been driven to and through the Master Hand fight with
+  `--kill`; the ending sequence after his defeat has not been reached (the
+  option cannot KO him).
 - `char` signedness and paired-single float rounding are not matched.
 - Threads are stubs (the game creates none that matter on PC).

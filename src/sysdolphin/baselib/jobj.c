@@ -1,6 +1,8 @@
 #include "jobj.h"
 #ifdef TARGET_PC
 #include <pc_hsd_swap.h>
+#include "pc_runtime.h"
+#include <stdlib.h>
 #endif
 
 #include <math.h>
@@ -687,6 +689,7 @@ s32 JObjLoad(HSD_JObj* jobj, HSD_Joint* joint, HSD_JObj* parent)
 HSD_JObj* HSD_JObjLoadJoint(HSD_Joint* arg0)
 {
 #ifdef TARGET_PC
+    pc_swap_verify_relocs("HSD_JObjLoadJoint");
     pc_swap_joint(arg0);
 #endif
     HSD_JObj* jobj = JObjLoadJointSub(arg0, 0);
@@ -1415,6 +1418,26 @@ void HSD_JObjSetupMatrixSub(HSD_JObj* jobj)
     f32 x_scale;
 
     HSD_JOBJ_METHOD(jobj)->make_mtx(jobj);
+#ifdef TARGET_PC
+    {
+        /* MELEE_TRACE_NAN=1: name the first joint per frame whose matrix
+         * went NaN, with its transform and where it was set up from */
+        static int trace = -1;
+        static u32 last_frame;
+        if (trace < 0) {
+            trace = getenv("MELEE_TRACE_NAN") != NULL;
+        }
+        if (trace && jobj->mtx[0][0] != jobj->mtx[0][0] && last_frame != pc_frame_count) {
+            last_frame = pc_frame_count;
+            OSReport("[pc] joint %p matrix is NaN: scale (%g %g %g) rot (%g %g %g %g) pos (%g %g %g) flags %08x "
+                     "parent %p\n",
+                     jobj, jobj->scale.x, jobj->scale.y, jobj->scale.z, jobj->rotate.x, jobj->rotate.y,
+                     jobj->rotate.z, jobj->rotate.w, jobj->translate.x, jobj->translate.y, jobj->translate.z,
+                     jobj->flags, jobj->parent);
+            pc_print_backtrace();
+        }
+    }
+#endif
     jobj->flags &= ~JOBJ_MTX_DIRTY;
     if (!(jobj->flags & JOBJ_USER_DEF_MTX)) {
         switch (jobj->flags & JOBJ_JOINT) {

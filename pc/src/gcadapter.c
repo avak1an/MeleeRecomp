@@ -269,7 +269,11 @@ void pc_gcadapter_rumble(int port, int command)
     if (!connected || port < 0 || port >= GC_PORTS) {
         return;
     }
-    rumble_state[port] = (u8) (command == 1 ? 1 : command == 2 ? 2 : 0);
+    /* PAD_MOTOR_RUMBLE (1) starts the motor; PAD_MOTOR_STOP (0) and
+     * PAD_MOTOR_STOP_HARD (2) both stop it. The adapter's own "2" is a
+     * brake pulse that left the motor running on the official adapter, and
+     * the game ends every fight rumble with STOP_HARD. */
+    rumble_state[port] = (u8) (command == 1 ? 1 : 0);
     msg[0] = 0x11;
     memcpy(msg + 1, rumble_state, 4);
     WinUsb_WritePipe(usb, 0x02, msg, sizeof(msg), &sent, NULL);

@@ -1,4 +1,7 @@
 #include "toy.h"
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 
 #include <Runtime/platform.h>
 
@@ -241,10 +244,17 @@ bool un_80304780(void)
     { 7, 65 }, { 6, 66 }, { 5, 67 }, { 4, 68 }, { 3, 69 },
     { 2, 70 }, { 0, 73 }, { 1, 88 }, { 8, 83 },
 };
+#ifdef TARGET_PC
+struct pc_toy_block_t pc_toy_block; /* see toy.h */
+#define _Toy_804A26B8 (pc_toy_block.base)
+#define _Toy_devtext_buf_804A26C4 (pc_toy_block.devtext1)
+#define _Toy_devtext_buf_804A2750 (pc_toy_block.devtext2)
+#else
 /* 4A26B8 */ static struct _Toy_804A26B8_t _Toy_804A26B8;
 /* 4A26C4 */ static char _Toy_devtext_buf_804A26C4[0x8C];
 /* 4A2750 */ static char _Toy_devtext_buf_804A2750[0xFC];
 /* 4A284C */ u16 Toy_804A284C[302];
+#endif
 /* 4A2AA8 */ ToyAnimState Toy_804A2AA8;
 /* 4D5A40 */ static GXColor _Toy_color_E2E2E2FF = { 0xE2, 0xE2, 0xE2, 0xFF };
 /* 4D5A44 */ static GXColor _Toy_color_FF8020FF = { 0xFF, 0x80, 0x20, 0xFF };
@@ -927,6 +937,12 @@ s32 Toy_80305058(s32 arg0, s32 arg1, s32 arg2, f32 farg0)
         byte_off += 2;
     } while (trophy < TY_TROPHY_COUNT);
 
+#ifdef TARGET_PC
+    if (total == 0) {
+        OSReport("[pc] Toy_80305058(%d, %d, %d, %g): no candidate trophy (1P %d)\n", arg0, arg1, arg2, farg0,
+                 gm_IsCurrently1PMode());
+    }
+#endif
     if (total != 0) {
         s32 use_new;
         if (farg0 >= 100.0f || obtained_count == 0) {
@@ -6724,6 +6740,10 @@ void Toy_803124BC(void)
             &_Toy_sbss_804D6EB4, "tyNoGetUsTbl", &Toy_sbss_804D6EB0,
             "tyDisplayModelTbl", &Toy_sbss_804D6EAC, "tyDisplayModelUsTbl",
             NULL);
+#ifdef TARGET_PC
+        pc_swap_trophy_tables(_Toy_sbss_804D6EC4, _Toy_sbss_804D6EC0, _Toy_sbss_804D6EBC, _Toy_sbss_804D6EB8,
+                              _Toy_sbss_804D6EB4, Toy_sbss_804D6EB0, Toy_sbss_804D6EAC);
+#endif
     }
 
     i = 0;
@@ -6775,6 +6795,10 @@ void Toy_8031263C(void)
             &_Toy_sbss_804D6EB4, "tyNoGetUsTbl", &Toy_sbss_804D6EB0,
             "tyDisplayModelTbl", &Toy_sbss_804D6EAC, "tyDisplayModelUsTbl",
             NULL);
+#ifdef TARGET_PC
+        pc_swap_trophy_tables(_Toy_sbss_804D6EC4, _Toy_sbss_804D6EC0, _Toy_sbss_804D6EBC, _Toy_sbss_804D6EB8,
+                              _Toy_sbss_804D6EB4, Toy_sbss_804D6EB0, Toy_sbss_804D6EAC);
+#endif
     }
 
     i = 0;

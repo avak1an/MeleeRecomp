@@ -33,10 +33,12 @@ void pc_swap_fobjdesc(HSD_FObjDesc* desc);
 void pc_swap_mobjdesc(HSD_MObjDesc* desc);
 void pc_swap_tobjdesc(HSD_TObjDesc* desc);
 void pc_swap_tlutdesc(HSD_TlutDesc* desc);
+void pc_swap_imagedesc(HSD_ImageDesc* im);
 void pc_swap_tobjtevdesc(HSD_TObjTevDesc* desc);
 void pc_swap_pobjdesc(HSD_PObjDesc* desc);
 void pc_swap_robjdesc(HSD_RObjDesc* desc);
 void pc_swap_spline(HSD_Spline* spline);
+void pc_swap_joint_tree(HSD_Joint* joint);
 void pc_swap_animjoint(HSD_AnimJoint* anim);
 void pc_swap_texanim(HSD_TexAnim* anim);
 void pc_swap_sis_message(u8* message);
@@ -56,6 +58,9 @@ bool pc_swap_ptr_ok(const void* p);
 /// Called by the archive pre-pass for every pointer slot it relocates, and
 /// queried by swappers whose fields hold either a pointer or an integer.
 void pc_swap_note_reloc_slot(const void* slot);
+/// MELEE_ARCHIVE_CHECK=1: report relocated pointer slots that changed since parsing.
+void pc_swap_verify_relocs(const char* tag);
+bool pc_swap_is_archive(const void* p);
 bool pc_swap_is_reloc_slot(const void* slot);
 
 /// Record where a relocated slot points, and find the start of the first

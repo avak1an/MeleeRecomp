@@ -7,6 +7,7 @@
  */
 #include "pc_gl.h"
 #include "pc_runtime.h"
+#include <pc_hsd_swap.h>
 
 #include <dolphin/gx/GXStruct.h>
 #include <dolphin/vi.h>
@@ -151,6 +152,18 @@ void VIWaitForRetrace(void)
     }
     pc_pump();
     pc_ax_frame();
+    pc_swap_verify_relocs("retrace");
+    if (pc_config.kill_slots != 0 && pc_frame_count >= (u32) pc_config.kill_frame &&
+        (pc_frame_count - (u32) pc_config.kill_frame) % (u32) pc_config.kill_every == 0)
+    {
+        extern void pc_debug_kill_fighter(int slot);
+        int slot;
+        for (slot = 0; slot < 6; slot++) {
+            if (pc_config.kill_slots & (1 << slot)) {
+                pc_debug_kill_fighter(slot);
+            }
+        }
+    }
     if (pc_config.max_frames > 0 && pc_frame_count >= (u32) pc_config.max_frames) {
         pc_exit(0);
     }
