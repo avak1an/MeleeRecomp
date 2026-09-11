@@ -250,24 +250,27 @@ Launcher: `melee-launcher.exe` is built alongside the game and needs
 nothing else; each build also copies it to `pc/dist`, where it is
 committed so a fresh clone can start from the launcher (it links the C
 runtime statically and contains nothing from the game; see
-`pc/dist/README.md`). It picks the disc image (checks it is GALE01, and on
-request hashes it: the whole image against the SHA-1 of the v1.02 disc
-the decompilation targets, `d4e70c06...`, and its `main.dol` against the
-README's `08e0bf20...`, so a differently dumped or modified image is told
-apart from a wrong revision), window
-size or full screen, whether the game's console window is shown (hidden,
-the game still writes everything to `melee.log`), volume and mute, the
-keyboard layout file (with a
-button that writes the default layout and opens it for editing), the
-saves folder, the mod list (checkboxes for enabled, buttons for priority),
-extracts the disc's files, and starts the game with the matching options.
-Settings persist in `launcher.ini` next to it; an "extra options" box
-passes anything else through. Its "Build from source" section points at a
-checkout of this repository (the launcher's own, two levels up from
-`build\pc`, by default), reports whether Visual Studio with the C++
-workload is installed, and builds the game from the chosen disc image in a
-console window; afterwards it runs the `melee.exe` it built, so the
-launcher alone plus a checkout and a disc is a complete setup.
+`pc/dist/README.md`). It is a dark, hand-drawn Win32 window: a sidebar of
+pages (Setup shows every card, the others one group each), a state pill
+in the header, cards for the settings, and a Play button. The cards, in
+the order a new user needs them: the game disc (the image is checked to
+be GALE01 and its banner is shown; "Verify SHA-1" hashes the whole image
+against the v1.02 disc the decompilation targets, `d4e70c06...`, and its
+`main.dol` against the README's `08e0bf20...`, so a differently dumped or
+modified image is told apart from a wrong revision); Build (a checkout of
+this repository, the launcher's own two levels up from `build\pc` by
+default, whether Visual Studio with the C++ workload is installed, and a
+Build button that builds the game from the chosen disc in a console
+window; afterwards Play runs the `melee.exe` it built); Display (window
+size, full screen, and whether the game's console window is shown; hidden,
+the game still writes everything to `melee.log`); Audio (volume, mute);
+Controls (adapter state and setup, the keyboard layout file with a button
+that writes the default layout and opens it for editing); Saves (the
+folder); Mods (the list with checkboxes for enabled and buttons for
+priority, plus extracting the disc's files); and Advanced (extra options
+passed through as typed). Settings persist in `launcher.ini` next to it.
+The launcher scales with the monitor's DPI and uses the Segoe MDL2 icon
+font that ships with Windows 10 and 11.
 
 Saves: slot A is a virtual 64 Mbit memory card whose files are
 `<name>.sav` in the saves directory: a 96-byte header (the directory

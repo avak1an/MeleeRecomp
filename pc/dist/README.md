@@ -14,9 +14,9 @@ To use it without building anything first:
 1. Clone this repository and install Visual Studio (Community is free)
    with "Desktop development with C++" and the "C++ Clang tools for
    Windows" component.
-2. Run `pc\dist\melee-launcher.exe`. Point "Game disc" at your Super Smash
-   Bros. Melee (USA) v1.02 disc image and click "Verify (SHA-1)".
-3. In "Build from source" the source folder is this checkout; click Build.
+2. Run `pc\dist\melee-launcher.exe`. Point the game disc card at your
+   Super Smash Bros. Melee (USA) v1.02 disc image and click "Verify SHA-1".
+3. In the Build card the source folder is this checkout; click Build.
    A console shows the build; it takes a few minutes the first time.
 4. Click Play. Saves and mods live next to the built `melee.exe`, under
    `build\pc\`.
