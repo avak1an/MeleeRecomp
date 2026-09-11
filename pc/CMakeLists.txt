@@ -184,7 +184,7 @@ endif()
 # /LARGEADDRESSAWARE lets the 32-bit process map the console's main-memory
 # range (0x80000000+), which the game uses to tell main memory from ARAM.
 target_link_options(melee PRIVATE /SUBSYSTEM:CONSOLE /STACK:0x400000 /LARGEADDRESSAWARE /DYNAMICBASE:NO)
-target_link_libraries(melee PRIVATE dbghelp xinput9_1_0 winmm winusb setupapi opengl32 gdi32 user32)
+target_link_libraries(melee PRIVATE dbghelp xinput9_1_0 winmm winusb setupapi advapi32 opengl32 gdi32 user32)
 set_target_properties(melee PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     C_STANDARD 11)

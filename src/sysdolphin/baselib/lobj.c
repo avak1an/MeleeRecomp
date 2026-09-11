@@ -15,6 +15,7 @@
 #include <dolphin/gx/GXEnum.h>
 #include <dolphin/mtx.h>
 #include <dolphin/os.h>
+#include <stdlib.h>
 
 static void LObjInfoInit(void);
 
@@ -496,6 +497,27 @@ void HSD_LObjSetupInit(HSD_CObj* cobj)
     vmtx = cobj->view_mtx;
 
     HSD_LObjClearActive();
+
+#ifdef TARGET_PC
+    {
+        static int trace_frame = -1;
+        extern unsigned int pc_frame_count;
+        if (trace_frame < 0) {
+            const char* e = getenv("MELEE_TRACE_LIGHT");
+            trace_frame = e != NULL ? atoi(e) : 0;
+        }
+        if (trace_frame != 0 && pc_frame_count == (unsigned) trace_frame) {
+            for (list = current_lights; list != NULL; list = list->next) {
+                HSD_LObj* lobj = list->data;
+                Vec3 lpos = { 0, 0, 0 };
+                HSD_LObjGetPosition(lobj, &lpos);
+                OSReport("[pc] light %p flags %x color (%u %u %u %u) pos (%g %g %g) shin %g pri %d\n", lobj,
+                         lobj->flags, lobj->color.r, lobj->color.g, lobj->color.b, lobj->color.a, lpos.x, lpos.y,
+                         lpos.z, lobj->shininess, HSD_LObjGetPriority(lobj));
+            }
+        }
+    }
+#endif
 
     for (list = current_lights; idx < MAX_GXLIGHT - 1 && list;
          list = list->next)

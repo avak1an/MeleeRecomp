@@ -1,5 +1,9 @@
 #include "ground.h"
 
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
+
 #include <Runtime/platform.h>
 
 #include <math.h>
@@ -1269,6 +1273,12 @@ LightList** Ground_801C20E0(UnkArchiveStruct* archive, LightList** lightset)
         HSD_LightDesc* desc = *(HSD_LightDesc**) *out;
         UnkStageDat* dat;
         u16* flags;
+#ifdef TARGET_PC
+        /* the flags are read and rewritten here before HSD_LObjLoadDesc
+         * swaps the descriptor; swap it now (once) so the type test and the
+         * diffuse/specular overrides land on the right bits */
+        pc_swap_lightdesc(desc);
+#endif
         if (*(flags = &desc->flags) & 3) {
             dat = archive->unk4;
             if (find_light_override_in_dat(dat, archive->unk4, desc, &b6, &b7,

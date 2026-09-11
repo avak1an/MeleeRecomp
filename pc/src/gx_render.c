@@ -121,6 +121,7 @@ typedef struct GLVertex {
 } GLVertex;
 
 static u8 imm_buf[1 << 20];
+static Vertex first_vertex; /* first vertex of the current draw (draw log) */
 static u32 imm_len;
 static u32 imm_expected;
 static u8 imm_prim, imm_vat;
@@ -144,6 +145,7 @@ static int fighter_draws;     /* draws issued for fighters this frame */
 int pc_debug_fighter_counts[4]; /* jobj / dobj / pobj / display-list calls while drawing fighters */
 static int debug_nocull;      /* MELEE_GX_NOCULL: never cull faces */
 static int debug_noalpha;     /* MELEE_GX_NOALPHA: skip the alpha test */
+static int debug_litonly;     /* MELEE_GX_LITONLY: textures read as white (shows lighting only) */
 static u32 debug_log_frame;   /* MELEE_GX_LOG_FRAME=N: log every draw of frame N */
 
 /* --- Helpers ------------------------------------------------------------ */
@@ -439,6 +441,32 @@ static void light_channel(const ChanCtrl* c, int chan, const float* vtx_col, con
             float cosa = -(ldir[0] * l->dir[0] + ldir[1] * l->dir[1] + ldir[2] * l->dir[2]);
             float a = l->a0 + l->a1 * cosa + l->a2 * cosa * cosa;
             float k = l->k0 + l->k1 * dist + l->k2 * dist * dist;
+            if (a < 0.0f) {
+                a = 0.0f;
+            }
+            attn = k > 1e-12f ? a / k : 0.0f;
+        } else if (c->attn_fn == GX_AF_SPEC) {
+            /* Specular light: the position is the direction to the light
+             * (scaled far away), the direction is the half-angle vector; the
+             * angle attenuation runs over N.H and, with a diffuse function,
+             * the distance coefficients are used normalized (as the
+             * hardware does). */
+            float nl = ldir[0] * nrm[0] + ldir[1] * nrm[1] + ldir[2] * nrm[2];
+            float h = nl >= 0.0f ? l->dir[0] * nrm[0] + l->dir[1] * nrm[1] + l->dir[2] * nrm[2] : 0.0f;
+            float a, k, k0 = l->k0, k1 = l->k1, k2 = l->k2;
+            if (h < 0.0f) {
+                h = 0.0f;
+            }
+            if (c->diff_fn != GX_DF_NONE) {
+                float m = sqrtf(k0 * k0 + k1 * k1 + k2 * k2);
+                if (m > 1e-12f) {
+                    k0 /= m;
+                    k1 /= m;
+                    k2 /= m;
+                }
+            }
+            a = l->a0 + l->a1 * h + l->a2 * h * h;
+            k = k0 + k1 * h + k2 * h * h;
             if (a < 0.0f) {
                 a = 0.0f;
             }
@@ -1130,7 +1158,7 @@ static void emit_stage(const ShaderKey* k, int i)
 
     emit("    {\n");
     /* texture sample */
-    if (s->map < 8 && k->texmap_valid[s->map] && s->coord < 8) {
+    if (!debug_litonly && s->map < 8 && k->texmap_valid[s->map] && s->coord < 8) {
         emit("        tex = texture2D(u_tex%d, v_tex%d).%s;\n", s->map, s->coord,
              swizzle_for(k->swap_table[s->tex_swap & 3]));
     } else {
@@ -1466,6 +1494,9 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
     for (i = 0; i < nverts; i++) {
         Vertex v;
         p = decode_vertex(p, vat, big, &v);
+        if (i == 0) {
+            first_vertex = v; /* for the draw log */
+        }
         transform_vertex(&v, &glverts[i]);
     }
     if (pc_debug_in_fighter) {
@@ -1493,6 +1524,59 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
                 gx.texmap[0].tlut_name < 20 ? gx.tlut[gx.texmap[0].tlut_name].n_entries : 0, gx.num_chans, gx.num_texgen, gx.vp[0], gx.vp[1], gx.vp[2], gx.vp[3], gx.cull,
                 gx.z_enable, gx.z_func, gx.z_update, gx.blend_mode, gx.alpha_comp0, gx.alpha_ref0,
                 gx.alpha_op, gx.alpha_comp1, gx.proj_type);
+        {
+            u32 st;
+            for (st = 0; st < gx.num_tev && st < 16; st++) {
+                const TevStage* t = &gx.tev[st];
+                fprintf(stderr,
+                        "[gx]   tev%u: c=(%u %u %u %u) op=%u bias=%u scale=%u reg=%u kc=%u | a=(%u %u %u %u) op=%u "
+                        "reg=%u ka=%u | coord=%u map=%u chan=%u\n",
+                        st, t->ca[0], t->ca[1], t->ca[2], t->ca[3], t->cop, t->cbias, t->cscale, t->creg, t->kcsel,
+                        t->aa[0], t->aa[1], t->aa[2], t->aa[3], t->aop, t->areg, t->kasel, t->coord, t->map,
+                        t->chan);
+            }
+            fprintf(stderr, "[gx]   kcolor0=(%.2f %.2f %.2f %.2f) kcolor1=(%.2f %.2f %.2f %.2f) tevreg0=(%.2f %.2f %.2f "
+                            "%.2f) tevreg1=(%.2f %.2f %.2f %.2f)\n",
+                    gx.kcolor[0][0], gx.kcolor[0][1], gx.kcolor[0][2], gx.kcolor[0][3], gx.kcolor[1][0],
+                    gx.kcolor[1][1], gx.kcolor[1][2], gx.kcolor[1][3], gx.tev_reg[0][0], gx.tev_reg[0][1],
+                    gx.tev_reg[0][2], gx.tev_reg[0][3], gx.tev_reg[1][0], gx.tev_reg[1][1], gx.tev_reg[1][2],
+                    gx.tev_reg[1][3]);
+        }
+        if (gx.num_chans > 0) {
+            const ChanCtrl* c = &gx.chan[0];
+            const Light* l = &gx.lights[0];
+            fprintf(stderr,
+                    "[gx]   chan0: en=%u amb_src=%u mat_src=%u mask=%02x diff=%u attn=%u amb=(%.2f %.2f %.2f) "
+                    "mat=(%.2f %.2f %.2f) light0 pos=(%.1f %.1f %.1f) dir=(%.2f %.2f %.2f) col=(%.2f %.2f %.2f) "
+                    "light1 pos=(%.1f %.1f %.1f) col=(%.2f %.2f %.2f) "
+                    "v0 nrm=(%.2f %.2f %.2f) vcol=(%.2f %.2f %.2f) lit=(%.2f %.2f %.2f)\n",
+                    c->enable, c->amb_src, c->mat_src, c->light_mask, c->diff_fn, c->attn_fn, gx.amb_color[0][0],
+                    gx.amb_color[0][1], gx.amb_color[0][2], gx.mat_color[0][0], gx.mat_color[0][1],
+                    gx.mat_color[0][2], l->pos[0], l->pos[1], l->pos[2], l->dir[0], l->dir[1], l->dir[2],
+                    l->color[0], l->color[1], l->color[2], gx.lights[1].pos[0], gx.lights[1].pos[1],
+                    gx.lights[1].pos[2], gx.lights[1].color[0], gx.lights[1].color[1], gx.lights[1].color[2],
+                    first_vertex.nrm[0], first_vertex.nrm[1], first_vertex.nrm[2],
+                    first_vertex.col[0][0], first_vertex.col[0][1], first_vertex.col[0][2], g->col[0][0], g->col[0][1],
+                    g->col[0][2]);
+        }
+        if (gx.num_chans > 1) {
+            const ChanCtrl* c = &gx.chan[1];
+            u32 li;
+            fprintf(stderr, "[gx]   chan1: en=%u amb_src=%u mat_src=%u mask=%02x diff=%u attn=%u amb=(%.2f %.2f %.2f) "
+                            "mat=(%.2f %.2f %.2f) lit1=(%.2f %.2f %.2f)",
+                    c->enable, c->amb_src, c->mat_src, c->light_mask, c->diff_fn, c->attn_fn, gx.amb_color[1][0],
+                    gx.amb_color[1][1], gx.amb_color[1][2], gx.mat_color[1][0], gx.mat_color[1][1],
+                    gx.mat_color[1][2], g->col[1][0], g->col[1][1], g->col[1][2]);
+            for (li = 0; li < 8; li++) {
+                const Light* l = &gx.lights[li];
+                if (c->light_mask & (1u << li)) {
+                    fprintf(stderr, " L%u pos=(%.1f %.1f %.1f) dir=(%.2f %.2f %.2f) col=(%.2f %.2f %.2f) a=(%g %g %g) k=(%g %g %g)",
+                            li, l->pos[0], l->pos[1], l->pos[2], l->dir[0], l->dir[1], l->dir[2], l->color[0],
+                            l->color[1], l->color[2], l->a0, l->a1, l->a2, l->k0, l->k1, l->k2);
+                }
+            }
+            fprintf(stderr, "\n");
+        }
         if (gx.num_texgen > 0) {
             const TexGen* tg = &gx.texgen[0];
             fprintf(stderr, "[gx]   texgen0: src=%u type=%u mtx=%u pt=%u", tg->src, tg->type, tg->mtx, tg->pt_mtx);
@@ -2556,6 +2640,7 @@ void pc_gx_render_init(void)
     debug_flat = getenv("MELEE_GX_FLAT") != NULL;
     debug_nocull = getenv("MELEE_GX_NOCULL") != NULL;
     debug_noalpha = getenv("MELEE_GX_NOALPHA") != NULL;
+    debug_litonly = getenv("MELEE_GX_LITONLY") != NULL;
     debug_log_frame = getenv("MELEE_GX_LOG_FRAME") != NULL ? (u32) strtoul(getenv("MELEE_GX_LOG_FRAME"), NULL, 0) : 0;
     rendering = pc_window_ready();
     if (rendering) {

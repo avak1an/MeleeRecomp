@@ -12,6 +12,8 @@
 #include <ctype.h>
 #include <direct.h>
 #include <stdio.h>
+#include <windows.h>
+#include <wincrypt.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -79,6 +81,68 @@ static const char* find_default_iso(void)
     return NULL;
 }
 
+/* The port is built against the NTSC 1.02 executable: its font tables are
+ * extracted from that DOL at build time and every data fix assumes its
+ * layout. Other revisions boot into garbage, so the disc's main.dol is
+ * checked here (SHA-1, the same value the launcher's "Verify" uses).
+ * MELEE_UNVERIFIED=1 skips the check for experiments. */
+#define KNOWN_DOL_SHA1 "08e0bf20134dfcb260699671004527b2d6bb1a45"
+
+static void verify_dol(const char* path)
+{
+    u8 dol[0x100];
+    u32 dol_offset = be32(disc_header + 0x420), dol_size = 0x100, i;
+    HCRYPTPROV prov = 0;
+    HCRYPTHASH hash = 0;
+    u8 digest[20];
+    DWORD dlen = sizeof(digest);
+    char hex[41];
+    u8* data;
+    if (getenv("MELEE_UNVERIFIED") != NULL) {
+        return;
+    }
+    disc_read(dol_offset, dol, sizeof(dol));
+    for (i = 0; i < 18; i++) {
+        u32 off = be32(dol + i * 4), size = be32(dol + 0x90 + i * 4);
+        if (size != 0 && off + size > dol_size) {
+            dol_size = off + size;
+        }
+    }
+    if (dol_size > (64u << 20)) {
+        goto bad;
+    }
+    data = (u8*) malloc(dol_size);
+    if (data == NULL) {
+        return;
+    }
+    disc_read(dol_offset, data, dol_size);
+    if (!CryptAcquireContextA(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
+        free(data);
+        return; /* no crypto provider: cannot check, carry on */
+    }
+    if (!CryptCreateHash(prov, CALG_SHA1, 0, 0, &hash) || !CryptHashData(hash, data, dol_size, 0) ||
+        !CryptGetHashParam(hash, HP_HASHVAL, digest, &dlen, 0)) {
+        free(data);
+        CryptReleaseContext(prov, 0);
+        return;
+    }
+    free(data);
+    CryptDestroyHash(hash);
+    CryptReleaseContext(prov, 0);
+    for (i = 0; i < 20; i++) {
+        sprintf(hex + i * 2, "%02x", digest[i]);
+    }
+    hex[40] = '\0';
+    if (strcmp(hex, KNOWN_DOL_SHA1) == 0) {
+        return;
+    }
+    fprintf(stderr, "[pc] %s: main.dol SHA-1 %s is not the NTSC 1.02 executable (%s)\n", path, hex, KNOWN_DOL_SHA1);
+bad:
+    fprintf(stderr, "[pc] This build only supports Super Smash Bros. Melee NTSC 1.02 (GALE01, revision 2). "
+                    "Use that disc image; set MELEE_UNVERIFIED=1 to try anyway.\n");
+    exit(2);
+}
+
 void pc_dvd_init(const char* path)
 {
     u32 fst_offset, fst_size, i;
@@ -101,6 +165,7 @@ void pc_dvd_init(const char* path)
                 disc_header);
         exit(2);
     }
+    verify_dol(path);
     fst_offset = be32(disc_header + 0x424);
     fst_size = be32(disc_header + 0x428);
     fst = (FSTEntry*) malloc(fst_size);

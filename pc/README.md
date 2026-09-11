@@ -218,6 +218,14 @@ source. To make a mod, extract the disc (`--extract DIR` or the launcher's
 button), copy the files you want to change into a new folder under
 `mods\`, edit them, and enable the folder.
 
+Disc check: the game itself hashes the disc's `main.dol` when it opens
+the image and refuses anything but the NTSC 1.02 executable (SHA-1
+`08e0bf20...`, the one the decompilation matches): other revisions have
+different data layouts and boot into garbage. `MELEE_UNVERIFIED=1` skips
+the check for experiments. This is a compatibility check, not copy
+protection: anyone can edit it out of the source, and nothing in the
+repository or the build contains the game's data, which is the point.
+
 Launcher: `melee-launcher.exe` is built alongside the game and needs
 nothing else; each build also copies it to `pc/dist`, where it is
 committed so a fresh clone can start from the launcher (it links the C
@@ -255,7 +263,10 @@ recorder on PC) and display lists from disc (the same command format,
 big-endian). Vertices are decoded with the current vertex descriptor,
 attribute formats and index arrays, then transformed on the CPU as the
 console's XF unit would: position/normal matrices from the matrix memory,
-per-vertex lighting from the channel controls, texture-coordinate
+per-vertex lighting from the channel controls (ambient and material
+registers, up to eight lights with the spot and specular attenuation
+functions: a specular light's position is the direction to it and its
+direction the half-angle vector, as the hardware defines them), texture-coordinate
 generation (source, texture matrix and the post-transform matrix HSD
 uses for every texture's own translate/scale/rotate). The fragment side is a GLSL shader generated from the TEV
 stage configuration (all inputs, compare ops, bias/scale, swap tables,
@@ -329,9 +340,14 @@ such copies and drew it upside down before.
 ### Debugging aids
 
 - `MELEE_GX_NOCULL=1` / `MELEE_GX_NOALPHA=1` disable face culling / the
-  alpha test; `MELEE_GX_LOG_FRAME=N` logs every draw of frame N with its
-  state and first vertex (draws issued while a fighter model is displayed
-  are tagged, and each screenshot line reports how many).
+  alpha test; `MELEE_GX_LITONLY=1` samples every texture as white, so a
+  screenshot shows the vertex lighting alone; `MELEE_GX_LOG_FRAME=N` logs
+  every draw of frame N with its state, TEV stages, both colour channels
+  with their lights and the first vertex's normal and lit colours (draws
+  issued while a fighter model is displayed are tagged, and each
+  screenshot line reports how many). `MELEE_TRACE_LIGHT=N` lists the
+  scene's light objects (flags, colour, position) as they are set up
+  during frame N.
 - `--watch 0xADDR` (or `--watch symbol`, `--watch symbol+0x1c`, resolved
   through the debug symbols) reports every swap helper that touches the word at ADDR
   and every change of it seen at descriptor swaps, GObj processes and
@@ -670,6 +686,13 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   command structs in `lb/types.h` are declared in console bit order on PC.
   Raw half-word/byte reads inside a command word go through
   `CMD_HALF`/`CMD_BYTE`.
+- `ground.c`: the stage's light override table (which lights are diffuse,
+  specular or shadow-only for this stage) is applied to the light
+  descriptors' flags before `HSD_LObjLoadDesc` swaps them; on PC the
+  descriptor is swapped there first. Unswapped, the type test failed on
+  every light and the overrides were skipped, so Temple's shadow-only
+  white light lit the fighters as a second diffuse light and washed the
+  shading out (the "characters look flat and pale" report).
 - Bit-fields that mirror disc data or are written through a byte/word view
   with console bit numbering are declared in reverse under `TARGET_PC`:
   `StageCallbacks::flags`, `LightOverrideEntry`, `ItemAttr`,
@@ -718,5 +741,11 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - Classic mode has been driven to and through the Master Hand fight with
   `--kill`; the ending sequence after his defeat has not been reached (the
   option cannot KO him).
+- Specular lighting: sysdolphin builds the half-angle vector as
+  `light vector + (joint direction from the eye)`, which is the negative
+  of the half-angle the GX SDK's `GXInitSpecularDir` stores, so with the
+  hardware's `N . H` term (as Dolphin implements it) the specular channel
+  comes out zero for fighters here. Whether the console shows those
+  highlights, and with which sign, has not been checked against hardware.
 - `char` signedness and paired-single float rounding are not matched.
 - Threads are stubs (the game creates none that matter on PC).
