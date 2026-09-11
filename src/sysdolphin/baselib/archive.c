@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "archive.h"
 #ifdef TARGET_PC
 #include <pc_hsd_swap.h>
@@ -149,6 +150,15 @@ void* HSD_ArchiveGetPublicAddress(HSD_Archive* archive, const char* symbols)
             return archive->data + archive->public_info[i].offset;
         }
     }
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_ARCHIVE") != NULL) {
+        OSReport("[pc] archive %p has no symbol %s; it has:", (void*) archive, symbols);
+        for (i = 0; i < archive->header.nb_public; i++) {
+            OSReport(" %s", archive->symbols + archive->public_info[i].symbol);
+        }
+        OSReport("\n");
+    }
+#endif
 
     return NULL;
 }

@@ -32,6 +32,7 @@ enum {
     IDC_ISO_HASH,
     IDC_SIZE_COMBO,
     IDC_FULLSCREEN,
+    IDC_NO_CONSOLE,
     IDC_VOLUME,
     IDC_VOLUME_LABEL,
     IDC_MUTE,
@@ -721,6 +722,7 @@ static void save_settings(void)
     ini_set("iso", buf);
     ini_set_int("scale", (int) SendMessageA(ctl(IDC_SIZE_COMBO), CB_GETCURSEL, 0, 0) + 1);
     ini_set_int("fullscreen", IsDlgButtonChecked(main_wnd, IDC_FULLSCREEN) == BST_CHECKED);
+    ini_set_int("no_console", IsDlgButtonChecked(main_wnd, IDC_NO_CONSOLE) == BST_CHECKED);
     ini_set_int("volume", (int) SendMessageA(ctl(IDC_VOLUME), TBM_GETPOS, 0, 0));
     ini_set_int("mute", IsDlgButtonChecked(main_wnd, IDC_MUTE) == BST_CHECKED);
     get_text(IDC_KEYMAP_EDIT, buf, sizeof(buf));
@@ -758,7 +760,11 @@ static int find_game_exe(char* out, int size)
     return 0;
 }
 
-static int run_child(const char* cmd_line, const char* dir, int new_console, int kind)
+/* flags: 0 inherits the launcher's (absent) console, so a console
+ * program gets a new window; CREATE_NEW_CONSOLE for the build and the
+ * extraction, whose progress is that window; CREATE_NO_WINDOW for the
+ * game when the console is hidden (its output goes to melee.log). */
+static int run_child(const char* cmd_line, const char* dir, DWORD flags, int kind)
 {
     char cmd[4096];
     STARTUPINFOA si;
@@ -768,7 +774,7 @@ static int run_child(const char* cmd_line, const char* dir, int new_console, int
     memset(&si, 0, sizeof(si));
     si.cb = sizeof(si);
     memset(&pi, 0, sizeof(pi));
-    if (!CreateProcessA(NULL, cmd, NULL, NULL, FALSE, new_console ? CREATE_NEW_CONSOLE : 0, NULL, dir, &si, &pi)) {
+    if (!CreateProcessA(NULL, cmd, NULL, NULL, FALSE, flags, NULL, dir, &si, &pi)) {
         char msg[256];
         snprintf(msg, sizeof(msg), "The program could not be started (error %lu).", GetLastError());
         MessageBoxA(main_wnd, msg, APP_TITLE, MB_ICONERROR);
@@ -787,7 +793,7 @@ static int run_child(const char* cmd_line, const char* dir, int new_console, int
     return 1;
 }
 
-static int run_game(const char* args, int new_console, int is_extract)
+static int run_game(const char* args, DWORD flags, int is_extract)
 {
     char cmd[4096];
     char exe[MAX_PATH];
@@ -799,7 +805,7 @@ static int run_game(const char* args, int new_console, int is_extract)
         return 0;
     }
     snprintf(cmd, sizeof(cmd), "\"%s\" %s", exe, args);
-    return run_child(cmd, exe_dir, new_console, is_extract ? 1 : 0);
+    return run_child(cmd, exe_dir, flags, is_extract ? 1 : 0);
 }
 
 /* --- building from source ------------------------------------------------------ */
@@ -893,7 +899,7 @@ static void build_game(void)
         }
     }
     snprintf(cmd, sizeof(cmd), "cmd.exe /S /C \"\"%s\\pc\\build.cmd\" || pause\"", src);
-    if (run_child(cmd, src, 1, 2)) {
+    if (run_child(cmd, src, CREATE_NEW_CONSOLE, 2)) {
         set_status("Building the game from source; the console window shows the progress.");
     }
 }
@@ -933,7 +939,11 @@ static void play(void)
     if (buf[0] != '\0') {
         n += (size_t) snprintf(args + n, sizeof(args) - n, " %s", buf);
     }
-    if (run_game(args, 0, 0)) {
+    if (IsDlgButtonChecked(main_wnd, IDC_NO_CONSOLE) == BST_CHECKED) {
+        if (run_game(args, CREATE_NO_WINDOW, 0)) {
+            set_status("Game running without a console; its output goes to melee.log. Escape ends it.");
+        }
+    } else if (run_game(args, 0, 0)) {
         set_status("Game running. Escape or closing the game window ends it; F11 toggles full screen.");
     }
 }
@@ -956,7 +966,7 @@ static void extract(void)
     }
     save_settings();
     snprintf(args, sizeof(args), "--iso \"%s\" --extract \"%s\"", iso, extract_dir);
-    if (run_game(args, 1, 1)) {
+    if (run_game(args, CREATE_NEW_CONSOLE, 1)) {
         set_status("Extracting the disc's files. A console window shows the progress.");
     }
 }
@@ -996,7 +1006,7 @@ static void child_finished(void)
         if (code == 0) {
             snprintf(msg, sizeof(msg), "The game exited normally.");
         } else {
-            snprintf(msg, sizeof(msg), "The game exited with status %lu (run it from a console for details).",
+            snprintf(msg, sizeof(msg), "The game exited with status %lu (see melee.log next to melee.exe).",
                      code);
         }
         set_status(msg);
@@ -1054,7 +1064,10 @@ static void build_ui(void)
     }
     make("BUTTON", "Full screen (F11 or Alt+Enter in the game)", BS_AUTOCHECKBOX, 270, y + 2, 254, 18,
          IDC_FULLSCREEN);
-    y += 32;
+    y += 24;
+    make("BUTTON", "Hide the console window (the game's output still goes to melee.log)", BS_AUTOCHECKBOX, 16,
+         y + 2, 508, 18, IDC_NO_CONSOLE);
+    y += 30;
 
     heading("Audio", y);
     y += 20;
@@ -1162,6 +1175,7 @@ static void build_ui(void)
     i = ini_get_int("scale", 2);
     SendMessageA(ctl(IDC_SIZE_COMBO), CB_SETCURSEL, (WPARAM) (i >= 1 && i <= 4 ? i - 1 : 1), 0);
     CheckDlgButton(main_wnd, IDC_FULLSCREEN, ini_get_int("fullscreen", 0) ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(main_wnd, IDC_NO_CONSOLE, ini_get_int("no_console", 0) ? BST_CHECKED : BST_UNCHECKED);
     i = ini_get_int("volume", 100);
     SendMessageA(ctl(IDC_VOLUME), TBM_SETPOS, TRUE, (LPARAM) (i < 0 ? 0 : i > 100 ? 100 : i));
     snprintf(buf, sizeof(buf), "%d%%", i);
@@ -1369,7 +1383,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmdline, int show)
     r.left = 0;
     r.top = 0;
     r.right = 540;
-    r.bottom = 872;
+    r.bottom = 894;
     AdjustWindowRect(&r, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
     main_wnd = CreateWindowExA(0, "MeleeLauncher", APP_TITLE, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
                                CW_USEDEFAULT, CW_USEDEFAULT, r.right - r.left, r.bottom - r.top, NULL, NULL, inst,

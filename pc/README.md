@@ -139,7 +139,13 @@ Start period). Different seeds give different stages and opponents.
 (a four-player match, run it with `--frames 9500`).
 `pc\scripts\classic-play.txt` is the Classic route without the later Start
 presses: the first match runs unpaused, for watching a CPU on a stage
-(combine with `--stage`). A sweep of every stage is the VS route with
+(combine with `--stage`). The other modes have routes too:
+`adventure-play.txt` (Adventure, Mushroom Kingdom; press Start around
+frame 700 to skip the intro, then hold right), `event-play.txt` (Event
+Match 1), `target-play.txt` (Target Test), `homerun-play.txt` (Home-Run
+Contest), `multiman-play.txt` (10-Man Melee) and `training-play.txt`
+(Training, up to the match with its menu open). All-Star is locked on a
+fresh save and has no route yet. A sweep of every stage is the VS route with
 `--stage N` for N = 2..32, checking the exit status, the `corrupt` /
 `archive check` lines and the motion trace.
 
@@ -249,7 +255,9 @@ request hashes it: the whole image against the SHA-1 of the v1.02 disc
 the decompilation targets, `d4e70c06...`, and its `main.dol` against the
 README's `08e0bf20...`, so a differently dumped or modified image is told
 apart from a wrong revision), window
-size or full screen, volume and mute, the keyboard layout file (with a
+size or full screen, whether the game's console window is shown (hidden,
+the game still writes everything to `melee.log`), volume and mute, the
+keyboard layout file (with a
 button that writes the default layout and opens it for editing), the
 saves folder, the mod list (checkboxes for enabled, buttons for priority),
 extracts the disc's files, and starts the game with the matching options.
@@ -744,6 +752,27 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - `gx_render.c`: `GX_VA_NBT` vertices (items with environment maps: the
   capsule, the shells, the barrel) supply their normal; without it they
   were lit by the ambient term only and looked grey and flat.
+- `gx_render.c`: a texture coordinate generated with the identity matrix
+  still goes through the post-transform matrix; toon-shaded items (tomato,
+  Poke Ball, barrel, crate, food) map their normal through it and were
+  drawn unshaded.
+- `mnevent.c`: the event menu addresses its strings as offsets from an
+  animation-settings struct that precedes them in the console's data
+  layout; on PC the string block is addressed directly (the menu looked
+  up garbage symbol names and asserted).
+- `gmevent.c`: the event level tables from `GmEvent.dat` are swapped, and
+  `gm_evinit` declares its two flag bytes as byte-sized bit-fields so the
+  fields after them stay at their console offsets (every event had stage
+  0 and no music).
+- `gm_181A.c`: the Multi-Man spawn tables from `GmKumite.dat` are swapped
+  (the wireframes' attack ratio was a denormal; the first hit sent the
+  player to infinity). `mnhyaku.c`: the Multi-Man menu passes the port to
+  `gm_801677E8` explicitly (the console build left it in r3 from the call
+  before), so the character select stores the pick under the right port;
+  before, the match started with no character and a second Mario.
+- `gm_180A.c`: the four ints that `fn_80181708` clears past
+  `lbl_80472E48` are that struct's own storage (`lbl_80472EC8`) on PC;
+  they used to land on the Home-Run Contest's archive pointers.
 - `ground.c`: the stage's light override table (which lights are diffuse,
   specular or shadow-only for this stage) is applied to the light
   descriptors' flags before `HSD_LObjLoadDesc` swaps them; on PC the
@@ -802,6 +831,10 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - Stages 1 (Test), 21 (Akaneia) and 26 (Icetop) are unfinished in the
   game and crash or hang when forced with `--stage`; the menus never
   select them.
+- Adventure mode has only been driven through the first stage's opening
+  (the scripted walker stops at the first tall wall); the later stages
+  and their cutscenes are unverified. All-Star mode is locked on a fresh
+  save and untested.
 - Flat Zone (`--stage 27`): after about a minute a falling tool item
   crashes while flashing before it vanishes (`it_80273670` with state
   index `x0 + 5` = 9, whose animation joint has a garbage child). Not

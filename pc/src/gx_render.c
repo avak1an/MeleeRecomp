@@ -142,6 +142,8 @@ static int debug_log;  /* MELEE_GX_DEBUG: log the first draws of a frame */
 static int debug_flat; /* MELEE_GX_FLAT: magenta fragments, no alpha test */
 int pc_debug_in_fighter;      /* set by the fighter draw routine: 1 + kind while its model is drawn */
 int pc_debug_in_item;         /* set by the item draw routine: 1 + kind while its model is drawn */
+unsigned int pc_debug_rendermode; /* the last material's render mode (HSD_MObjSetup) */
+unsigned char pc_debug_mat_colors[16];
 static int fighter_draws;     /* draws issued for fighters this frame */
 int pc_debug_fighter_counts[4]; /* jobj / dobj / pobj / display-list calls while drawing fighters */
 static int debug_nocull;      /* MELEE_GX_NOCULL: never cull faces */
@@ -523,16 +525,20 @@ static void texgen(const Vertex* v, const float vpos[3], const float vnrm[3], in
         normalize3(in);
     }
     if (g->mtx >= MTX_ROWS - 2) {
-        out[0] = in[0];
-        out[1] = in[1];
-        return;
-    }
-    m = (const float(*)[4]) gx.mtx[g->mtx];
-    s = m[0][0] * in[0] + m[0][1] * in[1] + m[0][2] * in[2] + m[0][3] * in[3];
-    t = m[1][0] * in[0] + m[1][1] * in[1] + m[1][2] * in[2] + m[1][3] * in[3];
-    q = 1.0f;
-    if (g->type == GX_TG_MTX3x4) {
-        q = m[2][0] * in[0] + m[2][1] * in[1] + m[2][2] * in[2] + m[2][3] * in[3];
+        /* GX_IDENTITY: the input passes through, but the post-transform
+         * matrix below still applies (toon shading maps the normal through
+         * it: identity texture matrix, then s = a * nx + b) */
+        s = in[0];
+        t = in[1];
+        q = g->type == GX_TG_MTX3x4 ? in[2] : 1.0f;
+    } else {
+        m = (const float(*)[4]) gx.mtx[g->mtx];
+        s = m[0][0] * in[0] + m[0][1] * in[1] + m[0][2] * in[2] + m[0][3] * in[3];
+        t = m[1][0] * in[0] + m[1][1] * in[1] + m[1][2] * in[2] + m[1][3] * in[3];
+        q = 1.0f;
+        if (g->type == GX_TG_MTX3x4) {
+            q = m[2][0] * in[0] + m[2][1] * in[1] + m[2][2] * in[2] + m[2][3] * in[3];
+        }
     }
     /* dual transform: the post-transform matrix (GX_PTTEXMTX0..19) is applied
      * to the generated (s, t, q). HSD loads every texture's own matrix
@@ -1510,7 +1516,9 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
     if ((debug_log && stats_draws < 8) || (debug_log_frame != 0 && pc_frame_count == debug_log_frame)) {
         const GLVertex* g = &glverts[0];
         if (pc_debug_in_item) {
-            fprintf(stderr, "[gx] (item kind %d) ", pc_debug_in_item - 1);
+            fprintf(stderr, "[gx] (item kind %d rendermode %08x amb %02x%02x%02x dif %02x%02x%02x) ", pc_debug_in_item - 1,
+                    pc_debug_rendermode, pc_debug_mat_colors[0], pc_debug_mat_colors[1], pc_debug_mat_colors[2],
+                    pc_debug_mat_colors[4], pc_debug_mat_colors[5], pc_debug_mat_colors[6]);
         }
         if (pc_debug_in_fighter) {
             fprintf(stderr, "[gx] (fighter kind %d) ", pc_debug_in_fighter - 1);
@@ -1585,9 +1593,9 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
             }
             fprintf(stderr, "\n");
         }
-        if (gx.num_texgen > 0) {
-            const TexGen* tg = &gx.texgen[0];
-            fprintf(stderr, "[gx]   texgen0: src=%u type=%u mtx=%u pt=%u", tg->src, tg->type, tg->mtx, tg->pt_mtx);
+        for (u32 tgi = 0; tgi < gx.num_texgen && tgi < 8; tgi++) {
+            const TexGen* tg = &gx.texgen[tgi];
+            fprintf(stderr, "[gx]   texgen%u: src=%u type=%u mtx=%u pt=%u", tgi, tg->src, tg->type, tg->mtx, tg->pt_mtx);
             if (tg->mtx < MTX_ROWS - 2) {
                 const float(*m)[4] = (const float(*)[4]) gx.mtx[tg->mtx];
                 fprintf(stderr, " m=[%.3f %.3f %.3f %.3f | %.3f %.3f %.3f %.3f]", m[0][0], m[0][1], m[0][2], m[0][3],
@@ -1598,7 +1606,7 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
                 fprintf(stderr, " pt=[%.3f %.3f %.3f %.3f | %.3f %.3f %.3f %.3f]", m[0][0], m[0][1], m[0][2], m[0][3],
                         m[1][0], m[1][1], m[1][2], m[1][3]);
             }
-            fprintf(stderr, " v0tex=(%.2f %.2f)\n", glverts[0].tex[0][0], glverts[0].tex[0][1]);
+            fprintf(stderr, " v0tex=(%.2f %.2f)\n", glverts[0].tex[tgi][0], glverts[0].tex[tgi][1]);
         }
         {
             u32 a;

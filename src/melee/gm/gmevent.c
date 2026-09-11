@@ -63,6 +63,20 @@ struct gm_event_char_list {
 /// Per-level match init data; shares its first two bytes' bitfield layout
 /// with #StartMeleeRules.
 struct gm_evinit {
+#ifdef TARGET_PC
+    /* disc data: two bytes of flags in the console's bit order, kept as
+     * byte-sized fields so unk2 stays at offset 2 */
+    /* 0x00 */ u8 x0_7 : 1;
+    /* 0x00 */ u8 x0_6 : 1;
+    /* 0x00 */ u8 x0_3 : 3;
+    /* 0x00 */ u8 x0_0 : 3;
+    /* 0x01 */ u8 x1_5 : 3;
+    /* 0x01 */ u8 x1_4 : 1;
+    /* 0x01 */ u8 x1_3 : 1;
+    /* 0x01 */ u8 x1_2 : 1;
+    /* 0x01 */ u8 x1_1 : 1;
+    /* 0x01 */ u8 x1_0 : 1;
+#else
     /* 0x00 */ u32 x0_0 : 3;
     /* 0x00 */ u32 x0_3 : 3;
     /* 0x00 */ u32 x0_6 : 1;
@@ -73,6 +87,7 @@ struct gm_evinit {
     /* 0x01 */ u32 x1_3 : 1;
     /* 0x01 */ u32 x1_4 : 1;
     /* 0x01 */ u32 x1_5 : 3;
+#endif
     /* 0x02 */ u8 unk2;
     /* 0x03 */ s8 unk3;
     /* 0x04 */ s8 unk4;
@@ -201,10 +216,81 @@ GameModeState gm_Mode_Event_States[] = {
     { -1 },
 };
 
+#ifdef TARGET_PC
+#include <pc_endian.h>
+#include <pc_hsd_swap.h>
+/* GmEvent.dat: the event level table, one pointer per event, each level
+ * pointing at small blocks of bytes, shorts, ints and floats. */
+static void pc_swap_player_init(struct gm_801BAB40_src* pi)
+{
+    if (pi == NULL || !pc_swap_ptr_ok(pi) || !pc_swap_once(pi)) {
+        return;
+    }
+    pc_swap16(&pi->x12);
+    pc_swap16(&pi->hp);
+    pc_swapf(&pi->x18);
+    pc_swapf(&pi->x1C);
+    pc_swapf(&pi->x20);
+}
+
+static void pc_swap_event_levels(void)
+{
+    struct gm_804D6900_t** levels = gm_804D6900[0];
+    int i, j;
+    if (levels == NULL || !pc_swap_ptr_ok(levels) || !pc_swap_once(levels)) {
+        return;
+    }
+    for (i = 0; i < 64 && pc_swap_is_reloc_slot(&levels[i]); i++) {
+        struct gm_804D6900_t* lv = levels[i];
+        if (lv == NULL || !pc_swap_ptr_ok(lv) || !pc_swap_once(lv)) {
+            continue;
+        }
+        if (lv->x4 != NULL && pc_swap_ptr_ok(lv->x4) && pc_swap_once(lv->x4)) {
+            pc_swap32(&lv->x4->x0);
+            if (!pc_swap_is_reloc_slot(&lv->x4->x4)) {
+                pc_swap32(&lv->x4->x4);
+            }
+        }
+        if (lv->x8 != NULL && pc_swap_ptr_ok(lv->x8) && pc_swap_once(lv->x8)) {
+            u8* b = (u8*) lv->x8;
+            u8 t;
+            pc_swap16(b + 0x06);
+            pc_swap32(b + 0x08);
+            for (j = 0; j < 4; j++) { /* the u64 at 0x10 */
+                t = b[0x10 + j];
+                b[0x10 + j] = b[0x17 - j];
+                b[0x17 - j] = t;
+            }
+            pc_swap32(b + 0x18);
+            pc_swap32(b + 0x1C);
+            pc_swap32(b + 0x20);
+            pc_swap32(b + 0x24);
+        }
+        if (lv->xC != NULL && pc_swap_ptr_ok(lv->xC) && pc_swap_once(lv->xC)) {
+            pc_swapf(&lv->xC->x8);
+            pc_swapf(&lv->xC->xC);
+            pc_swapf(&lv->xC->x10);
+        }
+        if (lv->x10 != NULL && pc_swap_ptr_ok(lv->x10) && pc_swap_once(lv->x10)) {
+            pc_swap16_range(lv->x10->stage, sizeof(lv->x10->stage));
+            for (j = 0; j < 5; j++) {
+                pc_swap_player_init(lv->x10->entries[j]);
+            }
+        }
+        for (j = 0; j < 5; j++) {
+            pc_swap_player_init(lv->player_init[j]);
+        }
+    }
+}
+#endif
+
 void gm_801BA8FC(void)
 {
     lbArchive_LoadSymbols("GmEvent.dat", &gm_804D6900,
                           "sqEventInitDataLevelTbl", 0);
+#ifdef TARGET_PC
+    pc_swap_event_levels();
+#endif
 }
 
 void gm_801BA938(struct EventData* arg0, int lo, int hi, bool arg3)
@@ -370,6 +456,9 @@ void onEnterVs(GameModeState* arg0)
 
     lbArchive_LoadSymbols("GmEvent.dat", &gm_804D6900,
                           "sqEventInitDataLevelTbl", 0);
+#ifdef TARGET_PC
+    pc_swap_event_levels();
+#endif
     levels = gm_804D6900[0];
     gm_SetupRulesDefaults(&md->rules);
     md->rules.match_kind = levels[level]->x8->x0_0;

@@ -1,3 +1,7 @@
+#ifdef TARGET_PC
+#include <pc_endian.h>
+#include <pc_hsd_swap.h>
+#endif
 #include <Runtime/platform.h>
 
 #include <sysdolphin/baselib/forward.h>
@@ -442,6 +446,37 @@ void gm_80182174(void)
         (spawn_table_25 = &lbl_80472ED8.x6B4), "gmKumiteSystemTableEndless",
         (spawn_table_26 = &lbl_80472ED8.x6B8),
         "gmKumiteSystemTableMercilessly", 0);
+
+#ifdef TARGET_PC
+    /* the six spawn tables: {s32 x0; four bytes; f32 attack; f32 defense}
+     * per entry, ended by x0 == 999. Unswapped, the wireframes' attack
+     * ratio was a denormal and the first hit sent the player off to
+     * infinity. */
+    {
+        RegClearSpawnEntry* tables[6];
+        int t, k;
+        tables[0] = lbl_80472ED8.x6A4;
+        tables[1] = *spawn_table_22;
+        tables[2] = *spawn_table_23;
+        tables[3] = *spawn_table_24;
+        tables[4] = *spawn_table_25;
+        tables[5] = *spawn_table_26;
+        for (t = 0; t < 6; t++) {
+            RegClearSpawnEntry* e = tables[t];
+            if (e == NULL || !pc_swap_ptr_ok(e) || !pc_swap_once(e)) {
+                continue;
+            }
+            for (k = 0; k < 101; k++) {
+                pc_swap32(&e[k].x0);
+                pc_swap32(&e[k].x8);
+                pc_swap32(&e[k].xC);
+                if (e[k].x0 == 0x3E7) {
+                    break;
+                }
+            }
+        }
+    }
+#endif
 
     lbl_80472ED8.x0 = 0;
     lbl_80472ED8.x4 = 0;

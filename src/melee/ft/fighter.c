@@ -859,6 +859,15 @@ static void Fighter_Create_Inline2(Fighter_GObj* gobj)
 
 Fighter_GObj* Fighter_Create(struct plAllocInfo* input)
 {
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_MOTION") != NULL) {
+        static int shown;
+        if (shown++ < 8) {
+            OSReport("[pc] Fighter_Create: slot %d internal id %d; from:\n", input->slot, input->internal_id);
+            pc_print_backtrace();
+        }
+    }
+#endif
     Fighter_GObj* gobj;
     Fighter* fp;
     HSD_JObj* jobj;
@@ -969,8 +978,8 @@ void Fighter_ChangeMotionState(Fighter_GObj* gobj, FtMotionId msid,
             }
         }
         if (trace) {
-            OSReport("[pc] frame %u: P%d motion %d -> %d (flags %x, start %g) at (%.1f %.1f) vel (%.2f %.2f) ground %d\n",
-                     pc_frame_count, fp->player_id + 1, fp->motion_id, msid, flags, anim_start, fp->cur_pos.x,
+            OSReport("[pc] frame %u: P%d (kind %d, %p) motion %d -> %d (flags %x, start %g) at (%.1f %.1f) vel (%.2f %.2f) ground %d\n",
+                     pc_frame_count, fp->player_id + 1, fp->kind, (void*) gobj, fp->motion_id, msid, flags, anim_start, fp->cur_pos.x,
                      fp->cur_pos.y, fp->self_vel.x, fp->self_vel.y, fp->ground_or_air);
         }
     }
@@ -2906,9 +2915,11 @@ void Fighter_ProcessHit_8006D1EC(Fighter_GObj* gobj)
             ftKb_SpecialN_800F5BA4(fp);
 #ifdef TARGET_PC
             if (getenv("MELEE_TRACE_MOTION") != NULL) {
-                OSReport("[pc] frame %u: P%d hit: damage %g kb %g angle %d src ply %d kind %d x1908 %d at (%.1f %.1f)\n",
-                         pc_frame_count, fp->player_id + 1, fp->dmg.x1838_percentTemp, fp->dmg.x18A4_knockbackMagnitude,
-                         fp->dmg.x1848_kb_angle, fp->dmg.x18c4_source_ply, fp->dmg.x1840, fp->dmg.x1908, fp->cur_pos.x,
+                OSReport("[pc] frame %u: P%d hit: damage %g kb %g (mag %g, ratio %g, def %g, atk %g, weight %g) angle %d src ply %d kind %d x1908 %d at (%.1f %.1f)\n",
+                         pc_frame_count, fp->player_id + 1, fp->dmg.x1838_percentTemp, fp->dmg.kb_applied,
+                         fp->dmg.x18A4_knockbackMagnitude, gm_8016B248(), Player_GetDefenseRatio(fp->player_id),
+                         fp->dmg.x18c4_source_ply < 6 ? Player_GetAttackRatio(fp->dmg.x18c4_source_ply) : -1.0f,
+                         fp->co_attrs.weight, fp->dmg.x1848_kb_angle, fp->dmg.x18c4_source_ply, fp->dmg.x1840, fp->dmg.x1908, fp->cur_pos.x,
                          fp->cur_pos.y);
             }
 #endif

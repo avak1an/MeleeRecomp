@@ -35,8 +35,23 @@ struct lbl_80472E48_t {
 }; /* size = 0x80 */
 ASSERT_SIZE(struct lbl_80472E48_t, 0x80);
 
+#ifdef TARGET_PC
+/* fn_80181708 clears four ints past this struct (the console's next
+ * static); on PC they must have their own storage, or the writes land on
+ * the archive pointers below (the home-run counter models were NULL) */
+static struct {
+    struct lbl_80472E48_t x0;
+    int x80[4];
+} lbl_80472E48_pc;
+#define lbl_80472E48 lbl_80472E48_pc.x0
+#else
 static struct lbl_80472E48_t lbl_80472E48;
+#endif
+#ifdef TARGET_PC
+#define lbl_80472EC8 lbl_80472E48_pc.x80 /* the four ints above */
+#else
 static s32 lbl_80472EC8[4];
+#endif
 
 static HSD_Archive* lbl_804D65C8;
 static DynamicModelDesc** lbl_804D65CC;

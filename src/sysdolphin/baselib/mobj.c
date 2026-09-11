@@ -416,6 +416,16 @@ void HSD_MObjSetup(HSD_MObj* mobj, u32 rendermode)
 
     HSD_StateInitTev();
     rendermode = mobj->rendermode;
+#ifdef TARGET_PC
+    {
+        extern unsigned int pc_debug_rendermode;
+        extern unsigned char pc_debug_mat_colors[16];
+        pc_debug_rendermode = rendermode;
+        memcpy(pc_debug_mat_colors, &mobj->mat->ambient, 4);
+        memcpy(pc_debug_mat_colors + 4, &mobj->mat->diffuse, 4);
+        memcpy(pc_debug_mat_colors + 8, &mobj->mat->specular, 4);
+    }
+#endif
     HSD_SetMaterialColor(mobj->mat->ambient, mobj->mat->diffuse,
                          mobj->mat->specular, mobj->mat->alpha);
     if (rendermode & RENDER_SPECULAR) {

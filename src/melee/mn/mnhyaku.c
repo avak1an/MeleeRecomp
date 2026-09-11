@@ -16,7 +16,11 @@
 
 static HSD_GObj* mnHyaku_804D6C58;
 
+#ifdef TARGET_PC
+void gm_801677E8(s8 port);
+#else
 void gm_801677E8(void);
+#endif
 
 static AnimLoopSettings mnHyaku_803EF668 = { 0.0f, 19.0f, -0.1f };
 static AnimLoopSettings mnHyaku_803EF674 = { 20.0f, 29.0f, -0.1f };
@@ -69,8 +73,15 @@ void mnHyaku_8024C68C(HSD_GObj* arg0)
     }
     if (events & MenuInput_Confirm) {
         sfxForward();
+#ifdef TARGET_PC
+        /* the console build passes the port through r3 from the call
+         * before; spelled out here (Multi-Man Melee's character select
+         * otherwise stored the pick under a garbage port) */
+        gm_801677E8(mn_802295AC());
+#else
         mn_802295AC();
         gm_801677E8();
+#endif
         // load the different multi-man melee modes
         switch (menu->cursor) {
         case 0:

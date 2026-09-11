@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include "player.h"
 
@@ -271,6 +272,12 @@ void Player_80031AD0(int slot)
 
     internal_id = byte_check =
         offset_arr[player->player_character * sizeof(ftMapping)];
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_MOTION") != NULL) {
+        OSReport("[pc] Player_80031AD0: slot %d character %d internal %d extra %d (sizeof ftMapping %u)\n", slot,
+                 player->player_character, internal_id, (int) byte_check, (unsigned) sizeof(ftMapping));
+    }
+#endif
 
     if (byte_check != -1) {
         has_transformation =
