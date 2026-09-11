@@ -10,6 +10,9 @@
 #include "types.h"
 #include <dolphin/mtx.h>
 #include <melee/ft/fighter.h>
+#ifdef TARGET_PC
+#include <melee/it/itspawn.h>
+#endif
 #include <melee/ft/ft_0877.h>
 #include <melee/ft/ft_0D4D.h>
 #include <melee/ft/ftdata.h>
@@ -1089,6 +1092,25 @@ void pc_debug_kill_fighter(int slot)
     if (fp != NULL) {
         fp->cur_pos.y = -10000.0f;
     }
+}
+
+/// Debugging aid (--item): spawns an item next to a slot's fighter.
+void pc_debug_spawn_item(int kind, int slot)
+{
+    HSD_GObj* gobj;
+    Fighter* fp;
+    Vec3 pos;
+    if (slot < 0 || slot >= 6) {
+        return;
+    }
+    gobj = player_slots[slot].player_entity[player_slots[slot].transformed[0]];
+    if (gobj == NULL || (fp = GET_FIGHTER(gobj)) == NULL) {
+        return;
+    }
+    pos = fp->cur_pos;
+    pos.y += 8.0f;
+    pos.x += 4.0f * fp->facing_dir;
+    it_8026D258(&pos, (ItemKind) kind);
 }
 #endif
 

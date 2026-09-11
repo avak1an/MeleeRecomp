@@ -912,7 +912,9 @@ static void play(void)
     save_settings();
     scale = (int) SendMessageA(ctl(IDC_SIZE_COMBO), CB_GETCURSEL, 0, 0) + 1;
     volume = (int) SendMessageA(ctl(IDC_VOLUME), TBM_GETPOS, 0, 0);
-    n = (size_t) snprintf(args, sizeof(args), "--iso \"%s\" --scale %d --volume %d", iso, scale, volume);
+    game_dir(buf, sizeof(buf));
+    n = (size_t) snprintf(args, sizeof(args), "--iso \"%s\" --scale %d --volume %d --log \"%s\\melee.log\"", iso,
+                          scale, volume, buf);
     if (IsDlgButtonChecked(main_wnd, IDC_FULLSCREEN) == BST_CHECKED) {
         n += (size_t) snprintf(args + n, sizeof(args) - n, " --fullscreen");
     }

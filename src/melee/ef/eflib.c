@@ -7,6 +7,10 @@
  *       as it matches lol.
  */
 #include "eflib.h"
+#ifdef TARGET_PC
+#include <pc_endian.h>
+#include <pc_hsd_swap.h>
+#endif
 
 #include <math.h>
 #include <stdarg.h>
@@ -438,6 +442,14 @@ EF_Effect* efLib_Create(int gfx_id, HSD_GObj* parent_gobj)
 
     desc = &((EF_EffectDesc*) efAsync_DatEntries[gfx_id / 1000]
                  .data)[gfx_id % 1000];
+#ifdef TARGET_PC
+    /* the descriptor's lifetime is a float in the effect data file;
+     * unswapped it read as a denormal, i.e. 0, i.e. "never expires" (the
+     * entry beam stayed for the whole match) */
+    if (pc_swap_ptr_ok(desc) && pc_swap_once(desc)) {
+        pc_swapf(&desc->lifetime);
+    }
+#endif
 
     if (efLib_LoadKind == EF_LOADKIND_ASYNC) {
         if (efLib_EffectCount >= 64) {

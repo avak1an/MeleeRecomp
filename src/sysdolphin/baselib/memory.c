@@ -1,6 +1,7 @@
 #include "memory.h"
 #ifdef TARGET_PC
 #include <pc_hsd_swap.h>
+#include "pc_runtime.h"
 #endif
 
 #include <Runtime/platform.h>
@@ -34,6 +35,13 @@ void* HSD_MemAlloc(ssize_t size)
     }
 
     adr = OSAllocFromHeap(HSD_GetHeap(), size);
+#ifdef TARGET_PC
+    if (adr == NULL) {
+        OSReport("[pc] HSD_MemAlloc: %d bytes from heap %d failed (free %ld)\n", (int) size, HSD_GetHeap(),
+                 OSCheckHeap(HSD_GetHeap()));
+        pc_print_backtrace();
+    }
+#endif
     HSD_ASSERT(52, adr);
 
     return adr;

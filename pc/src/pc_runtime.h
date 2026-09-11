@@ -23,7 +23,9 @@ typedef struct PCConfig {
     int screenshot_every;
     int kill_slots; /* --kill: bit mask of player slots to KO repeatedly (0 = off) */
     int kill_frame; /* --kill: first frame */
-    int kill_every; /* --kill: repeat period in frames */       ///< N for the above (default 60)
+    int kill_every; /* --kill: repeat period in frames */
+    int item_kind;  /* --item: item kind to spawn next to player 1 (-1 = off) */
+    int item_frame; /* --item: frame */       ///< N for the above (default 60)
     const char* iso;     ///< path of the disc image (NULL = auto-detect)
     const char* save_dir; ///< memory card files (NULL = "saves")
     bool quiet_stubs;    ///< --quiet-stubs: also silences informational prints

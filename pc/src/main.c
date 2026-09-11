@@ -25,6 +25,8 @@ static void usage(void)
             "melee " PC_PORT_NAME " " PC_PORT_VERSION "\n"
             "usage: melee [--iso PATH] [--frames N] [--realtime] [--quiet-stubs]\n"
             "  --version       print the port's version and exit\n"
+            "  --log FILE      write everything the game prints to FILE instead of the\n"
+            "                  console (the launcher uses melee.log next to melee.exe)\n"
             "  --iso PATH      GameCube disc image (GALE01 .iso/.gcm). Default: $MELEE_ISO\n"
             "                  or GALE01.iso in the current or parent directory\n"
             "  --frames N      exit after N video frames (default 0 = run until a\n"
@@ -42,6 +44,8 @@ static void usage(void)
             "  --headless      no window; run the game logic only\n"
             "  --screenshots DIR  save a BMP of every 60th frame into DIR\n"
             "  --screenshot-every N  with --screenshots: every Nth frame instead\n"
+            "  --item KIND@FRAME  spawn item KIND (number, see src/melee/it/forward.h) next to\n"
+            "                  player 1 at FRAME\n"
             "  --kill SLOTS@FRAME[/N]  KO the fighters of player SLOTS (e.g. 1 or 1,2,3) at\n"
             "                  FRAME and every N (300) frames after it, to reach results\n"
             "  --saves DIR     memory card files (default: saves next to the exe)\n"
@@ -102,10 +106,23 @@ int main(int argc, char** argv)
     pc_config.volume = 100;
     pc_config.scale = 1;
     pc_config.screenshot_every = 60;
+    pc_config.item_kind = -1;
 
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) {
             pc_config.max_frames = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--log") == 0 && i + 1 < argc) {
+            /* everything the game prints goes to this file (the launcher
+             * passes melee.log next to the game) */
+            const char* path = argv[++i];
+            if (freopen(path, "w", stderr) == NULL) {
+                fprintf(stdout, "[pc] cannot write the log file %s\n", path);
+            } else {
+                setvbuf(stderr, NULL, _IOLBF, 4096);
+                freopen(path, "a", stdout);
+                setvbuf(stdout, NULL, _IOLBF, 4096);
+                fprintf(stderr, "[pc] %s %s log\n", PC_PORT_NAME, PC_PORT_VERSION);
+            }
         } else if (strcmp(argv[i], "--iso") == 0 && i + 1 < argc) {
             pc_config.iso = argv[++i];
         } else if (strcmp(argv[i], "--extract") == 0 && i + 1 < argc) {
@@ -163,6 +180,12 @@ int main(int argc, char** argv)
             if (pc_config.kill_every <= 0) {
                 pc_config.kill_every = 300;
             }
+        } else if (strcmp(argv[i], "--item") == 0 && i + 1 < argc) {
+            /* KIND@FRAME: spawn item KIND (see it/forward.h) next to player 1 */
+            const char* spec = argv[++i];
+            const char* at = strchr(spec, '@');
+            pc_config.item_kind = atoi(spec);
+            pc_config.item_frame = at != NULL ? atoi(at + 1) : 0;
         } else if (strcmp(argv[i], "--screenshot-every") == 0 && i + 1 < argc) {
             pc_config.screenshot_every = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--saves") == 0 && i + 1 < argc) {

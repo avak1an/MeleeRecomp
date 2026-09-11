@@ -858,6 +858,25 @@ struct MotionState {
     union {
         /// @todo Try to match without this being a @c union.
         u32 _;
+#ifdef TARGET_PC
+        /* the tables initialize the word as (move_id << 24) | (bit << 23) |
+         * ...: keep the console's byte and bit numbering on the host word */
+        struct {
+            u8 xB;
+            u8 xA;
+            struct {
+                u8 x9_b7 : 1;
+                u8 x9_b6 : 1;
+                u8 x9_b5 : 1;
+                u8 x9_b4 : 1;
+                u8 x9_b3 : 1;
+                u8 x9_b2 : 1;
+                u8 x9_b1 : 1;
+                u8 x9_b0 : 1;
+            };
+            u8 move_id : 8;
+        };
+#else
         struct {
             u8 move_id : 8;
             struct {
@@ -873,6 +892,7 @@ struct MotionState {
             u8 xA;
             u8 xB;
         };
+#endif
     };
 
     HSD_GObjEvent anim_cb;

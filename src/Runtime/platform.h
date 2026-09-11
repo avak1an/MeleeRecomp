@@ -179,6 +179,9 @@ typedef bool (*Predicate)(void);
 #pragma section(".pcadj$i", read, write)
 #pragma section(".pcadj$j", read, write)
 #pragma section(".pcadj$k", read, write)
+#pragma section(".pcadj$l", read, write)
+#pragma section(".pcadj$m", read, write)
+#pragma section(".pcadj$n", read, write)
 /* __declspec(allocate) wants a single string literal (no concatenation). */
 #define PC_ADJ_SECTION_a ".pcadj$a"
 #define PC_ADJ_SECTION_b ".pcadj$b"
@@ -191,6 +194,9 @@ typedef bool (*Predicate)(void);
 #define PC_ADJ_SECTION_i ".pcadj$i"
 #define PC_ADJ_SECTION_j ".pcadj$j"
 #define PC_ADJ_SECTION_k ".pcadj$k"
+#define PC_ADJ_SECTION_l ".pcadj$l"
+#define PC_ADJ_SECTION_m ".pcadj$m"
+#define PC_ADJ_SECTION_n ".pcadj$n"
 #define PC_ADJACENT(k) __declspec(allocate(PC_ADJ_SECTION_##k))
 #else
 #define PC_ADJACENT(k)

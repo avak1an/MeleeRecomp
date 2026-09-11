@@ -135,6 +135,8 @@ at about frame 8000); the second plays Classic mode, winning each stage
 by KO and pressing Start through the stage-clear screens (a Start that
 lands inside a match pauses it, which is why the KOs repeat twice per
 Start period). Different seeds give different stages and opponents.
+`pc\scripts\vs-greens.txt` sets ports 2-4 to CPU and picks Green Greens
+(a four-player match, run it with `--frames 9500`).
 
 - `--iso PATH`: the NTSC 1.02 disc image (`GALE01`). Without it the runtime
   reads `$MELEE_ISO`, then looks for `GALE01.iso` in the current and parent
@@ -173,6 +175,11 @@ Start period). Different seeds give different stages and opponents.
   draw and vertex counts of that frame on stderr; `--screenshot-every N`
   changes the interval (every frame with 1, for calibrating scripted
   cursor moves).
+- `--log FILE`: write everything the game prints to FILE instead of the
+  console. The launcher always passes `melee.log` next to `melee.exe`, so
+  that file is the log to send with a bug report.
+- `--item KIND@FRAME`: spawn item KIND (the number from
+  `src/melee/it/forward.h`, e.g. 24 for the fan) next to player 1 at FRAME.
 - `--kill SLOTS@FRAME[/N]`: drop the fighters of player slots SLOTS (`1`,
   or `1,2,3`) below the stage at FRAME and every N frames after it (300 by
   default). A debugging aid: with it a scripted match ends with a KO and
@@ -336,6 +343,10 @@ such copies and drew it upside down before.
   with status 8 when no frame completes for N seconds: the way to find
   where a run spins.
 - `MELEE_TRACE_CARD=1` logs the memory-card command queue.
+- `MELEE_TRACE_MOTION=1` logs player 1's motion-state changes and the
+  animation archives loaded for it; `MELEE_TRACE_PAD=1` also logs every
+  motor command; `MELEE_TRACE_CSS=1` logs the character-select cursor and
+  tag bounds on each A press (for calibrating scripted routes).
 - `MELEE_TRACE_NAN=1` names the first joint per frame whose matrix went
   NaN, with its transform and a backtrace; `MELEE_TRACE_SHIELD=1`,
   `MELEE_TRACE_MOVIE=1`, `MELEE_TRACE_ANIM=1` and `MELEE_TRACE_SWAP=1` log
@@ -580,6 +591,25 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - `sobjlib.c`: sprite descriptors (the opening's "Nintendo's All-Stars
   in" caption, how-to-play captions) get their image and palette
   descriptors swapped; the caption drew as a white rectangle before.
+- `rumble.c` + `lb_013B.c`: rumble patterns are u16 word lists loaded from
+  `LbRb.dat` (three command bits, a count below); they are swapped when
+  loaded and the interpreter takes the command from the host-order word.
+  Unswapped, the first fight rumble never reached its stop word, which is
+  why the controller vibrated for the whole match.
+- `ef/eflib.c`: an effect descriptor's lifetime is a float in the effect
+  data file; unswapped it read as 0, "never expires", and the entry beam
+  stayed around the fighter for the whole match.
+- `ft/types.h`: the motion-state tables initialize a word as
+  `(move_id << 24) | (flag << 23) | ...` and read it through byte and
+  bit-field views; on PC the view is declared in the console's order.
+- `pc_swap_ft_common`: the item swing speed table (`float[type][5]`) and
+  the float list after it from `PlCo.dat` are swapped; unswapped the fan
+  swing ran at a denormal speed and the fighter never left the state
+  (Fox "unresponsive after grabbing the fan").
+- `grvenom.c`: the stage callbacks are read as the data 0x44 bytes past
+  the stage's data struct; the three objects are kept adjacent with
+  `PC_ADJACENT` (sections l-n). Otherwise the stage's init recursed until
+  the heap was gone.
 - `gcadapter.c`: `PAD_MOTOR_STOP_HARD` stops the motor too; the adapter's
   own "brake" value kept the official adapter rumbling for the whole match.
 - `itmasterhandlaser.c`: a finger-beam laser that already died leaves a

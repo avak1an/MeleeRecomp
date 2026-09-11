@@ -245,6 +245,9 @@ bool lb_800144C8(ColorOverlay* arg0, Fighter_804D653C_t* arg1, int arg2,
 void lb_80014534(void)
 {
     lbArchive_80017040(NULL, "LbRb.dat", &lb_804D63C0, "lbRumbleData", 0);
+#ifdef TARGET_PC
+    pc_swap_rumble_data(lb_804D63C0);
+#endif
 }
 
 void lb_80014574(u8 arg0, int arg1, int arg2, int arg3)

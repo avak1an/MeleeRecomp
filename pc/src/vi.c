@@ -153,6 +153,10 @@ void VIWaitForRetrace(void)
     pc_pump();
     pc_ax_frame();
     pc_swap_verify_relocs("retrace");
+    if (pc_config.item_kind >= 0 && pc_frame_count == (u32) pc_config.item_frame) {
+        extern void pc_debug_spawn_item(int kind, int slot);
+        pc_debug_spawn_item(pc_config.item_kind, 0);
+    }
     if (pc_config.kill_slots != 0 && pc_frame_count >= (u32) pc_config.kill_frame &&
         (pc_frame_count - (u32) pc_config.kill_frame) % (u32) pc_config.kill_every == 0)
     {

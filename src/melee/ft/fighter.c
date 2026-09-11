@@ -2,6 +2,7 @@
 #ifdef TARGET_PC
 #include <pc_game_swap.h>
 #include "pc_runtime.h"
+#include <stdlib.h>
 #endif
 
 #include <math.h>
@@ -948,6 +949,18 @@ void Fighter_ChangeMotionState(Fighter_GObj* gobj, FtMotionId msid,
     struct Fighter_WaitAnimData* unk_struct_x18;
     s32 bone_index;
     u8(*unk_byte_ptr)[2];
+#ifdef TARGET_PC
+    {
+        static int trace = -1;
+        if (trace < 0) {
+            trace = getenv("MELEE_TRACE_MOTION") != NULL;
+        }
+        if (trace && fp->player_id == 0) {
+            OSReport("[pc] frame %u: P1 motion %d -> %d (flags %x, start %g)\n", pc_frame_count, fp->motion_id, msid, flags,
+                     anim_start);
+        }
+    }
+#endif
     bool animflags_bool;
     union Struct2070 x2070;
 

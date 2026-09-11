@@ -162,13 +162,23 @@ void HSD_Rumble_80378524(int a)
     OSRestoreInterrupts(intrEnabled);
 }
 
+/* A rumble list is u16 words: the top three bits are the command, the
+ * rest a count. The console reads the command from the word's first byte;
+ * on PC the words are in host order (the disc lists are swapped when
+ * loaded, the static ones are compiled in host order). */
+#ifdef TARGET_PC
+#define RUMBLE_CMD(p) ((*(p) >> 13) & 7)
+#else
+#define RUMBLE_CMD(p) ((*(u8*) (p) >> 5) & 7)
+#endif
+
 int HSD_PadRumbleInterpret1(HSD_PadRumbleListData* a, u8* b)
 {
     if (a->pause == 1) {
         return 0;
     }
     while (a->wait == 0) {
-        switch ((*(u8*) a->listp >> 5) & 7) {
+        switch (RUMBLE_CMD(a->listp)) {
         case 0:
             if (a->frame == -2) {
                 return 1;

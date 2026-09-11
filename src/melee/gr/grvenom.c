@@ -51,7 +51,10 @@ struct grVenom_YakumonoParam {
     s32 x38;
 };
 
-static grVe_Data grVe_803E5348 = {
+/* grVenom_80203EAC reads the callbacks as the data 0x44 bytes past this
+ * struct (grVe_803E5380 then grVe_StageCallbacks in link order); keep the
+ * three adjacent and in order on PC (see PC_ADJACENT). */
+static grVe_Data PC_ADJACENT(l) grVe_803E5348 = {
     {
         { 0, 5, 0 },
         { 1, 5, 0 },
@@ -61,9 +64,9 @@ static grVe_Data grVe_803E5348 = {
     },
 };
 
-static int grVe_803E5380[3] = { 0 };
+static int PC_ADJACENT(m) grVe_803E5380[3] = { 0 };
 
-StageCallbacks grVe_StageCallbacks[16] = {
+StageCallbacks PC_ADJACENT(n) grVe_StageCallbacks[16] = {
     {
         grVenom_80203F98,
         grVenom_80203FC4,

@@ -406,6 +406,15 @@ void pc_swap_ft_common(void** tables)
     if (tables[1] != NULL && pc_swap_once(tables[1])) {
         pc_swap32_range(tables[1], 26 * 3 * sizeof(f32));
     }
+    /* [2] item swing animation speeds, float[swing type][5]; [3] a float
+     * list (ft_0881.c): both run to the next object in the file. Without
+     * [2] a fan swing ran at a denormal speed and never ended. */
+    for (i = 2; i <= 3; i++) {
+        if (tables[i] != NULL && pc_swap_ptr_ok(tables[i]) && pc_swap_once(tables[i])) {
+            const u8* end = (const u8*) pc_swap_next_object(tables[i], (const u8*) tables[i] + 4096);
+            pc_swap32_range(tables[i], (size_t) (end - (const u8*) tables[i]) & ~(size_t) 3);
+        }
+    }
     /* [4] parts tables, one per fighter kind: {u8* joint_to_part; u8* part_to_joint; u32 parts_num} */
     if (tables[4] != NULL && pc_swap_once(tables[4])) {
         FighterPartsTable** parts = (FighterPartsTable**) tables[4];
@@ -850,6 +859,36 @@ void pc_swap_trophy_tables(void* init_tbl, void* init_d_tbl, void* sort_tbl, voi
                 }
             }
         }
+    }
+}
+
+/* LbRb.dat's lbRumbleData: entries of {u16* list, u8 priority, u8} up to
+ * the next object in the file; each list is u16 words (3-bit command in
+ * the top bits, count below) ending with a command-0 word. */
+void pc_swap_rumble_data(void* table)
+{
+    u8* e = (u8*) table;
+    const u8* end;
+    int n;
+    if (e == NULL || !pc_swap_ptr_ok(e) || !pc_swap_once(e)) {
+        return;
+    }
+    end = (const u8*) pc_swap_next_object(e, e + 256 * 8);
+    for (n = 0; e + 8 <= end && n < 256; n++, e += 8) {
+        u16* w = *(u16**) e;
+        int k;
+        if (w == NULL || !pc_swap_ptr_ok(w) || !pc_swap_once(w)) {
+            continue;
+        }
+        for (k = 0; k < 4096; k++) {
+            pc_swap16(&w[k]);
+            if (((w[k] >> 13) & 7) == 0) {
+                break;
+            }
+        }
+    }
+    if (getenv("MELEE_TRACE_SWAP") != NULL) {
+        fprintf(stderr, "[pc] rumble table %p: %d entries\n", table, n);
     }
 }
 

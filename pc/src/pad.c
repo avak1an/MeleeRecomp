@@ -65,8 +65,16 @@ BOOL PADSync(void)
 void PADControlMotor(s32 chan, u32 command)
 {
     XINPUT_VIBRATION vib;
+    static int trace = -1;
     if (chan < 0 || chan >= PAD_MAX_CONTROLLERS) {
         return;
+    }
+    if (trace < 0) {
+        trace = getenv("MELEE_TRACE_PAD") != NULL;
+    }
+    if (trace) {
+        fprintf(stderr, "[pad] frame %u: port %d motor %s\n", pc_frame_count, chan + 1,
+                command == 1 ? "rumble" : command == 2 ? "stop hard" : "stop");
     }
     pc_gcadapter_rumble(chan, (int) command);
     memset(&vib, 0, sizeof(vib));

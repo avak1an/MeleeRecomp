@@ -84,7 +84,9 @@ if defined MELEE_ISO (
 if not exist "%BUILD%\build.ninja" (
     cmake -S "%ROOT%\pc" -B "%BUILD%" -G Ninja -DCMAKE_BUILD_TYPE=Debug %CMAKE_EXTRA% %ISO_ARG% || exit /b 1
 )
-ninja -C "%BUILD%" || exit /b 1
+rem -k 0: keep building the other targets when one fails (a running
+rem melee-launcher.exe blocks its own relink but must not block melee.exe)
+ninja -C "%BUILD%" -k 0 || exit /b 1
 
 if /i "%ACTION%"=="run" (
     "%BUILD%\melee.exe"

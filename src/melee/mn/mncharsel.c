@@ -1,4 +1,7 @@
 #include "mncharsel.h"
+#ifdef TARGET_PC
+#include <stdlib.h>
+#endif
 
 #include <melee/ft/forward.h>
 #include <sysdolphin/baselib/forward.h>
@@ -2999,6 +3002,14 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                     mnCharSel_804A0BC0[door]->x5 != 1)
                                 {
                                     tag_data = mnCharSel_803F0E8C[door].data;
+#ifdef TARGET_PC
+                                    if (getenv("MELEE_TRACE_CSS") != NULL) {
+                                        OSReport("[pc] css A: cursor (%g %g) door %d tag state %d toggle x %g..%g\n",
+                                                 cursor->xC, cursor->x10, door, tag_data->state,
+                                                 mnCharSel_803F0DFC.doors[door].togglebtn_left,
+                                                 mnCharSel_803F0DFC.doors[door].togglebtn_right);
+                                    }
+#endif
                                     if (tag_data->state != 0) {
                                         continue;
                                     }

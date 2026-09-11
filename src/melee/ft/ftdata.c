@@ -1,5 +1,8 @@
 #include "ftdata.h"
 #ifdef TARGET_PC
+#include <stdlib.h>
+#endif
+#ifdef TARGET_PC
 #include <pc_game_swap.h>
 #endif
 
@@ -1744,6 +1747,9 @@ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
     struct Fighter_WaitAnimData* temp_r3;
     u32 temp_r3_2;
     u32 temp_r4_2;
+#ifdef TARGET_PC
+    bool copied = false;
+#endif
 
     if (msid < arg1->x58C) {
         temp_r3 = (struct Fighter_WaitAnimData*) ftData_80085FD4(arg1, msid);
@@ -1754,6 +1760,9 @@ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
                 if ((temp_r3_3 != NULL) &&
                     (temp_r3->x14 == (u32) temp_r3_3->x5A4))
                 {
+#ifdef TARGET_PC
+                    copied = true;
+#endif
                     memcpy(fp->x59C, temp_r3_3->x59C, temp_r3->x8);
                     temp_r4 = fp->x59C;
                     temp_ret = lbArchiveRelocate(
@@ -1780,7 +1789,16 @@ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
                 }
                 fp->x590 = HSD_ArchiveGetPublicAddress(&sp14, temp_r3->x0);
 #ifdef TARGET_PC
-                pc_swap_figatree(fp->x590);
+                /* a copy taken from another fighter (the first branch) is
+                 * already in host order: swapping it again would break
+                 * the animation (a fan swing that never ended) */
+                if (!copied) {
+                    pc_swap_figatree(fp->x590);
+                }
+                if (getenv("MELEE_TRACE_MOTION") != NULL) {
+                    OSReport("[pc] fighter %d anim %d: figatree %p%s\n", fp->player_id, msid, (void*) fp->x590,
+                             copied ? " (copied from another fighter)" : "");
+                }
 #endif
             } else {
                 fp->x590 = NULL;
