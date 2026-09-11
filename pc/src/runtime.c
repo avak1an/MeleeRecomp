@@ -20,6 +20,8 @@
 #include <time.h>
 #include <windows.h>
 #include <dbghelp.h>
+#include <crtdbg.h>
+#include <signal.h>
 
 PCConfig pc_config;
 uint32_t pc_frame_count;
@@ -266,6 +268,23 @@ static void print_exception_backtrace(CONTEXT* ctx, HANDLE thread)
     }
 }
 
+static void abort_handler(int sig)
+{
+    (void) sig;
+    fprintf(stderr, "\n[pc] abort() called after %u frame(s); the C runtime reported an error above. Stack:\n", pc_frame_count);
+    pc_print_backtrace();
+    fflush(stderr);
+    _exit(9);
+}
+
+/* Every exit path leaves a last line in the log, so a log that stops
+ * without one means the process was killed from outside. */
+static void exit_note(void)
+{
+    fprintf(stderr, "[pc] exit after %u frame(s)\n", pc_frame_count);
+    fflush(stderr);
+}
+
 static LONG WINAPI crash_handler(EXCEPTION_POINTERS* ep)
 {
     EXCEPTION_RECORD* er = ep->ExceptionRecord;
@@ -429,6 +448,20 @@ void pc_runtime_init(void)
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
     SetUnhandledExceptionFilter(crash_handler);
+    /* C runtime assertions, heap checks and abort() go to the log too,
+     * instead of a dialog box that leaves the log ending mid-way. */
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+#ifdef _DEBUG
+    _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
+    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+#endif
+    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+    signal(SIGABRT, abort_handler);
+    atexit(exit_note);
 }
 
 /* --- Completion pump ---------------------------------------------------- */

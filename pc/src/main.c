@@ -44,6 +44,8 @@ static void usage(void)
             "  --headless      no window; run the game logic only\n"
             "  --screenshots DIR  save a BMP of every 60th frame into DIR\n"
             "  --screenshot-every N  with --screenshots: every Nth frame instead\n"
+            "  --stage N       play every VS and Classic match on stage N (StKind, see\n"
+            "                  src/melee/gr/forward.h: 2 Fountain ... 11 Rainbow Cruise ... 31 Battlefield)\n"
             "  --item KIND@FRAME  spawn item KIND (number, see src/melee/it/forward.h) next to\n"
             "                  player 1 at FRAME\n"
             "  --kill SLOTS@FRAME[/N]  KO the fighters of player SLOTS (e.g. 1 or 1,2,3) at\n"
@@ -180,6 +182,8 @@ int main(int argc, char** argv)
             if (pc_config.kill_every <= 0) {
                 pc_config.kill_every = 300;
             }
+        } else if (strcmp(argv[i], "--stage") == 0 && i + 1 < argc) {
+            pc_config.stage = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--item") == 0 && i + 1 < argc) {
             /* KIND@FRAME: spawn item KIND (see it/forward.h) next to player 1 */
             const char* spec = argv[++i];

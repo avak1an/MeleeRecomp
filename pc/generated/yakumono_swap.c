@@ -231,16 +231,15 @@ void pc_swap_yakumono_grizumi(void* p)
     swap_words(b + 0x0, 21);
 }
 
-/* grkinokoroute.c: grKongo_YakumonoParam, 0xBC bytes */
+/* grkinokoroute.c: anonymous struct, 0x8 bytes */
 void pc_swap_yakumono_grkinokoroute(void* p)
 {
     u8* b = (u8*) p;
     if (p == NULL || !pc_swap_once(p)) {
         return;
     }
-    swap_words(b + 0x0, 17);
-    pc_swap16_range(b + 0x44, 0x10);
-    swap_words(b + 0x54, 26);
+    swap_words(b + 0x0, 1);
+    pc_swap16(b + 0x4);
 }
 
 /* grkongo.c: grKongo_YakumonoParam, 0xBC bytes */
@@ -300,16 +299,16 @@ void pc_swap_yakumono_groldpupupu(void* p)
     swap_words(b + 0x8, 11);
 }
 
-/* groldyoshi.c: grKongo_YakumonoParam, 0xBC bytes */
+/* groldyoshi.c: anonymous struct, 0x1C bytes */
 void pc_swap_yakumono_groldyoshi(void* p)
 {
     u8* b = (u8*) p;
     if (p == NULL || !pc_swap_once(p)) {
         return;
     }
-    swap_words(b + 0x0, 17);
-    pc_swap16_range(b + 0x44, 0x10);
-    swap_words(b + 0x54, 26);
+    pc_swap16_range(b + 0x0, 0x4);
+    swap_words(b + 0x4, 3);
+    pc_swap16_range(b + 0x10, 0xA);
 }
 
 /* gronett.c: grOnett_StageParam, 0x68 bytes */

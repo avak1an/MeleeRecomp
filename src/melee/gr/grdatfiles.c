@@ -202,6 +202,11 @@ UnkArchiveStruct* grDatFiles_801C6478(void* data, s32 length)
     arc->unk0 = archive;
     arc->unk4 = HSD_ArchiveGetPublicAddress(archive, "map_head");
     arc->unk8 = 1;
+#ifdef TARGET_PC
+    /* the transformation's map_head is read right away (its x28 table
+     * count); unswapped the count was garbage and the walk crashed */
+    pc_swap_map_head(arc->unk4);
+#endif
 
     grDatFiles_801C6228(arc->unk4);
 

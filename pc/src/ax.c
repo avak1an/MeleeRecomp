@@ -374,6 +374,31 @@ static WAVEHDR wave_hdr[OUT_BUFFERS];
 static s16 wave_data[OUT_BUFFERS][OUT_BUFFER_FRAMES * AX_FRAME * 2];
 static int wave_cur, wave_fill;
 static int wave_ready;
+static u32 wave_dropped, wave_starved, wave_pushed;
+static DWORD wave_report_ms;
+
+/* Report device trouble once in a while: "dropped" frames are mixed
+ * faster than the device plays them (all buffers still queued), "starved"
+ * is the opposite (every buffer done: the device ran out of data and
+ * played silence, the audible stutter). */
+static void out_stats(void)
+{
+    DWORD now = timeGetTime();
+    if (wave_report_ms == 0) {
+        wave_report_ms = now;
+        return;
+    }
+    if (now - wave_report_ms < 5000) {
+        return;
+    }
+    if (wave_dropped != 0 || wave_starved != 0) {
+        fprintf(stderr, "[pc] audio: in the last %u ms %u of %u mixer frames were dropped (mixed faster than the device "
+                        "plays: an unpaced run) and the device ran dry %u time(s) (the game ran slower than 60 Hz: stutter)\n",
+                (unsigned) (now - wave_report_ms), wave_dropped, wave_pushed, wave_starved);
+    }
+    wave_report_ms = now;
+    wave_dropped = wave_starved = wave_pushed = 0;
+}
 
 static void out_open(void)
 {
@@ -412,8 +437,22 @@ static void out_push(const s32* frame)
         return;
     }
     h = &wave_hdr[wave_cur];
+    wave_pushed++;
+    out_stats();
     if (wave_fill == 0 && !(h->dwFlags & WHDR_DONE)) {
+        wave_dropped++;
         return; /* the device is behind: drop this frame */
+    }
+    if (wave_fill == 0) {
+        /* every buffer already played back: the device had nothing left */
+        for (i = 0; i < OUT_BUFFERS; i++) {
+            if (!(wave_hdr[i].dwFlags & WHDR_DONE)) {
+                break;
+            }
+        }
+        if (i == OUT_BUFFERS && wave_pushed > OUT_BUFFERS * OUT_BUFFER_FRAMES) {
+            wave_starved++;
+        }
     }
     dst = wave_data[wave_cur] + wave_fill * AX_FRAME * 2;
     for (i = 0; i < AX_FRAME * 2; i++) {

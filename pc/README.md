@@ -137,6 +137,11 @@ lands inside a match pauses it, which is why the KOs repeat twice per
 Start period). Different seeds give different stages and opponents.
 `pc\scripts\vs-greens.txt` sets ports 2-4 to CPU and picks Green Greens
 (a four-player match, run it with `--frames 9500`).
+`pc\scripts\classic-play.txt` is the Classic route without the later Start
+presses: the first match runs unpaused, for watching a CPU on a stage
+(combine with `--stage`). A sweep of every stage is the VS route with
+`--stage N` for N = 2..32, checking the exit status, the `corrupt` /
+`archive check` lines and the motion trace.
 
 - `--iso PATH`: the NTSC 1.02 disc image (`GALE01`). Without it the runtime
   reads `$MELEE_ISO`, then looks for `GALE01.iso` in the current and parent
@@ -178,6 +183,15 @@ Start period). Different seeds give different stages and opponents.
 - `--log FILE`: write everything the game prints to FILE instead of the
   console. The launcher always passes `melee.log` next to `melee.exe`, so
   that file is the log to send with a bug report.
+- `--stage N`: play every VS and Classic match on stage N (the `StKind`
+  number from `src/melee/gr/forward.h`: 2 Fountain, 3 Stadium, 4 Peach's
+  Castle, 5 Kongo Jungle, 6 Brinstar, 7 Corneria, 8 Yoshi's Story, 9 Onett,
+  10 Mute City, 11 Rainbow Cruise, 12 Jungle Japes, 13 Great Bay, 14 Temple,
+  15 Brinstar Depths, 16 Yoshi's Island, 17 Green Greens, 18 Fourside, 19/20
+  Mushroom Kingdom I/II, 22 Venom, 23 Poke Floats, 24 Big Blue, 25 Icicle
+  Mountain, 27 Flat Zone, 28-30 the N64 stages, 31 Battlefield, 32 Final
+  Destination). Only the stage file changes: the rules keep the stage the
+  menu chose, which is fine for testing.
 - `--item KIND@FRAME`: spawn item KIND (the number from
   `src/melee/it/forward.h`, e.g. 24 for the fan) next to player 1 at FRAME.
 - `--kill SLOTS@FRAME[/N]`: drop the fighters of player slots SLOTS (`1`,
@@ -359,15 +373,25 @@ such copies and drew it upside down before.
   with status 8 when no frame completes for N seconds: the way to find
   where a run spins.
 - `MELEE_TRACE_CARD=1` logs the memory-card command queue.
-- `MELEE_TRACE_MOTION=1` logs player 1's motion-state changes and the
-  animation archives loaded for it; `MELEE_TRACE_PAD=1` also logs every
-  motor command; `MELEE_TRACE_CSS=1` logs the character-select cursor and
-  tag bounds on each A press (for calibrating scripted routes).
+- `MELEE_TRACE_MOTION=1` logs every fighter's motion-state changes with
+  position and velocity, the animation lengths read at spawn, every hit a
+  fighter takes (source, damage, knockback, angle) and the animation
+  archives loaded; `MELEE_TRACE_CPU=1` logs every command the CPU logic
+  queues and every destination it picks, with the routine that decided it;
+  `MELEE_TRACE_PAD=1` also logs every motor command; `MELEE_TRACE_CSS=1`
+  logs the character-select cursor and tag bounds on each A press (for
+  calibrating scripted routes).
 - `MELEE_TRACE_NAN=1` names the first joint per frame whose matrix went
   NaN, with its transform and a backtrace; `MELEE_TRACE_SHIELD=1`,
   `MELEE_TRACE_MOVIE=1`, `MELEE_TRACE_ANIM=1` and `MELEE_TRACE_SWAP=1` log
   the shield size inputs, the movie player's frame counters, texture
   animation image selection and the swapped attribute/pose/trophy tables.
+- The log always ends with an `exit after N frame(s)` line, an abort or
+  hardware exception prints a backtrace, and C runtime assertions go to
+  the log instead of a dialog; a log that stops without any of these means
+  the process was killed from outside. A paced run reports every five
+  seconds how many frames took longer than a retrace and whether the
+  audio device ran dry (the stutter) or was fed too fast (an unpaced run).
 - `MELEE_ARCHIVE_CHECK=1` verifies once per frame (and before every joint
   load) that every relocated pointer slot of the parsed archives still
   holds what the parser wrote, and names the first slots that changed:
@@ -686,6 +710,40 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   command structs in `lb/types.h` are declared in console bit order on PC.
   Raw half-word/byte reads inside a command word go through
   `CMD_HALF`/`CMD_BYTE`.
+- `ftdata.c`: the second figatree loader (the one that only reads an
+  animation's frame count for the landing and jump lengths) swaps the tree
+  too; unswapped, LandingFallSpecial ran at a speed near zero and a fighter
+  stood still for good after landing from an up special (the "Mario
+  stopped and never moved again" report; CPUs died the same way on
+  Rainbow Cruise).
+- `pc_swap_ft_common`: the CPU attack-selection lists, distance thresholds
+  and weapon reach floats (PlCo table 22) and the crowd reaction
+  thresholds (table 21) are swapped; every per-kind array is walked to the
+  next relocated object instead of a fixed count, and the entry for kind
+  33 ("no kind", used for a thrown fighter's animation) is swapped when it
+  is first used (`pc_swap_ft_kind_entry`). With CPUs now grabbing and
+  throwing, the demo reached several paths for the first time: a
+  fighter's own items (the Ice Climbers' blizzard and rope) get their
+  item-specific attribute block swapped like a stage item's, and Kirby's
+  copy hats (`PlKb*.dat`: parts descriptor, and the bone dynamics of
+  Kirby's and Pichu's hats) are swapped when a hat is put on.
+- `lb/types.h`: `spawn_hitbox_skip` reads its flag from the word the
+  console compiler packs it into; misread, the damage-fly collision
+  hitbox was created for fighters that were merely launched, and two
+  fighters hit by the same hazard (Onett's car, a Green Greens block)
+  juggled each other every frame for the rest of the match.
+- `grdatfiles.c`: a stage's extra `map_head` (Pokemon Stadium's
+  transformations) is swapped before its table is read (crash on the
+  first transformation).
+- `pc/tools/gen_struct_swap.py`: stages that declare their parameter
+  block inline (`static struct { ... }* yakumono_param`) get a swapper for
+  that struct; before, a header's declaration of the same name won, and
+  the Yoshi's Island (N64) block was swapped as Kongo Jungle's 0xBC bytes,
+  running into the light descriptors behind it (the stage asserted on a
+  missing light).
+- `gx_render.c`: `GX_VA_NBT` vertices (items with environment maps: the
+  capsule, the shells, the barrel) supply their normal; without it they
+  were lit by the ambient term only and looked grey and flat.
 - `ground.c`: the stage's light override table (which lights are diffuse,
   specular or shadow-only for this stage) is applied to the light
   descriptors' flags before `HSD_LObjLoadDesc` swaps them; on PC the
@@ -741,6 +799,14 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - Classic mode has been driven to and through the Master Hand fight with
   `--kill`; the ending sequence after his defeat has not been reached (the
   option cannot KO him).
+- Stages 1 (Test), 21 (Akaneia) and 26 (Icetop) are unfinished in the
+  game and crash or hang when forced with `--stage`; the menus never
+  select them.
+- Flat Zone (`--stage 27`): after about a minute a falling tool item
+  crashes while flashing before it vanishes (`it_80273670` with state
+  index `x0 + 5` = 9, whose animation joint has a garbage child). Not
+  found yet; every other selectable stage runs 5000 frames of a VS match
+  clean.
 - Specular lighting: sysdolphin builds the half-angle vector as
   `light vector + (joint direction from the eye)`, which is the negative
   of the half-angle the GX SDK's `GXInitSpecularDir` stores, so with the

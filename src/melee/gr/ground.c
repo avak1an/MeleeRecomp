@@ -2,6 +2,7 @@
 
 #ifdef TARGET_PC
 #include <pc_hsd_swap.h>
+#include <stdlib.h>
 #endif
 
 #include <Runtime/platform.h>
@@ -1278,6 +1279,16 @@ LightList** Ground_801C20E0(UnkArchiveStruct* archive, LightList** lightset)
          * swaps the descriptor; swap it now (once) so the type test and the
          * diffuse/specular overrides land on the right bits */
         pc_swap_lightdesc(desc);
+        if (getenv("MELEE_TRACE_LIGHT") != NULL) {
+            bool f6 = 0, f7 = 0, f5 = 0;
+            OSReport("[pc] light desc %p: attnflags %04x words %08x %08x %08x %08x %08x %08x\n", (void*) desc,
+                     desc->attnflags, ((u32*) desc)[0], ((u32*) desc)[1], ((u32*) desc)[2], ((u32*) desc)[3],
+                     ((u32*) desc)[4], ((u32*) desc)[5]);
+            bool found = find_light_override_in_dat(archive->unk4, archive->unk4, desc, &f6, &f7, &f5);
+            OSReport("[pc] light desc %p: file flags %04x color (%u %u %u) override %s diffuse %d specular %d shadow %d\n",
+                     (void*) desc, desc->flags, desc->color.r, desc->color.g, desc->color.b, found ? "found" : "none", f6,
+                     f7, f5);
+        }
 #endif
         if (*(flags = &desc->flags) & 3) {
             dat = archive->unk4;

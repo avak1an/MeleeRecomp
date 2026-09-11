@@ -324,9 +324,39 @@ void ftCo_800B462C(Fighter* fp)
 }
 
 /// Writes a command to the current location in the script buffer area
+#ifdef TARGET_PC
+/* MELEE_TRACE_CPU=1: log every command the CPU logic queues, with the
+ * routine that decided it (the helpers below pass their caller on). */
+#include <intrin.h>
+#include <stdlib.h>
+#include "pc_runtime.h"
+#include <melee/it/types.h>
+extern unsigned int pc_frame_count;
+static const void* pc_cpu_trace_caller;
+static int pc_cpu_trace = -1;
+static void pc_cpu_trace_cmd(Fighter* fp, u8 cmd, const void* caller)
+{
+    if (pc_cpu_trace < 0) {
+        pc_cpu_trace = getenv("MELEE_TRACE_CPU") != NULL;
+    }
+    if (pc_cpu_trace) {
+        OSReport("[pc] frame %u: P%d cpu cmd %u from %s at (%.1f %.1f) target (%.1f %.1f) prev (%.1f %.1f) foe (%.1f %.1f) xC %d x60 %d x38 %g item %p (%.1f %.1f) x18 %d x1C %d\n", pc_frame_count,
+                 fp->player_id + 1, cmd, pc_symbol_name(pc_cpu_trace_caller != NULL ? pc_cpu_trace_caller : caller),
+                 fp->cur_pos.x, fp->cur_pos.y, fp->cpu.x54.x, fp->cpu.x54.y, fp->cpu.x64.x, fp->cpu.x64.y,
+                 fp->cpu.x44 != NULL ? fp->cpu.x44->cur_pos.x : 0.0f, fp->cpu.x44 != NULL ? fp->cpu.x44->cur_pos.y : 0.0f,
+                 fp->cpu.xC, fp->cpu.x60, fp->cpu.x38, (void*) fp->cpu.x4C,
+                 fp->cpu.x4C != NULL ? fp->cpu.x4C->pos.x : 0.0f, fp->cpu.x4C != NULL ? fp->cpu.x4C->pos.y : 0.0f,
+                 fp->cpu.x18, fp->cpu.x1C);
+    }
+}
+#endif
+
 void ftCo_800B463C(Fighter* fp, u8 cmd)
 {
     struct CpuFighter* data = &fp->cpu;
+#ifdef TARGET_PC
+    pc_cpu_trace_cmd(fp, cmd, _ReturnAddress());
+#endif
     if (data->write_pos >= data->buffer + sizeof(data->buffer)) {
         HSD_ASSERTREPORT(501, 0, "command script buffer over flow!\n");
     }
@@ -336,15 +366,27 @@ void ftCo_800B463C(Fighter* fp, u8 cmd)
 
 void ftCo_800B46B8(Fighter* fp, u8 cmd, u8 arg)
 {
+#ifdef TARGET_PC
+    pc_cpu_trace_caller = _ReturnAddress();
+#endif
     ftCo_800B463C(fp, cmd);
     ftCo_800B463C(fp, arg);
+#ifdef TARGET_PC
+    pc_cpu_trace_caller = NULL;
+#endif
 }
 
 void ftCo_800B4778(Fighter* fp, u8 cmd, u8 arg1, u8 arg2)
 {
+#ifdef TARGET_PC
+    pc_cpu_trace_caller = _ReturnAddress();
+#endif
     ftCo_800B463C(fp, cmd);
     ftCo_800B463C(fp, arg1);
     ftCo_800B463C(fp, arg2);
+#ifdef TARGET_PC
+    pc_cpu_trace_caller = NULL;
+#endif
 }
 
 /**
@@ -353,6 +395,13 @@ void ftCo_800B4778(Fighter* fp, u8 cmd, u8 arg1, u8 arg2)
 void ftCo_800B4880(Fighter* fp, int script_idx)
 {
     u8* cmd = Fighter_804D64FC->cmdscripts[script_idx];
+#ifdef TARGET_PC
+    pc_cpu_trace_caller = _ReturnAddress();
+    if (pc_cpu_trace > 0) {
+        OSReport("[pc] frame %u: P%d cpu script %d from %s\n", pc_frame_count, fp->player_id + 1, script_idx,
+                 pc_symbol_name(pc_cpu_trace_caller));
+    }
+#endif
     while (*cmd != CpuCmd_Done) {
         ftCo_800B463C(fp, *cmd);
         if (*cmd > CpuCmd_OneArgEnd) {
@@ -366,6 +415,9 @@ void ftCo_800B4880(Fighter* fp, int script_idx)
         cmd++;
     }
     ftCo_800B463C(fp, *cmd);
+#ifdef TARGET_PC
+    pc_cpu_trace_caller = NULL;
+#endif
 }
 
 void ftCo_800B49F4(Fighter* fp)

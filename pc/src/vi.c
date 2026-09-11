@@ -133,6 +133,44 @@ static void pace_to_60hz(void)
     }
 }
 
+/* Frame-time accounting for paced runs: how many frames of the last few
+ * seconds took longer than a retrace (the game then runs below 60 Hz and
+ * the audio stutters), reported only when it happened. */
+static void frame_stats(void)
+{
+    static LARGE_INTEGER freq, last, report;
+    static u32 frames, slow;
+    static double worst;
+    LARGE_INTEGER now;
+    double ms;
+    if (freq.QuadPart == 0) {
+        QueryPerformanceFrequency(&freq);
+    }
+    QueryPerformanceCounter(&now);
+    if (last.QuadPart != 0) {
+        ms = (double) (now.QuadPart - last.QuadPart) * 1000.0 / (double) freq.QuadPart;
+        frames++;
+        if (ms > 17.5) {
+            slow++;
+            if (ms > worst) {
+                worst = ms;
+            }
+        }
+    }
+    if (report.QuadPart == 0) {
+        report = now;
+    } else if (now.QuadPart - report.QuadPart > freq.QuadPart * 5) {
+        if (slow != 0) {
+            fprintf(stderr, "[pc] frame %u: %u of the last %u frames took longer than 1/60 s (worst %.1f ms)\n",
+                    pc_frame_count, slow, frames, worst);
+        }
+        report = now;
+        frames = slow = 0;
+        worst = 0.0;
+    }
+    last = now;
+}
+
 void VIWaitForRetrace(void)
 {
     pc_frame_count++;
@@ -142,6 +180,7 @@ void VIWaitForRetrace(void)
         pc_exit(0);
     }
     if (pc_config.realtime) {
+        frame_stats(); /* before pacing: measures the work, not the wait */
         pace_to_60hz();
     }
     if (pre_cb != NULL) {

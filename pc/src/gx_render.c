@@ -141,6 +141,7 @@ static int stats_draws, stats_verts;
 static int debug_log;  /* MELEE_GX_DEBUG: log the first draws of a frame */
 static int debug_flat; /* MELEE_GX_FLAT: magenta fragments, no alpha test */
 int pc_debug_in_fighter;      /* set by the fighter draw routine: 1 + kind while its model is drawn */
+int pc_debug_in_item;         /* set by the item draw routine: 1 + kind while its model is drawn */
 static int fighter_draws;     /* draws issued for fighters this frame */
 int pc_debug_fighter_counts[4]; /* jobj / dobj / pobj / display-list calls while drawing fighters */
 static int debug_nocull;      /* MELEE_GX_NOCULL: never cull faces */
@@ -202,6 +203,7 @@ static u32 attr_comps(u8 attr, const VtxAttrFmt* f)
     case GX_VA_POS:
         return f->cnt == GX_POS_XY ? 2 : 3;
     case GX_VA_NRM:
+    case GX_VA_NBT: /* normal, binormal, tangent: nine components */
         return f->cnt == GX_NRM_XYZ ? 3 : 9;
     case GX_VA_CLR0:
     case GX_VA_CLR1:
@@ -325,6 +327,9 @@ static const u8* decode_attr_data(u8 attr, const u8* p, const VtxAttrFmt* f, int
         }
         return p + n * comp_size(f->type);
     case GX_VA_NRM:
+    case GX_VA_NBT:
+        /* an NBT vertex (items with environment maps) carries the normal
+         * first; the binormal and tangent are only for bump mapping */
         n = attr_comps(attr, f);
         for (i = 0; i < 3; i++) {
             v->nrm[i] = read_comp(p + i * comp_size(f->type), f->type, f->frac, big);
@@ -1504,6 +1509,9 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
     }
     if ((debug_log && stats_draws < 8) || (debug_log_frame != 0 && pc_frame_count == debug_log_frame)) {
         const GLVertex* g = &glverts[0];
+        if (pc_debug_in_item) {
+            fprintf(stderr, "[gx] (item kind %d) ", pc_debug_in_item - 1);
+        }
         if (pc_debug_in_fighter) {
             fprintf(stderr, "[gx] (fighter kind %d) ", pc_debug_in_fighter - 1);
         }

@@ -14,6 +14,12 @@
 
 /// Stage archive roots: map_head, grGroundParam, coll_data, itemdata (a
 /// NULL-terminated array of {s32 kind; Article* article} pointers).
+void pc_swap_map_head(struct UnkStageDat* map_head);
+void pc_swap_ft_kind_entry(int kind);
+struct KirbyHatStruct;
+void pc_swap_kirby_hat(struct KirbyHatStruct* hat, int kind);
+struct FtPartsDesc;
+void pc_swap_parts_desc_lazy(struct FtPartsDesc* desc, int costume_id);
 void pc_swap_stage_data(struct UnkStageDat* map_head, struct GroundParam* param,
                         struct MapCollData* coll, void** itemdata);
 

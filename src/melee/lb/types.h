@@ -1293,12 +1293,27 @@ struct it_create_hitbox_4 {
 #endif
 };
 struct spawn_hitbox_skip {
+#ifdef TARGET_PC
+    /* the console compiler packs these bits into the word at 0xC (byte 0xF,
+     * MSB first); on PC that word is in host order, so byte 0xF is its low
+     * byte. Unfixed, xF_b4 read a bit of the next command and the
+     * damage-fly collision hitbox was created for fighters that were not
+     * thrown: two launched fighters juggled each other for good. */
+    u8 _0[0xC];
+    u32 _pad : 3;
+    u32 xF_b4 : 1;
+    u32 xF_b3 : 1;
+    u32 xF_b2 : 1;
+    u32 xF_b1 : 1;
+    u32 xF_b0 : 1;
+#else
     u8 _0[0xF];
     u32 xF_b0 : 1;
     u32 xF_b1 : 1;
     u32 xF_b2 : 1;
     u32 xF_b3 : 1;
     u32 xF_b4 : 1;
+#endif
 };
 struct sound_effect_0 {
 #ifdef TARGET_PC

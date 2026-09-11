@@ -848,6 +848,12 @@ static void Fighter_Create_Inline2(Fighter_GObj* gobj)
             fp->x2E4 = lbAnim_8001E8F8(ftData_80085E50(fp, 9));
             fp->x2E8 = lbAnim_8001E8F8(ftData_80085E50(fp, 0x25));
         }
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_MOTION") != NULL) {
+            OSReport("[pc] P%d anim lengths: landingfallspecial %g jumps %g %g %g %g\n", fp->player_id + 1, fp->x2EC,
+                     fp->x2DC, fp->x2E0, fp->x2E4, fp->x2E8);
+        }
+#endif
     }
 }
 
@@ -955,9 +961,17 @@ void Fighter_ChangeMotionState(Fighter_GObj* gobj, FtMotionId msid,
         if (trace < 0) {
             trace = getenv("MELEE_TRACE_MOTION") != NULL;
         }
-        if (trace && fp->player_id == 0) {
-            OSReport("[pc] frame %u: P1 motion %d -> %d (flags %x, start %g)\n", pc_frame_count, fp->motion_id, msid, flags,
-                     anim_start);
+        if (trace && msid == 88 && fp->motion_id == 88) {
+            static int shown;
+            if (shown++ < 2) {
+                OSReport("[pc] DamageFlyN re-entered; from:\n");
+                pc_print_backtrace();
+            }
+        }
+        if (trace) {
+            OSReport("[pc] frame %u: P%d motion %d -> %d (flags %x, start %g) at (%.1f %.1f) vel (%.2f %.2f) ground %d\n",
+                     pc_frame_count, fp->player_id + 1, fp->motion_id, msid, flags, anim_start, fp->cur_pos.x,
+                     fp->cur_pos.y, fp->self_vel.x, fp->self_vel.y, fp->ground_or_air);
         }
     }
 #endif
@@ -2890,6 +2904,14 @@ void Fighter_ProcessHit_8006D1EC(Fighter_GObj* gobj)
             Fighter_UnkTakeDamage_8006CC30(fp, fp->dmg.x1838_percentTemp);
             ftCo_Damage_CalcKnockback(fp);
             ftKb_SpecialN_800F5BA4(fp);
+#ifdef TARGET_PC
+            if (getenv("MELEE_TRACE_MOTION") != NULL) {
+                OSReport("[pc] frame %u: P%d hit: damage %g kb %g angle %d src ply %d kind %d x1908 %d at (%.1f %.1f)\n",
+                         pc_frame_count, fp->player_id + 1, fp->dmg.x1838_percentTemp, fp->dmg.x18A4_knockbackMagnitude,
+                         fp->dmg.x1848_kb_angle, fp->dmg.x18c4_source_ply, fp->dmg.x1840, fp->dmg.x1908, fp->cur_pos.x,
+                         fp->cur_pos.y);
+            }
+#endif
 
             if (fp->take_dmg_2_cb) {
                 fp->take_dmg_2_cb(gobj);

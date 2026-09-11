@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#endif
 #include "gmclassic.h"
 #ifdef TARGET_PC
 #include <dolphin/os.h>
@@ -927,6 +930,9 @@ void gmClassic_801B3500(GameModeState* arg0)
         gc->stkind = entry->xC->x00;
     }
 #ifdef TARGET_PC
+    if (pc_config.stage > 0) {
+        gc->stkind = (u16) pc_config.stage; /* --stage */
+    }
     OSReport("[pc] classic stage %d: entry x0 %u x1 %02x x2 %u xC %p -> stkind %u (chars %u %u %u)\n", arg0->id,
              entry->x0, entry->x1, entry->x2, entry->xC, gc->stkind, entry->xC != NULL ? entry->xC->x02[0] : 0,
              entry->xC != NULL ? entry->xC->x02[1] : 0, entry->xC != NULL ? entry->xC->x02[2] : 0);

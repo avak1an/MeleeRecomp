@@ -1819,6 +1819,9 @@ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
     u32 temp_r3_2;
     u32 temp_r4_2;
 
+#ifdef TARGET_PC
+    bool copied = false;
+#endif
     if (msid < arg0->x58C) {
         temp_r3 = ftData_80085FD4(arg0, msid);
         temp_r3_2 = temp_r3->x14;
@@ -1828,6 +1831,9 @@ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
                 if ((temp_r3_3 != NULL) &&
                     (temp_r3->x14 == (u32) temp_r3_3->x5A4))
                 {
+#ifdef TARGET_PC
+                    copied = true;
+#endif
                     memcpy(arg0->x59C, temp_r3_3->x59C, temp_r3->x8);
                     temp_r4 = arg0->x59C;
                     temp_ret = lbArchiveRelocate(
@@ -1853,6 +1859,16 @@ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
                     }
                 }
                 arg0->x598 = HSD_ArchiveGetPublicAddress(&sp10, temp_r3->x0);
+#ifdef TARGET_PC
+                /* this loader reads a figatree only for its frame count
+                 * (the landing and jump animation lengths); unswapped the
+                 * lengths were denormals and LandingFallSpecial ran at a
+                 * speed of nearly zero: a fighter stood still for good
+                 * after landing from an up special. */
+                if (!copied) {
+                    pc_swap_figatree(arg0->x598);
+                }
+#endif
             } else {
                 arg0->x598 = 0;
             }

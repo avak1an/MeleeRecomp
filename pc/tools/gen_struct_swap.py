@@ -219,10 +219,18 @@ def main():
         if not m:
             continue
         indent, var = m.group(1), m.group(2)
+        anon = None
         if f in SPECIAL:
             var, typ = SPECIAL[f]
         else:
-            typ = variable_type(var, text, headers)
+            # a stage that declares its block inline (`static struct { ... }* yakumono_param;`)
+            # must not fall through to a header's declaration of the same variable name
+            am = re.search(r'^static\s+struct\s*\{\n(.*?)^\}\s*\*\s*%s\s*;' % re.escape(var), text, re.S | re.M)
+            if am:
+                anon = am.group(1).split(chr(10))
+                typ = 'anonymous struct'
+            else:
+                typ = variable_type(var, text, headers)
             if typ is None:
                 print('%s: cannot find the type of %s' % (f, var))
                 continue
@@ -230,7 +238,10 @@ def main():
             print('%s: %s is a %s pointer -- skipped' % (f, var, typ))
             continue
         try:
-            lay = layout_of(typ, [text] + headers, {}, f)
+            if anon is not None:
+                lay = layout_of_body(anon, f, [text] + headers, {}, f)
+            else:
+                lay = layout_of(typ, [text] + headers, {}, f)
         except ValueError as e:
             print('%s: %s (%s) -- skipped' % (f, e, typ))
             continue

@@ -1,6 +1,7 @@
 #ifdef TARGET_PC
 #include <pc_hsd_swap.h>
 #include "pc_runtime.h"
+#include <stdlib.h>
 #endif
 #include "ftaction.h"
 
