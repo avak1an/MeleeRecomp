@@ -22,7 +22,13 @@
  * swapped (once) as 32-bit words right before the first copy. */
 #ifdef TARGET_PC
 #include <pc_game_swap.h>
-#define PC_SWAP_EXT_ATTRS(p, n) pc_swap_ext_attrs((p), (n))
+struct ftLk_DatAttrs;
+struct _MarsAttributes;
+/* the sword characters' attributes end in a SwordAttrs block (the sword
+ * trail: two floats, then bytes for alpha and colour) whose bytes the word
+ * swap must leave alone; its offset is passed along */
+#define PC_SWORD_ATTRS_OFFSET(p)                                                  _Generic((p), struct ftLk_DatAttrs*: 0x64, struct _MarsAttributes*: 0x78, default: -1)
+#define PC_SWAP_EXT_ATTRS(p, n) pc_swap_ext_attrs((p), (n), PC_SWORD_ATTRS_OFFSET(p))
 #else
 #define PC_SWAP_EXT_ATTRS(p, n) ((void) 0)
 #endif

@@ -267,6 +267,12 @@ void Player_80031AD0(int slot)
     first_struct.has_transformation = false;
     first_struct.x5 = -1;
 
+#ifdef TARGET_PC
+    if (slot != 0 && getenv("MELEE_CPU_LEVEL") != NULL) {
+        /* debugging aid: every CPU (ports 2-4) plays at this level */
+        player->cpu_level = (u8) atoi(getenv("MELEE_CPU_LEVEL"));
+    }
+#endif
     player->player_entity[0] = Fighter_Create(&first_struct);
     player->player_state = 2;
 

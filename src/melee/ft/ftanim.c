@@ -1021,11 +1021,34 @@ void ftAnim_80070200(Fighter* fp, ftData_x8_x8* r4, CostumeTObjList* r5,
     r5->x5D0 =
         r4->xC[fp->x619_costume_id] ? r4->xC[fp->x619_costume_id] : r4->xC[0];
 
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_ANIM") != NULL) {
+        /* every texture of the model in DObj order, the index space of the
+         * costume texture-anim table */
+        u32 d, n = 0;
+        for (d = 0; d < r6->count; d++) {
+            HSD_DObj* dobj = r6->data[d];
+            HSD_TObj* t = dobj != NULL && dobj->mobj != NULL ? HSD_MObjGetTObj(dobj->mobj) : NULL;
+            for (; t != NULL; t = t->next, n++) {
+                OSReport("[pc] fighter kind %d tobj index %u: dobj %u tobj %p aobj %p image %p\n", fp->kind, n, d, t,
+                         t->aobj, t->imagedesc != NULL ? t->imagedesc->image_ptr : NULL);
+            }
+        }
+    }
+#endif
     for (i = 0; i < r5->n_costume_tobjs; i++) {
         r5->costume_tobjs[i] = ftParts_80075240(r6, r5->x5D0[i]);
         if (r5->costume_tobjs[i]->aobj == NULL) {
             HSD_ASSERTREPORT(1236, 0, "can't find fighter texture anim!\n");
         }
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_ANIM") != NULL) {
+            HSD_TObj* t = r5->costume_tobjs[i];
+            OSReport("[pc] fighter kind %d costume tobj %u: id %u -> tobj %p aobj %p image %p (of %u dobjs)\n", fp->kind, i,
+                     (unsigned) r5->x5D0[i], t, t != NULL ? t->aobj : NULL,
+                     t != NULL && t->imagedesc != NULL ? t->imagedesc->image_ptr : NULL, r6->count);
+        }
+#endif
         HSD_AObjSetRate(r5->costume_tobjs[i]->aobj, 0.0F);
     }
 }

@@ -1070,6 +1070,7 @@ static void child_finished(void)
 #define C_ACCENT_LO RGB(0x1B, 0x5C, 0xC4)
 #define C_GREEN RGB(0x2E, 0xC2, 0x6E)
 #define C_ORANGE RGB(0xF0, 0xA0, 0x30)
+#define C_RED RGB(0xE5, 0x4D, 0x4D)
 #define C_BTN RGB(0x24, 0x29, 0x33)
 #define C_BTN_HI RGB(0x30, 0x36, 0x42)
 #define C_TRACK RGB(0x2C, 0x31, 0x3C)
@@ -1140,6 +1141,35 @@ static HFONT font_semi, font_head, font_title, font_small, font_icon, font_icon_
 static HBRUSH br_input;
 static HBITMAP banner;
 static int iso_ok;
+static int iso_verified; /* 0 not yet, 1 SHA-1 matched, -1 wrong revision */
+static HFONT font_icon_sm;
+
+/* "<size>|<mtime>|<path>" of the image whose SHA-1 last matched, so the
+ * launcher does not ask for a new verification of an unchanged file */
+static void iso_stamp(const char* path, char* out, int size)
+{
+    WIN32_FILE_ATTRIBUTE_DATA fa;
+    if (path[0] != '\0' && GetFileAttributesExA(path, GetFileExInfoStandard, &fa)) {
+        snprintf(out, (size_t) size, "%lu:%lu|%lu:%lu|%s", fa.nFileSizeHigh, fa.nFileSizeLow,
+                 fa.ftLastWriteTime.dwHighDateTime, fa.ftLastWriteTime.dwLowDateTime, path);
+    } else {
+        out[0] = '\0';
+    }
+}
+
+static void iso_status_text(void)
+{
+    if (!iso_ok) {
+        return; /* probe_iso's own message stays */
+    }
+    if (iso_verified > 0) {
+        set_text(IDC_ISO_STATUS, "Verified SHA-1 (v1.02, USA)");
+    } else if (iso_verified < 0) {
+        set_text(IDC_ISO_STATUS, "Wrong disc: not the v1.02 NTSC image");
+    } else {
+        set_text(IDC_ISO_STATUS, "Not verified: click Verify SHA-1");
+    }
+}
 static RECT card_rc[CARD_COUNT];
 static RECT mods_empty_rc;
 static int have_icon_font;
@@ -1308,7 +1338,17 @@ done:
  * loads its banner */
 static void ui_iso_changed(int ok, const char* path)
 {
+    char stamp[MAX_PATH + 64], known[MAX_PATH + 64];
     iso_ok = ok;
+    iso_verified = 0;
+    if (ok) {
+        iso_stamp(path, stamp, sizeof(stamp));
+        ini_get("verified", known, sizeof(known), "");
+        if (stamp[0] != '\0' && strcmp(stamp, known) == 0) {
+            iso_verified = 1;
+        }
+    }
+    iso_status_text();
     if (banner != NULL) {
         DeleteObject(banner);
         banner = NULL;
@@ -1646,6 +1686,11 @@ static void create_fonts(void)
     font_icon = CreateFontA(-S(15), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0,
                             "Segoe MDL2 Assets");
     font_icon_lg = CreateFontA(-S(19), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0,
+                               "Segoe MDL2 Assets");
+    if (font_icon_sm != NULL) {
+        DeleteObject(font_icon_sm);
+    }
+    font_icon_sm = CreateFontA(-S(10), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0,
                                "Segoe MDL2 Assets");
     {
         /* the icon font ships with Windows 10 and 11; without it the
@@ -1995,6 +2040,12 @@ static void pill_state(COLORREF* color, char* out, int size)
     } else if (!iso_ok) {
         *color = C_ORANGE;
         snprintf(out, size, "Choose the disc image");
+    } else if (iso_verified < 0) {
+        *color = C_RED;
+        snprintf(out, size, "Wrong disc image");
+    } else if (iso_verified == 0) {
+        *color = C_ORANGE;
+        snprintf(out, size, "Disc not verified");
     } else if (find_game_exe(exe, sizeof(exe))) {
         *color = C_GREEN;
         snprintf(out, size, "Ready to launch");
@@ -2043,9 +2094,11 @@ static void paint_card_body(HDC dc, int c, RECT rc)
              DT_SINGLELINE | DT_VCENTER | DT_LEFT);
         {
             int cy = y + S(108) + S(15);
-            dot(dc, tx + S(9), cy, S(9), iso_ok ? C_GREEN : C_ORANGE);
-            glyph(dc, font_small, C_WHITE, tx, cy - S(9), S(18), S(18), iso_ok ? 0xE73E : 0xE783);
-            text(dc, font_semi, iso_ok ? C_GREEN : C_ORANGE, tx + S(26), y + S(108), right - S(130) - tx - S(26), S(30),
+            int good = iso_ok && iso_verified > 0;
+            COLORREF sc = good ? C_GREEN : C_RED;
+            dot(dc, tx + S(9), cy, S(9), sc);
+            glyph(dc, font_icon_sm, C_WHITE, tx, cy - S(9), S(18), S(18), good ? 0xE73E : 0xE711);
+            text(dc, font_semi, sc, tx + S(26), y + S(108), right - S(130) - tx - S(26), S(30),
                  labels[IDC_ISO_STATUS - 100], DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS);
         }
         text(dc, font_small, C_TEXT_DIM, tx, y + S(140), right - tx, S(36), labels[IDC_ISO_HASH - 100],
@@ -2469,14 +2522,15 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
         return TRUE;
     case WM_HASH_DONE:
         set_text(IDC_ISO_HASH, hash_result);
-        if (strncmp(hash_result, "Verified", 8) == 0) {
-            set_text(IDC_ISO_STATUS, "Verified SHA-1 (v1.02, USA)");
-        } else if (strncmp(hash_result, "main.dol matches", 16) == 0) {
-            set_text(IDC_ISO_STATUS, "main.dol verified (the image differs from the reference)");
+        if (strncmp(hash_result, "Verified", 8) == 0 || strncmp(hash_result, "main.dol matches", 16) == 0) {
+            char stamp[MAX_PATH + 64];
+            iso_verified = 1;
+            iso_stamp(hash_iso_path, stamp, sizeof(stamp));
+            ini_set("verified", stamp);
         } else if (strncmp(hash_result, "Not the supported", 17) == 0) {
-            iso_ok = 0;
-            set_text(IDC_ISO_STATUS, "Not the supported revision (v1.02 NTSC is needed)");
+            iso_verified = -1;
         }
+        iso_status_text();
         EnableWindow(ctl(IDC_ISO_VERIFY), TRUE);
         InvalidateRect(h, NULL, FALSE);
         return 0;

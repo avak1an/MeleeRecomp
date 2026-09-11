@@ -44,10 +44,15 @@ static void usage(void)
             "  --headless      no window; run the game logic only\n"
             "  --screenshots DIR  save a BMP of every 60th frame into DIR\n"
             "  --screenshot-every N  with --screenshots: every Nth frame instead\n"
+            "  --screenshot-from N   with --screenshots: start at frame N\n"
             "  --stage N       play every VS and Classic match on stage N (StKind, see\n"
             "                  src/melee/gr/forward.h: 2 Fountain ... 11 Rainbow Cruise ... 31 Battlefield)\n"
-            "  --item KIND@FRAME  spawn item KIND (number, see src/melee/it/forward.h) next to\n"
-            "                  player 1 at FRAME\n"
+            "  --item KIND@FRAME[:P]  spawn item KIND (number, see src/melee/it/forward.h)\n"
+            "                  next to player P (default 1) at FRAME\n"
+            "  --char N        port 1 plays character N (CharacterKind, see src/melee/ft/forward.h:\n"
+            "                  0 Falcon 1 DK 2 Fox 3 G&W 4 Kirby 5 Bowser 6 Link 7 Luigi 8 Mario\n"
+            "                  9 Marth 10 Mewtwo 11 Ness 12 Peach 13 Pikachu 14 ICs 15 Puff 16 Samus\n"
+            "                  17 Yoshi 18 Zelda 19 Sheik 20 Falco 21 YLink 22 Dr.M 23 Roy 24 Pichu 25 Ganon)\n"
             "  --kill SLOTS@FRAME[/N]  KO the fighters of player SLOTS (e.g. 1 or 1,2,3) at\n"
             "                  FRAME and every N (300) frames after it, to reach results\n"
             "  --saves DIR     memory card files (default: saves next to the exe)\n"
@@ -109,6 +114,7 @@ int main(int argc, char** argv)
     pc_config.scale = 1;
     pc_config.screenshot_every = 60;
     pc_config.item_kind = -1;
+    pc_config.p1_char = -1;
 
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) {
@@ -188,10 +194,16 @@ int main(int argc, char** argv)
             /* KIND@FRAME: spawn item KIND (see it/forward.h) next to player 1 */
             const char* spec = argv[++i];
             const char* at = strchr(spec, '@');
+            const char* colon = at != NULL ? strchr(at, ':') : NULL;
             pc_config.item_kind = atoi(spec);
             pc_config.item_frame = at != NULL ? atoi(at + 1) : 0;
+            pc_config.item_slot = colon != NULL ? atoi(colon + 1) - 1 : 0;
+        } else if (strcmp(argv[i], "--char") == 0 && i + 1 < argc) {
+            pc_config.p1_char = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--screenshot-every") == 0 && i + 1 < argc) {
             pc_config.screenshot_every = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--screenshot-from") == 0 && i + 1 < argc) {
+            pc_config.screenshot_from = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--saves") == 0 && i + 1 < argc) {
             pc_config.save_dir = argv[++i];
         } else if (strcmp(argv[i], "--mod") == 0 && i + 1 < argc) {

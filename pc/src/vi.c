@@ -17,6 +17,12 @@
 #include <mmsystem.h>
 
 extern void pc_ax_frame(void);
+
+/* --char: the character forced on port 1 (see Player_SetPlayerCharacter) */
+int pc_debug_p1_char(void)
+{
+    return pc_config.p1_char;
+}
 extern int pc_window_vsync_hz(void);
 
 static VIRetraceCallback pre_cb;
@@ -194,7 +200,7 @@ void VIWaitForRetrace(void)
     pc_swap_verify_relocs("retrace");
     if (pc_config.item_kind >= 0 && pc_frame_count == (u32) pc_config.item_frame) {
         extern void pc_debug_spawn_item(int kind, int slot);
-        pc_debug_spawn_item(pc_config.item_kind, 0);
+        pc_debug_spawn_item(pc_config.item_kind, pc_config.item_slot);
     }
     if (pc_config.kill_slots != 0 && pc_frame_count >= (u32) pc_config.kill_frame &&
         (pc_frame_count - (u32) pc_config.kill_frame) % (u32) pc_config.kill_every == 0)

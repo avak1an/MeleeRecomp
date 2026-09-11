@@ -2653,6 +2653,22 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                         m2->xC > icons[i].bound_d &&
                                         icons[i].state >= 1)
                                     {
+#ifdef TARGET_PC
+                                        {
+                                            /* --char N: port 1's pick is
+                                             * always character N */
+                                            extern int pc_debug_p1_char(void);
+                                            int want = pc_debug_p1_char();
+                                            int k;
+                                            if (door == 0 && want >= 0) {
+                                                for (k = 0; k < 25; k++) {
+                                                    if (icons[k].char_kind == want) {
+                                                        i = k;
+                                                    }
+                                                }
+                                            }
+                                        }
+#endif
                                         all_data->doors_data.doors[door]
                                             .sel_icon = (u8) i;
                                         mnCharSel_8025DB34(door);

@@ -50,7 +50,7 @@ enum { PC_SCRIPT_FIGHTER, PC_SCRIPT_ITEM, PC_SCRIPT_OVERLAY };
 void pc_swap_script(void* start, int kind);
 
 /// Character-specific attribute block (ftData::ext_attr), size in bytes.
-void pc_swap_ext_attrs(void* attrs, size_t size);
+void pc_swap_ext_attrs(void* attrs, size_t size, int sword_off);
 
 /// Fighter animation tree found in a figatree archive.
 struct FigaTree;

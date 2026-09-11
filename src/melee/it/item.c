@@ -46,6 +46,10 @@
 #include <sysdolphin/baselib/gobjproc.h>
 #include <sysdolphin/baselib/gobjuserdata.h>
 #include <sysdolphin/baselib/jobj.h>
+#ifdef TARGET_PC
+#include <stdint.h>
+#include <stdlib.h>
+#endif
 
 /* 267130 */ static void Item_80267130(HSD_GObj* gobj, SpawnItem* spawnItem);
 /* 2674AC */ static void Item_802674AC(SpawnItem* spawnItem);
@@ -925,6 +929,19 @@ static HSD_GObj* Item_8026862C(SpawnItem* spawnItem)
     if (gobj == NULL) {
         return NULL;
     }
+#ifdef TARGET_PC
+    if (getenv("MELEE_POKEMON") != NULL && spawnItem->kind >= It_PKind_Start &&
+        spawnItem->kind < It_PKind_Terminate)
+    {
+        /* debugging aid: every Poke Ball releases this Pokemon (item kind) */
+        spawnItem->kind = (ItemKind) atoi(getenv("MELEE_POKEMON"));
+    }
+    if (getenv("MELEE_TRACE_MOTION") != NULL) {
+        extern uint32_t pc_frame_count;
+        OSReport("[pc] frame %u: item spawn kind %d hold %d at (%.1f %.1f)\n", pc_frame_count, spawnItem->kind,
+                 spawnItem->hold_kind, spawnItem->pos.x, spawnItem->pos.y);
+    }
+#endif
     if (spawnItem->kind < It_Kind_Kuriboh) {
         // Common items
         GObj_SetupGXLink(gobj, it_803F1418[spawnItem->kind].x0_renderFunc, 6,

@@ -3418,6 +3418,13 @@ void ftColl_8007B7A4(Fighter_GObj* gobj, int arg1)
 
 void ftColl_8007B7FC(Fighter* fp, int arg1)
 {
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_MOTION") != NULL) {
+        extern uint32_t pc_frame_count;
+        OSReport("[pc] frame %u: P%d timed status 107 for %d frames (threshold %d)\n", pc_frame_count,
+                 fp->player_id + 1, arg1, it_8026B588());
+    }
+#endif
     fp->x221D_b6 = true;
     fp->x2004 = arg1;
     ftCo_800BFFD0(fp, 107, 0);

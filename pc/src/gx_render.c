@@ -110,6 +110,7 @@ typedef struct Vertex {
     float col[2][4];
     float tex[8][2];
     float nrm[3];
+    float bnm[3], tan[3]; /* GX_VA_NBT: binormal and tangent (emboss bump mapping) */
     u8 pnmtx;
     u8 texmtx[8];
 } Vertex;
@@ -330,11 +331,17 @@ static const u8* decode_attr_data(u8 attr, const u8* p, const VtxAttrFmt* f, int
         return p + n * comp_size(f->type);
     case GX_VA_NRM:
     case GX_VA_NBT:
-        /* an NBT vertex (items with environment maps) carries the normal
-         * first; the binormal and tangent are only for bump mapping */
+        /* an NBT vertex carries the normal first, then the binormal and
+         * tangent that the emboss bump texgen offsets along */
         n = attr_comps(attr, f);
         for (i = 0; i < 3; i++) {
             v->nrm[i] = read_comp(p + i * comp_size(f->type), f->type, f->frac, big);
+        }
+        if (n == 9) {
+            for (i = 0; i < 3; i++) {
+                v->bnm[i] = read_comp(p + (3 + i) * comp_size(f->type), f->type, f->frac, big);
+                v->tan[i] = read_comp(p + (6 + i) * comp_size(f->type), f->type, f->frac, big);
+            }
         }
         return p + n * comp_size(f->type);
     case GX_VA_CLR0:
@@ -497,11 +504,32 @@ static void light_channel(const ChanCtrl* c, int chan, const float* vtx_col, con
     out[3] = mat[3] * clamp01(illum[3]);
 }
 
-static void texgen(const Vertex* v, const float vpos[3], const float vnrm[3], int i, float out[2])
+static void texgen(const Vertex* v, const float vpos[3], const float vnrm[3], const float vbnm[3],
+                   const float vtan[3], const GLVertex* sofar, int i, float out[2])
 {
     const TexGen* g = &gx.texgen[i];
     float in[4], s, t, q;
     const float(*m)[4];
+    if (g->type >= GX_TG_BUMP0 && g->type <= GX_TG_BUMP7) {
+        /* emboss bump mapping: an earlier coordinate shifted along the
+         * eye-space binormal and tangent by the direction to a light (the
+         * barrel and other NBT items sample their height map twice, at the
+         * plain and the shifted coordinate, and subtract) */
+        int srcc = g->src - GX_TG_TEXCOORD0;
+        const Light* l = &gx.lights[g->type - GX_TG_BUMP0];
+        float ld[3];
+        ld[0] = l->pos[0] - vpos[0];
+        ld[1] = l->pos[1] - vpos[1];
+        ld[2] = l->pos[2] - vpos[2];
+        normalize3(ld);
+        if (srcc < 0 || srcc >= i) {
+            out[0] = out[1] = 0.0f;
+            return;
+        }
+        out[0] = sofar->tex[srcc][0] + ld[0] * vbnm[0] + ld[1] * vbnm[1] + ld[2] * vbnm[2];
+        out[1] = sofar->tex[srcc][1] + ld[0] * vtan[0] + ld[1] * vtan[1] + ld[2] * vtan[2];
+        return;
+    }
     if (g->src >= GX_TG_TEX0 && g->src <= GX_TG_TEX7) {
         in[0] = v->tex[g->src - GX_TG_TEX0][0];
         in[1] = v->tex[g->src - GX_TG_TEX0][1];
@@ -562,10 +590,10 @@ static void texgen(const Vertex* v, const float vpos[3], const float vnrm[3], in
 
 static void transform_vertex(const Vertex* v, GLVertex* out)
 {
-    float pos[3], nrm[3];
+    float pos[3], nrm[3], bnm[3], tan[3];
     const float(*pm)[4];
     u32 slot = v->pnmtx;
-    int i;
+    int i, want_nbt = 0;
 
     if (slot + 2 >= MTX_ROWS) {
         slot = 0;
@@ -578,6 +606,23 @@ static void transform_vertex(const Vertex* v, GLVertex* out)
         nrm[1] = nm[1][0] * v->nrm[0] + nm[1][1] * v->nrm[1] + nm[1][2] * v->nrm[2];
         nrm[2] = nm[2][0] * v->nrm[0] + nm[2][1] * v->nrm[1] + nm[2][2] * v->nrm[2];
         normalize3(nrm);
+        for (i = 0; i < (int) gx.num_texgen; i++) {
+            if (gx.texgen[i].type >= GX_TG_BUMP0 && gx.texgen[i].type <= GX_TG_BUMP7) {
+                want_nbt = 1;
+            }
+        }
+        if (want_nbt) {
+            int k;
+            for (k = 0; k < 3; k++) {
+                bnm[k] = nm[k][0] * v->bnm[0] + nm[k][1] * v->bnm[1] + nm[k][2] * v->bnm[2];
+                tan[k] = nm[k][0] * v->tan[0] + nm[k][1] * v->tan[1] + nm[k][2] * v->tan[2];
+            }
+            /* not normalized: their length sets the bump depth (Dolphin
+             * normalizes only the normal) */
+        } else {
+            bnm[0] = bnm[1] = bnm[2] = 0.0f;
+            tan[0] = tan[1] = tan[2] = 0.0f;
+        }
     }
     memcpy(out->pos, pos, sizeof(pos));
 
@@ -597,7 +642,7 @@ static void transform_vertex(const Vertex* v, GLVertex* out)
     }
     for (i = 0; i < 8; i++) {
         if (i < gx.num_texgen) {
-            texgen(v, pos, nrm, i, out->tex[i]);
+            texgen(v, pos, nrm, bnm, tan, out, i, out->tex[i]);
         } else {
             out->tex[i][0] = v->tex[i][0];
             out->tex[i][1] = v->tex[i][1];
@@ -2188,6 +2233,9 @@ void GXSetTevColorS10(GXTevRegID id, GXColorS10 color)
 void GXSetTevKColor(GXTevKColorID id, GXColor color)
 {
     float* r = gx.kcolor[id & 3];
+    if (debug_log_frame != 0 && pc_frame_count == debug_log_frame) {
+        fprintf(stderr, "[gx] GXSetTevKColor %u = %02x%02x%02x%02x\n", (unsigned) id, color.r, color.g, color.b, color.a);
+    }
     r[0] = color.r / 255.0f;
     r[1] = color.g / 255.0f;
     r[2] = color.b / 255.0f;
@@ -2495,7 +2543,9 @@ void GXCopyDisp(void* dest, GXBool clear)
         return;
     }
     imm_flush();
-    if (pc_config.screenshot_dir != NULL && pc_config.screenshot_every > 0 && frame_no % (u32) pc_config.screenshot_every == 0) {
+    if (pc_config.screenshot_dir != NULL && pc_config.screenshot_every > 0 && frame_no >= (u32) pc_config.screenshot_from &&
+        (frame_no - (u32) pc_config.screenshot_from) % (u32) pc_config.screenshot_every == 0)
+    {
         save_screenshot();
     }
     pc_window_present();

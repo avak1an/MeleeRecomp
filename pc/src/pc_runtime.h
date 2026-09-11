@@ -21,12 +21,15 @@ typedef struct PCConfig {
     bool headless;       ///< no window, no rendering
     const char* screenshot_dir; ///< if set, dump a BMP of every Nth frame here
     int screenshot_every;
+    int screenshot_from; ///< --screenshot-from: first frame to save (default 0)
     int kill_slots; /* --kill: bit mask of player slots to KO repeatedly (0 = off) */
     int kill_frame; /* --kill: first frame */
     int kill_every; /* --kill: repeat period in frames */
     int item_kind;  /* --item: item kind to spawn next to player 1 (-1 = off) */
     int stage;      /* --stage: StKind forced on every VS/Classic match (0 = off) */
     int item_frame; /* --item: frame */       ///< N for the above (default 60)
+    int item_slot;  /* --item: player slot the item appears next to (0 = player 1) */
+    int p1_char;    /* --char: CharacterKind forced on port 1 at the character select (-1 = off) */
     const char* iso;     ///< path of the disc image (NULL = auto-detect)
     const char* save_dir; ///< memory card files (NULL = "saves")
     bool quiet_stubs;    ///< --quiet-stubs: also silences informational prints

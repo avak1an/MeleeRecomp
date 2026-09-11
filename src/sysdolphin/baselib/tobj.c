@@ -177,6 +177,12 @@ static void TObjUpdateFunc(void* obj, enum_t type, HSD_ObjData* val)
     } break;
     case HSD_A_T_BLEND:
         tobj->blending = val->fv;
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_ANIM") != NULL) {
+            OSReport("[pc] TObjUpdateFunc: tobj %p blend %g image %p\n", tobj, val->fv,
+                     tobj->imagedesc != NULL ? tobj->imagedesc->image_ptr : NULL);
+        }
+#endif
         break;
     case HSD_A_T_ROTX:
         tobj->rotate.x = val->fv;
@@ -216,6 +222,11 @@ static void TObjUpdateFunc(void* obj, enum_t type, HSD_ObjData* val)
         break;
     case HSD_A_T_KONST_A:
         tobj->tev->konst.a = (u8) (255.0 * val->fv);
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_ANIM") != NULL) {
+            OSReport("[pc] TObjUpdateFunc: tobj %p konst.a %g\n", tobj, val->fv);
+        }
+#endif
         break;
     case HSD_A_T_TEV0_R:
         tobj->tev->tev0.r = (u8) (255.0 * val->fv);
@@ -243,6 +254,12 @@ static void TObjUpdateFunc(void* obj, enum_t type, HSD_ObjData* val)
         break;
     case HSD_A_T_TS_BLEND:
         tobj->blending = val->fv;
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_ANIM") != NULL) {
+            OSReport("[pc] TObjUpdateFunc(TS): tobj %p blend %g image %p\n", tobj, val->fv,
+                     tobj->imagedesc != NULL ? tobj->imagedesc->image_ptr : NULL);
+        }
+#endif
         break;
     }
 }
@@ -749,6 +766,13 @@ static void MakeColorGenTExp(u32 lightmap, HSD_TObj* tobj, HSD_TExp** c,
         }
     }
 
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_ANIM") != NULL && (use_k_rgb || use_k_r || use_k_g || use_k_b || use_k_a)) {
+        OSReport("[pc] tobj %p tev konst %02x%02x%02x%02x (rgb %d r %d g %d b %d a %d) image %p\n", tobj,
+                 tobj->tev->konst.r, tobj->tev->konst.g, tobj->tev->konst.b, tobj->tev->konst.a, use_k_rgb, use_k_r,
+                 use_k_g, use_k_b, use_k_a, tobj->imagedesc != NULL ? tobj->imagedesc->image_ptr : NULL);
+    }
+#endif
     if (use_k_rgb) {
         konst_rgb =
             HSD_TExpCnst(&tobj->tev->konst, HSD_TE_RGB, HSD_TE_U8, list);
@@ -994,6 +1018,12 @@ static void TObjMakeTExp(HSD_TObj* tobj, u32 lightmap, u32 lightmap_done,
         break;
     case TEX_COLORMAP_BLEND:
         e1 = HSD_TExpCnst(&tobj->blending, HSD_TE_X, HSD_TE_F32, list);
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_ANIM") != NULL) {
+            OSReport("[pc] blend const at %p (tobj %p, blending %g, image %p)\n", (void*) &tobj->blending, tobj,
+                     tobj->blending, tobj->imagedesc != NULL ? tobj->imagedesc->image_ptr : NULL);
+        }
+#endif
         HSD_TExpColorOp(e0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_ENABLE);
         HSD_TExpColorIn(e0, HSD_TE_RGB, *c, c_sel, c_src, HSD_TE_X, e1,
                         HSD_TE_0, HSD_TEXP_ZERO);
@@ -1039,6 +1069,12 @@ static void TObjMakeTExp(HSD_TObj* tobj, u32 lightmap, u32 lightmap_done,
             break;
         case TEX_ALPHAMAP_BLEND:
             e1 = HSD_TExpCnst(&tobj->blending, HSD_TE_X, HSD_TE_F32, list);
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_ANIM") != NULL) {
+            OSReport("[pc] blend const at %p (tobj %p, blending %g, image %p)\n", (void*) &tobj->blending, tobj,
+                     tobj->blending, tobj->imagedesc != NULL ? tobj->imagedesc->image_ptr : NULL);
+        }
+#endif
             HSD_TExpAlphaOp(e0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1,
                             GX_ENABLE);
             HSD_TExpAlphaIn(e0, HSD_TE_A, *a, a_sel, a_src, HSD_TE_X, e1,

@@ -971,11 +971,20 @@ void pc_swap_script(void* start, int kind)
     }
 }
 
-/* Character-specific attribute block (ftData::ext_attr): floats and ints. */
-void pc_swap_ext_attrs(void* attrs, size_t size)
+/* Character-specific attribute block (ftData::ext_attr): floats and ints.
+ * sword_off >= 0: the offset of a SwordAttrs block {f32 x0, x4; u8 x8..x10
+ * (alpha and colour of the sword trail); pad; int x14; f32 x18, x1C}, whose
+ * three byte-filled words are put back in file order. */
+void pc_swap_ext_attrs(void* attrs, size_t size, int sword_off)
 {
     if (attrs != NULL && pc_swap_once(attrs)) {
         pc_swap32_range(attrs, size & ~(size_t) 3);
+        if (sword_off >= 0 && (size_t) sword_off + 0x14 <= size) {
+            u8* s = (u8*) attrs + sword_off;
+            pc_swap32(s + 8);
+            pc_swap32(s + 0xC);
+            pc_swap32(s + 0x10);
+        }
     }
 }
 

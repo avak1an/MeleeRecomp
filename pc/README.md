@@ -189,6 +189,18 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
 - `--log FILE`: write everything the game prints to FILE instead of the
   console. The launcher always passes `melee.log` next to `melee.exe`, so
   that file is the log to send with a bug report.
+- `--char N`: port 1 always picks character N at the character select
+  (`CharacterKind` from `src/melee/ft/forward.h`, e.g. 6 Link, 8 Mario,
+  9 Marth); `pc\scripts\vs-link.txt` is the VS route plus two forward
+  smashes for it.
+- `--item KIND@FRAME[:P]`: the item appears next to player P (default 1).
+- `--screenshot-from N`: with `--screenshots`, start saving at frame N.
+- `MELEE_POKEMON=N`: every Poke Ball releases item kind N (165 Weezing);
+  `MELEE_CPU_LEVEL=N`: ports 2-4 play at CPU level N.
+- `MELEE_TRACE_ANIM=1` also logs texture blend and konst animation
+  updates, the fighter's animated-texture table, and TEV constant
+  compilation; `MELEE_TRACE_MOTION` also logs item spawns and the star's
+  timed status.
 - `--stage N`: play every VS and Classic match on stage N (the `StKind`
   number from `src/melee/gr/forward.h`: 2 Fountain, 3 Stadium, 4 Peach's
   Castle, 5 Kongo Jungle, 6 Brinstar, 7 Corneria, 8 Yoshi's Story, 9 Onett,
@@ -254,7 +266,10 @@ runtime statically and contains nothing from the game; see
 pages (Setup shows every card, the others one group each), a state pill
 in the header, cards for the settings, and a Play button. The cards, in
 the order a new user needs them: the game disc (the image is checked to
-be GALE01 and its banner is shown; "Verify SHA-1" hashes the whole image
+be GALE01 and its banner is shown; the status line is red with a cross
+until "Verify SHA-1" has matched the image, then green with a check mark,
+and a matched image is remembered by size and date in `launcher.ini` so
+the check is not repeated; "Verify SHA-1" hashes the whole image
 against the v1.02 disc the decompilation targets, `d4e70c06...`, and its
 `main.dol` against the README's `08e0bf20...`, so a differently dumped or
 modified image is told apart from a wrong revision); Build (a checkout of
@@ -758,7 +773,15 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - `gx_render.c`: a texture coordinate generated with the identity matrix
   still goes through the post-transform matrix; toon-shaded items (tomato,
   Poke Ball, barrel, crate, food) map their normal through it and were
-  drawn unshaded.
+  drawn unshaded. Emboss bump mapping (`GX_TG_BUMP0-7`): the barrel and
+  other NBT items sample their height map twice, at the plain coordinate
+  and at one shifted along the eye-space binormal and tangent by the
+  direction to a light, and subtract; without it the shifted sample was
+  texel (0,0) and the barrel came out black.
+- `inlines.h` / `game_swap.c`: Link's, Young Link's, Marth's and Roy's
+  attribute blocks end in the sword-trail block whose alpha and colour are
+  bytes; the word swap now leaves those three words in file order (the
+  trail was a solid green sail instead of a soft fading arc).
 - `mnevent.c`: the event menu addresses its strings as offsets from an
   animation-settings struct that precedes them in the console's data
   layout; on PC the string block is addressed directly (the menu looked
