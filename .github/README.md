@@ -30,6 +30,13 @@ The port lives in the [`pc/`](../pc) directory and is documented in
 2. Clone this repository.
 3. Run `pc\dist\melee-launcher.exe`. Point "Game disc" at your own Super
    Smash Bros. Melee (USA) v1.02 disc image and click "Verify (SHA-1)".
+   The port targets exactly the executable the
+   [doldecomp/melee](https://github.com/doldecomp/melee) decompilation
+   matches, GALE01 revision 2 (NTSC 1.02), whose `main.dol` has the SHA-1
+   `08e0bf20134dfcb260699671004527b2d6bb1a45` (the same hash upstream's
+   README asks for). The launcher checks that hash, and the whole disc
+   image against `d4e70c064cc714ba8400a849cf299dbd1aa326fc`; the game
+   checks `main.dol` again when it starts and refuses any other revision.
 4. Click "Build" in the launcher's "Build from source" section (or run
    `pc\build.cmd`). A console shows the build; the first one takes a few
    minutes. The GameCube build described below is not needed.
@@ -37,7 +44,8 @@ The port lives in the [`pc/`](../pc) directory and is documented in
 
 The game executable is never distributed: it embeds tables taken from
 the disc's `main.dol`, so each copy is built from its owner's disc. The
-repository contains no game data.
+repository contains no game data. Other revisions of the game (1.00, 1.01,
+PAL, Japanese) have different data layouts and are not supported.
 
 ## How the port is built
 
