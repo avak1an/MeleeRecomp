@@ -2,8 +2,7 @@
 
 This repository is a copy of [doldecomp/melee](https://github.com/doldecomp/melee)
 with one addition: **MeleeRecomp**, a native Windows port of the game built
-from the decompiled sources. Everything below this section is the upstream
-decomp's own README, kept as is so the GameCube build keeps working.
+from the decompiled sources.
 
 The port lives in the [`pc/`](../pc) directory and is documented in
 [`pc/README.md`](../pc/README.md). What it does today:
