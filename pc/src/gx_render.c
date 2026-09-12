@@ -233,11 +233,9 @@ static u32 attr_stream_size(u8 attr, u8 vcd, const VtxAttrFmt* f)
     if (attr <= GX_VA_TEX7MTXIDX) {
         return 1;
     }
-    if (vcd == GX_INDEX8) {
-        return 1;
-    }
-    if (vcd == GX_INDEX16) {
-        return 2;
+    if (vcd == GX_INDEX8 || vcd == GX_INDEX16) {
+        u32 n = vcd == GX_INDEX8 ? 1 : 2;
+        return attr == GX_VA_NRM && f->cnt == GX_NRM_NBT3 ? 3 * n : n; /* NBT3: one index per vector */
     }
     if (attr == GX_VA_CLR0 || attr == GX_VA_CLR1) {
         return color_size(f->type);
@@ -392,6 +390,23 @@ static const u8* decode_vertex(const u8* p, u8 vat, int big, Vertex* v)
         }
         if (vcd == GX_DIRECT) {
             p = decode_attr_data(attr, p, f, big, v);
+        } else if (attr == GX_VA_NRM && f->cnt == GX_NRM_NBT3) {
+            /* three indices, one each for the normal, binormal and tangent,
+             * each three components into the same array */
+            u32 k;
+            for (k = 0; k < 3; k++) {
+                u32 idx = vcd == GX_INDEX8 ? *p : (big ? be16(p) : *(const u16*) p);
+                const u8* base = gx.array_base[attr];
+                p += vcd == GX_INDEX8 ? 1 : 2;
+                if (base != NULL) {
+                    const u8* q = base + idx * gx.array_stride[attr] + k * 3 * comp_size(f->type);
+                    float* dst = k == 0 ? v->nrm : k == 1 ? v->bnm : v->tan;
+                    u32 c;
+                    for (c = 0; c < 3; c++) {
+                        dst[c] = read_comp(q + c * comp_size(f->type), f->type, f->frac, 1);
+                    }
+                }
+            }
         } else {
             u32 idx = vcd == GX_INDEX8 ? *p : (big ? be16(p) : *(const u16*) p);
             const u8* base = gx.array_base[attr];
@@ -685,6 +700,37 @@ static u32 hash_bytes(const void* p, size_t n)
 
 #define TEX_CACHE 1024
 static TexEntry tex_cache[TEX_CACHE];
+/* buckets of candidate entries by image pointer (index + 1, 0 = empty) */
+#define TEX_BUCKETS 2048
+#define TEX_WAYS 4
+static u16 tex_buckets[TEX_BUCKETS][TEX_WAYS];
+
+static u32 tex_bucket_of(const void* image)
+{
+    u32 v = (u32) (uintptr_t) image;
+    return ((v >> 5) ^ (v >> 13) ^ (v >> 21)) & (TEX_BUCKETS - 1);
+}
+
+static void tex_bucket_add(u32 index)
+{
+    u16* b = tex_buckets[tex_bucket_of(tex_cache[index].image)];
+    int w;
+    for (w = TEX_WAYS - 1; w > 0; w--) {
+        b[w] = b[w - 1];
+    }
+    b[0] = (u16) (index + 1);
+}
+
+static void tex_bucket_remove(u32 index)
+{
+    u16* b = tex_buckets[tex_bucket_of(tex_cache[index].image)];
+    int w;
+    for (w = 0; w < TEX_WAYS; w++) {
+        if (b[w] == index + 1) {
+            b[w] = 0;
+        }
+    }
+}
 static int debug_nocache = -1;
 
 /* EFB copies: a destination pointer that GXCopyTex wrote maps to a GL
@@ -1004,26 +1050,36 @@ static GLuint bind_texture(const PCTexObj* t)
             goto params;
         }
     }
-    for (i = 0; i < TEX_CACHE; i++) {
-        if (tex_cache[i].tex == 0) {
-            if (free_slot == TEX_CACHE) {
-                free_slot = i;
-            }
-            continue;
-        }
-        if (tex_cache[i].image == t->image && tex_cache[i].width == t->width &&
-            tex_cache[i].height == t->height && tex_cache[i].format == t->format &&
-            tex_cache[i].tlut_name == t->tlut_name && tex_cache[i].lut == lut &&
-            tex_cache[i].lut_hash == lut_hash) {
-            if (debug_nocache) {
-                /* MELEE_GX_NOCACHE=1: decode every texture on every use */
-                glDeleteTextures(1, &tex_cache[i].tex);
-                memset(&tex_cache[i], 0, sizeof(TexEntry));
-                free_slot = i;
+    {
+        u16* b = tex_buckets[tex_bucket_of(t->image)];
+        int w;
+        for (w = 0; w < TEX_WAYS && e == NULL; w++) {
+            if (b[w] == 0) {
                 continue;
             }
-            e = &tex_cache[i];
-            break;
+            i = (u32) b[w] - 1;
+            if (tex_cache[i].tex != 0 && tex_cache[i].image == t->image && tex_cache[i].width == t->width &&
+                tex_cache[i].height == t->height && tex_cache[i].format == t->format &&
+                tex_cache[i].tlut_name == t->tlut_name && tex_cache[i].lut == lut &&
+                tex_cache[i].lut_hash == lut_hash)
+            {
+                if (debug_nocache) {
+                    /* MELEE_GX_NOCACHE=1: decode every texture on every use */
+                    glDeleteTextures(1, &tex_cache[i].tex);
+                    tex_bucket_remove(i);
+                    memset(&tex_cache[i], 0, sizeof(TexEntry));
+                    continue;
+                }
+                e = &tex_cache[i];
+            }
+        }
+    }
+    if (e == NULL) {
+        for (i = 0; i < TEX_CACHE; i++) {
+            if (tex_cache[i].tex == 0) {
+                free_slot = i;
+                break;
+            }
         }
     }
     if (e == NULL) {
@@ -1038,6 +1094,7 @@ static GLuint bind_texture(const PCTexObj* t)
                 }
             }
             glDeleteTextures(1, &tex_cache[oldest].tex);
+            tex_bucket_remove(oldest);
             memset(&tex_cache[oldest], 0, sizeof(TexEntry));
             free_slot = oldest;
         }
@@ -1045,6 +1102,7 @@ static GLuint bind_texture(const PCTexObj* t)
         pixels = decode_texture(t, &w, &h);
         dump_texture(t, pixels, w, h);
         e->image = t->image;
+        tex_bucket_add((u32) (e - tex_cache));
         e->width = t->width;
         e->height = t->height;
         e->format = t->format;
@@ -1117,6 +1175,12 @@ typedef struct Shader {
 #define MAX_SHADERS 256
 static Shader shaders[MAX_SHADERS];
 static int num_shaders;
+/* the key's hash picks a bucket of candidates (index + 1, 0 = empty); a
+ * frame has a thousand draws and comparing every key against every
+ * shader was the single largest cost of a four-player match */
+#define SHADER_BUCKETS 1024
+#define SHADER_WAYS 4
+static u16 shader_buckets[SHADER_BUCKETS][SHADER_WAYS];
 
 static char shader_src[32768];
 static int shader_len;
@@ -1388,17 +1452,27 @@ static Shader* get_shader(void)
         key.texmap_valid[i] = gx.texmap[i].image != NULL;
     }
     key.fog_type = gx.fog_type;
-    for (s = 0; s < num_shaders; s++) {
-        if (memcmp(&shaders[s].key, &key, sizeof(key)) == 0) {
-            return &shaders[s];
+    {
+        u32 h = hash_bytes(&key, sizeof(key)) & (SHADER_BUCKETS - 1);
+        u16* bucket = shader_buckets[h];
+        int w;
+        for (w = 0; w < SHADER_WAYS; w++) {
+            if (bucket[w] != 0 && memcmp(&shaders[bucket[w] - 1].key, &key, sizeof(key)) == 0) {
+                return &shaders[bucket[w] - 1];
+            }
         }
+        if (num_shaders == MAX_SHADERS) {
+            num_shaders = 0; /* crude: start over */
+            memset(shader_buckets, 0, sizeof(shader_buckets));
+        }
+        sh = &shaders[num_shaders++];
+        memset(sh, 0, sizeof(*sh));
+        sh->key = key;
+        for (w = SHADER_WAYS - 1; w > 0; w--) {
+            bucket[w] = bucket[w - 1];
+        }
+        bucket[0] = (u16) num_shaders; /* index + 1 */
     }
-    if (num_shaders == MAX_SHADERS) {
-        num_shaders = 0; /* crude: start over */
-    }
-    sh = &shaders[num_shaders++];
-    memset(sh, 0, sizeof(*sh));
-    sh->key = key;
 
     shader_len = 0;
     emit("#version 120\n");
@@ -1774,14 +1848,14 @@ static void draw_stream_impl(u8 prim, u8 vat, const u8* stream, u32 nverts, int 
         fprintf(stderr,
                 "[gx] draw prim=%02x vat=%u n=%u big=%d v0=(%.2f %.2f %.2f) clip=(%.2f %.2f %.2f w=%.2f) "
                 "col0=(%.2f %.2f %.2f %.2f) tex0=(%.2f %.2f) tev=%u map0=%p fmt=%u %ux%u tlut=%u/%p/%u/%u chans=%u texgen=%u "
-                "vp=(%.0f %.0f %.0f %.0f) cull=%u z=%u/%u/%u blend=%u alpha=%u/%u/%u/%u proj=%u\n",
+                "vp=(%.0f %.0f %.0f %.0f) cull=%u z=%u/%u/%u blend=%u(%u,%u) alpha=%u/%u/%u/%u proj=%u\n",
                 prim, vat, nverts, big, x, y, z, cx, cy, cz, cw, g->col[0][0], g->col[0][1],
                 g->col[0][2], g->col[0][3], g->tex[0][0], g->tex[0][1], gx.num_tev, gx.texmap[0].image,
                 gx.texmap[0].format, gx.texmap[0].width, gx.texmap[0].height, gx.texmap[0].tlut_name,
                 gx.texmap[0].tlut_name < 20 ? gx.tlut[gx.texmap[0].tlut_name].lut : NULL,
                 gx.texmap[0].tlut_name < 20 ? gx.tlut[gx.texmap[0].tlut_name].fmt : 0,
                 gx.texmap[0].tlut_name < 20 ? gx.tlut[gx.texmap[0].tlut_name].n_entries : 0, gx.num_chans, gx.num_texgen, gx.vp[0], gx.vp[1], gx.vp[2], gx.vp[3], gx.cull,
-                gx.z_enable, gx.z_func, gx.z_update, gx.blend_mode, gx.alpha_comp0, gx.alpha_ref0,
+                gx.z_enable, gx.z_func, gx.z_update, gx.blend_mode, gx.blend_src, gx.blend_dst, gx.alpha_comp0, gx.alpha_ref0,
                 gx.alpha_op, gx.alpha_comp1, gx.proj_type);
         {
             u32 st;
@@ -1817,6 +1891,11 @@ static void draw_stream_impl(u8 prim, u8 vat, const u8* stream, u32 nverts, int 
                     first_vertex.nrm[0], first_vertex.nrm[1], first_vertex.nrm[2],
                     first_vertex.col[0][0], first_vertex.col[0][1], first_vertex.col[0][2], g->col[0][0], g->col[0][1],
                     g->col[0][2]);
+            if (first_vertex.bnm[0] != 0.0f || first_vertex.bnm[1] != 0.0f || first_vertex.tan[0] != 0.0f) {
+                fprintf(stderr, "[gx]   v0 nbt: b=(%.3f %.3f %.3f) t=(%.3f %.3f %.3f) bump uv=(%.3f %.3f)\n",
+                        first_vertex.bnm[0], first_vertex.bnm[1], first_vertex.bnm[2], first_vertex.tan[0],
+                        first_vertex.tan[1], first_vertex.tan[2], g->tex[2][0], g->tex[2][1]);
+            }
         }
         if (gx.num_chans > 1) {
             const ChanCtrl* c = &gx.chan[1];
@@ -2148,8 +2227,17 @@ void GXClearVtxDesc(void)
     memset(gx.vcd, GX_NONE, sizeof(gx.vcd));
 }
 
+/* GX_VA_NBT is the normal attribute with nine components (normal, binormal,
+ * tangent): it shares the normal's descriptor, format and array, and sits
+ * between the position and the colours in the vertex stream */
+static GXAttr attr_alias(GXAttr attr)
+{
+    return attr == GX_VA_NBT ? GX_VA_NRM : attr;
+}
+
 void GXSetVtxDesc(GXAttr attr, GXAttrType type)
 {
+    attr = attr_alias(attr);
     if ((u32) attr < NUM_ATTR) {
         gx.vcd[attr] = (u8) type;
     }
@@ -2157,6 +2245,7 @@ void GXSetVtxDesc(GXAttr attr, GXAttrType type)
 
 void GXSetVtxAttrFmt(GXVtxFmt vtxfmt, GXAttr attr, GXCompCnt cnt, GXCompType type, u8 frac)
 {
+    attr = attr_alias(attr);
     if ((u32) vtxfmt < 8 && (u32) attr < NUM_ATTR) {
         VtxAttrFmt* f = &gx.vat[vtxfmt][attr];
         f->cnt = (u8) cnt;
@@ -2167,6 +2256,7 @@ void GXSetVtxAttrFmt(GXVtxFmt vtxfmt, GXAttr attr, GXCompCnt cnt, GXCompType typ
 
 void GXSetArray(GXAttr attr, const void* base_ptr, u8 stride)
 {
+    attr = attr_alias(attr);
     if ((u32) attr < NUM_ATTR) {
         gx.array_base[attr] = (const u8*) base_ptr;
         gx.array_stride[attr] = stride;

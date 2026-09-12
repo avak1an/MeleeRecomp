@@ -50,6 +50,7 @@ static void usage(void)
             "                  src/melee/gr/forward.h: 2 Fountain ... 11 Rainbow Cruise ... 31 Battlefield)\n"
             "  --item KIND@FRAME[:P]  spawn item KIND (number, see src/melee/it/forward.h)\n"
             "                  next to player P (default 1) at FRAME\n"
+            "  --profile       log where each frame's time goes every 300 frames\n"
             "  --trace A,B     turn on the MELEE_TRACE_A, MELEE_TRACE_B, ... logs (motion, cpu,\n"
             "                  css, anim, light, swap, archive) for a bug report with --log\n"
             "  --char N[,M]    port 1 plays character N (and port 2 starts on M) (CharacterKind:\n"
@@ -233,6 +234,8 @@ int main(int argc, char** argv)
             if (pc_config.volume > 100) {
                 pc_config.volume = 100;
             }
+        } else if (strcmp(argv[i], "--profile") == 0) {
+            _putenv_s("MELEE_GX_PROFILE", "1"); /* the renderer's frame-time breakdown, in the log */
         } else if (strcmp(argv[i], "--trace") == 0 && i + 1 < argc) {
             /* motion,cpu,... : the MELEE_TRACE_* switches from the command
              * line, for the launcher's extra options */

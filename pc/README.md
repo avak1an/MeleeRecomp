@@ -202,9 +202,10 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
 - `--screenshot-from N`: with `--screenshots`, start saving at frame N.
 - `MELEE_POKEMON=N`: every Poke Ball releases item kind N (165 Weezing);
   `MELEE_CPU_LEVEL=N`: ports 2-4 play at CPU level N.
-- `MELEE_GX_PROFILE=1`: every 300 frames, where the frame's wall time
-  went (vertex processing, shader and texture lookups, EFB copies, the
-  present, and the rest, which is the game logic and any pacing wait).
+- `MELEE_GX_PROFILE=1` (or `--profile`): every 300 frames, where the
+  frame's wall time went (vertex processing, shader and texture lookups,
+  EFB copies, the present, and the rest, which is the game logic and any
+  pacing wait).
 - `MELEE_GX_NOBLIT=1`: read EFB copies back through the CPU instead of
   blitting them on the GPU (for driver trouble); `MELEE_GX_NOSHADOW=1`
   skips the fighter shadow-map passes; `MELEE_TRACE_EFFECT=N` logs effect
@@ -241,9 +242,13 @@ every configuration, since the renderer transforms and lights every vertex
 on the CPU. The renderer also keeps the GL state it last applied (viewport,
 scissor, depth, blend, program, uniforms, vertex attributes) and only
 issues the calls whose values changed, and EFB copies are blitted on the
-GPU through a framebuffer object instead of being read back. Temple in a
-two-player match went from 13 ms to under 7 ms of work per frame on the
-development machine; before that it could not hold 60 frames per second
+GPU through a framebuffer object instead of being read back. The shader
+cache is looked up through a hash of the TEV/texgen key and the texture
+cache through a hash of the image pointer (a four-player match compares a
+thousand draws a frame against them; the linear searches were the largest
+single cost). Temple in a two-player match went from 13 ms to under 7 ms of
+work per frame on the development machine, a four-player Green Greens from
+14.5 to under 10; before that it could not hold 60 frames per second
 and the audio starved.
 
 The window starts at 640x480 (or `--scale` times that) and can be resized
@@ -792,7 +797,19 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   missing light).
 - `gx_render.c`: `GX_VA_NBT` vertices (items with environment maps: the
   capsule, the shells, the barrel) supply their normal; without it they
-  were lit by the ambient term only and looked grey and flat.
+  were lit by the ambient term only and looked grey and flat. `GX_VA_NBT`
+  is the normal attribute with nine components, so it shares the normal's
+  descriptor, format and array and sits between the position and the
+  colours in the vertex stream; read after the texture coordinates (its
+  own attribute number) the indices were garbage, the binormal and tangent
+  were random and the emboss stages subtracted a random amount of the red
+  bump map (the capsule came out olive instead of beige and pink).
+- `particle.c`: the particle bytecode's float operands (position, velocity,
+  size targets) are big-endian bytes and were assembled in stream order on
+  the little-endian host, so every one came out byte-reversed: a size of
+  6.0 read as a denormal and 5.2 as 2.7e23. Fox's Fire Fox charge sets its
+  flame sprites' size that way, and a sprite 1e23 units wide is the flat
+  yellow triangle that covered the screen during the move.
 - `mtx.c`: `MTXRotRad`, `MTXLightPerspective`, `MTXLightFrustum` and
   `MTXLightOrtho` were SDK stubs, so everything built from them had a zero
   matrix: the fighter shadow projections, the refraction texture matrix

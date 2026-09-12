@@ -657,10 +657,21 @@ s32 hsd_803991D8(HSD_Generator* gen, HSD_JObj* jobj, f32 force, f32 range)
 static inline void psReadFloat(u8** stream)
 {
     u8* p = *stream;
+#ifdef TARGET_PC
+    /* the bytecode's float operands are big-endian bytes; assembled in
+     * stream order on a little-endian host they came out reversed (a size
+     * of 6.0 read as a denormal, 5.2 as 2.7e23: the giant flat triangles
+     * over the screen during Fire Fox were particle quads that big) */
+    ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[3] = *p++;
+    ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[2] = *p++;
+    ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[1] = *p++;
+    ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[0] = *p++;
+#else
     ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[0] = *p++;
     ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[1] = *p++;
     ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[2] = *p++;
     ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[3] = *p++;
+#endif
     *stream = p;
 }
 
