@@ -18,6 +18,10 @@
 #include <sysdolphin/baselib/class.h>
 #include <sysdolphin/baselib/cobj.h>
 #include <sysdolphin/baselib/debug.h>
+#ifdef TARGET_PC
+#include <stdint.h>
+#include <stdlib.h>
+#endif
 #include <sysdolphin/baselib/dobj.h>
 #include <sysdolphin/baselib/memory.h>
 #include <sysdolphin/baselib/pobj.h>
@@ -432,6 +436,12 @@ void lbRefract_8002247C(HSD_CObj* cobj)
 
 void lbRefract_80022560(void)
 {
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_MOTION") != NULL && lbl_804336D0.refractionUserCount != 0) {
+        extern uint32_t pc_frame_count;
+        OSReport("[pc] frame %u: refraction screen copy (%d users)\n", pc_frame_count, lbl_804336D0.refractionUserCount);
+    }
+#endif
     if (lbl_804336D0.refractionUserCount != 0) {
         GXSetTexCopySrc(0, 0, 0x280, 0x1E0);
         GXSetTexCopyDst(0x140, 0xF0, 4, 1);
@@ -660,6 +670,12 @@ void lbRefract_80022998(HSD_MObj* mobj, u32 rendermode, s32 arg2)
 /// @brief Increment refraction effect user count.
 void lbRefract_80022BB8(void)
 {
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_MOTION") != NULL) {
+        extern uint32_t pc_frame_count;
+        OSReport("[pc] frame %u: refraction user added\n", pc_frame_count);
+    }
+#endif
     lbl_804336D0.refractionUserCount += 1;
 }
 

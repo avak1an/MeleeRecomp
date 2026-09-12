@@ -45,6 +45,10 @@ typedef struct TevStage {
     u8 coord, map, chan;      /* GXSetTevOrder */
     u8 kcsel, kasel;
     u8 ras_swap, tex_swap;
+    /* GXSetTevIndirect: the texture coordinate is offset by an indirect
+     * texture lookup (heat haze, water); ind_coord/ind_map are resolved
+     * from the indirect stage when the shader key is built */
+    u8 ind_on, ind_stage, ind_fmt, ind_bias, ind_mtx, ind_addprev, ind_coord, ind_map;
 } TevStage;
 
 typedef struct ChanCtrl {
@@ -88,6 +92,10 @@ static struct {
 
     TevStage tev[16];
     u8 num_tev, num_texgen, num_chans;
+    struct {
+        u8 coord, map;        /* GXSetIndTexOrder */
+    } ind_order[4];
+    float ind_mtx[4][2][3];   /* GXSetIndTexMtx, scaled by 2^scale_exp; [0] is GX_ITM_OFF */
     TexGen texgen[8];
     ChanCtrl chan[4];         /* COLOR0, COLOR1, ALPHA0, ALPHA1 */
     float mat_color[2][4], amb_color[2][4];
@@ -685,6 +693,7 @@ typedef struct CopyEntry {
     const void* dest;
     GLuint tex;
     u16 width, height;
+    int gl_w, gl_h; /* the texture's current storage (window pixels) */
 } CopyEntry;
 #define COPY_CACHE 32
 static CopyEntry copy_cache[COPY_CACHE];
@@ -1096,8 +1105,13 @@ typedef struct Shader {
     ShaderKey key;
     GLuint prog;
     GLint u_proj, u_tex[8], u_kcolor, u_tevreg, u_aref, u_fog, u_fogcolor;
+    GLint u_indmtx, u_texsize; /* -1 unless a stage uses indirect texturing */
+    float last_indmtx[18], last_texsize[16];
     GLint a_pos, a_col0, a_col1, a_tex[8];
     int used;
+    /* the uniform values last uploaded, so unchanged ones are skipped */
+    int uniforms_valid;
+    float last_proj[16], last_kcolor[16], last_tevreg[16], last_aref[4], last_fog[4], last_fogcolor[4];
 } Shader;
 
 #define MAX_SHADERS 256
@@ -1214,7 +1228,26 @@ static void emit_stage(const ShaderKey* k, int i)
 
     emit("    {\n");
     /* texture sample */
-    if (!debug_litonly && s->map < 8 && k->texmap_valid[s->map] && s->coord < 8) {
+    if (!debug_litonly && s->map < 8 && k->texmap_valid[s->map] && s->coord < 8 && s->ind_on &&
+        s->ind_map < 8 && k->texmap_valid[s->ind_map] && s->ind_coord < 8)
+    {
+        /* indirect texturing: the indirect texture's (a, b, g) are the
+         * (s, t, u) inputs, 8-bit values with an optional bias of -128,
+         * multiplied by the indirect matrix into an offset in texels of
+         * this stage's texture */
+        int b = s->ind_bias;
+        float full = s->ind_fmt == GX_ITF_8 ? 255.0f : s->ind_fmt == GX_ITF_5 ? 31.0f : s->ind_fmt == GX_ITF_4 ? 15.0f : 7.0f;
+        float bias = s->ind_fmt == GX_ITF_8 ? 128.0f : 1.0f;
+        emit("        vec3 indc = texture2D(u_tex%d, v_tex%d).abg * %.1f - vec3(%.1f, %.1f, %.1f);\n", s->ind_map,
+             s->ind_coord, full, (b & 1) ? bias : 0.0f, (b & 2) ? bias : 0.0f, (b & 4) ? bias : 0.0f);
+        if (s->ind_mtx >= 1 && s->ind_mtx <= 3) {
+            emit("        vec2 induv = v_tex%d + vec2(dot(u_indmtx[%d], indc), dot(u_indmtx[%d], indc)) / u_texsize[%d];\n",
+                 s->coord, (s->ind_mtx - 1) * 2, (s->ind_mtx - 1) * 2 + 1, s->map);
+        } else {
+            emit("        vec2 induv = v_tex%d;\n", s->coord);
+        }
+        emit("        tex = texture2D(u_tex%d, induv).%s;\n", s->map, swizzle_for(k->swap_table[s->tex_swap & 3]));
+    } else if (!debug_litonly && s->map < 8 && k->texmap_valid[s->map] && s->coord < 8) {
         emit("        tex = texture2D(u_tex%d, v_tex%d).%s;\n", s->map, s->coord,
              swizzle_for(k->swap_table[s->tex_swap & 3]));
     } else {
@@ -1342,6 +1375,10 @@ static Shader* get_shader(void)
     key.num_tev = gx.num_tev;
     for (i = 0; i < gx.num_tev; i++) {
         key.tev[i] = gx.tev[i];
+        if (key.tev[i].ind_on) {
+            key.tev[i].ind_coord = gx.ind_order[key.tev[i].ind_stage].coord;
+            key.tev[i].ind_map = gx.ind_order[key.tev[i].ind_stage].map;
+        }
     }
     key.alpha_comp0 = gx.alpha_comp0;
     key.alpha_op = gx.alpha_op;
@@ -1368,7 +1405,9 @@ static Shader* get_shader(void)
     for (i = 0; i < 8; i++) {
         emit("uniform sampler2D u_tex%d;\n", i);
     }
-    emit("uniform vec4 u_kcolor[4];\n"
+    emit("uniform vec3 u_indmtx[6];\n" /* GX_ITM_0..2, two rows each, scaled */
+         "uniform vec2 u_texsize[8];\n"
+         "uniform vec4 u_kcolor[4];\n"
          "uniform vec4 u_tevreg[4];\n"
          "uniform vec4 u_aref;\n"
          "uniform vec4 u_fog;\n" /* start, end, unused, unused */
@@ -1438,6 +1477,8 @@ static Shader* get_shader(void)
     sh->u_aref = pc_glGetUniformLocation(sh->prog, "u_aref");
     sh->u_fog = pc_glGetUniformLocation(sh->prog, "u_fog");
     sh->u_fogcolor = pc_glGetUniformLocation(sh->prog, "u_fogcolor");
+    sh->u_indmtx = pc_glGetUniformLocation(sh->prog, "u_indmtx");
+    sh->u_texsize = pc_glGetUniformLocation(sh->prog, "u_texsize");
     sh->a_pos = pc_glGetAttribLocation(sh->prog, "a_pos");
     sh->a_col0 = pc_glGetAttribLocation(sh->prog, "a_col0");
     sh->a_col1 = pc_glGetAttribLocation(sh->prog, "a_col1");
@@ -1454,68 +1495,130 @@ static Shader* get_shader(void)
 
 /* --- Drawing --------------------------------------------------------------- */
 
+/* The GL state last applied, so a draw only issues the calls whose
+ * values changed (a frame has a thousand draws and most of them share
+ * their state with the previous one). Anything that touches this state
+ * behind the cache's back (clears, copies, presents) resets `valid`. */
+static struct {
+    int valid;
+    GLint vp[4];
+    float depth_range[2];
+    GLint scissor[4];
+    int cull; /* -1 off, else the GL face */
+    int z_enable, z_func, z_update;
+    int color_update, alpha_update;
+    int blend_mode, blend_src, blend_dst, logic_op;
+} rs;
+static GLuint cur_prog;         /* the program in use */
+static Shader* attrib_shader;   /* whose vertex attributes are set up ... */
+static GLVertex* attrib_base;   /* ... for this vertex buffer */
+
 static void apply_raster_state(void)
 {
     int vx, vy, vw, vh;
     float sx, sy;
+    GLint vp[4], sc[4];
+    int cull;
     pc_window_viewport(&vx, &vy, &vw, &vh);
     sx = (float) vw / EFB_W;
     sy = (float) vh / EFB_H;
 
-    glViewport(vx + (GLint) (gx.vp[0] * sx), vy + (GLint) ((EFB_H - gx.vp[1] - gx.vp[3]) * sy),
-               (GLsizei) (gx.vp[2] * sx), (GLsizei) (gx.vp[3] * sy));
-    glDepthRange(gx.vp[4], gx.vp[5]);
-    glEnable(GL_SCISSOR_TEST);
-    glScissor(vx + (GLint) (gx.scissor[0] * sx),
-              vy + (GLint) ((EFB_H - (int) gx.scissor[1] - (int) gx.scissor[3]) * sy),
-              (GLsizei) (gx.scissor[2] * sx), (GLsizei) (gx.scissor[3] * sy));
-
-    if (gx.cull == GX_CULL_NONE || debug_nocull) {
-        glDisable(GL_CULL_FACE);
-    } else {
-        glEnable(GL_CULL_FACE);
-        glFrontFace(GL_CW);
-        glCullFace(gx.cull == GX_CULL_FRONT ? GL_FRONT : gx.cull == GX_CULL_BACK ? GL_BACK : GL_FRONT_AND_BACK);
+    vp[0] = vx + (GLint) (gx.vp[0] * sx);
+    vp[1] = vy + (GLint) ((EFB_H - gx.vp[1] - gx.vp[3]) * sy);
+    vp[2] = (GLint) (gx.vp[2] * sx);
+    vp[3] = (GLint) (gx.vp[3] * sy);
+    if (!rs.valid || memcmp(vp, rs.vp, sizeof(vp)) != 0) {
+        glViewport(vp[0], vp[1], (GLsizei) vp[2], (GLsizei) vp[3]);
+        memcpy(rs.vp, vp, sizeof(vp));
     }
-    if (gx.z_enable) {
+    if (!rs.valid || rs.depth_range[0] != gx.vp[4] || rs.depth_range[1] != gx.vp[5]) {
+        glDepthRange(gx.vp[4], gx.vp[5]);
+        rs.depth_range[0] = gx.vp[4];
+        rs.depth_range[1] = gx.vp[5];
+    }
+    sc[0] = vx + (GLint) (gx.scissor[0] * sx);
+    sc[1] = vy + (GLint) ((EFB_H - (int) gx.scissor[1] - (int) gx.scissor[3]) * sy);
+    sc[2] = (GLint) (gx.scissor[2] * sx);
+    sc[3] = (GLint) (gx.scissor[3] * sy);
+    if (!rs.valid || memcmp(sc, rs.scissor, sizeof(sc)) != 0) {
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(sc[0], sc[1], (GLsizei) sc[2], (GLsizei) sc[3]);
+        memcpy(rs.scissor, sc, sizeof(sc));
+    }
+
+    cull = (gx.cull == GX_CULL_NONE || debug_nocull) ? -1
+           : gx.cull == GX_CULL_FRONT                 ? GL_FRONT
+           : gx.cull == GX_CULL_BACK                  ? GL_BACK
+                                                      : GL_FRONT_AND_BACK;
+    if (!rs.valid || cull != rs.cull) {
+        if (cull < 0) {
+            glDisable(GL_CULL_FACE);
+        } else {
+            glEnable(GL_CULL_FACE);
+            glFrontFace(GL_CW);
+            glCullFace((GLenum) cull);
+        }
+        rs.cull = cull;
+    }
+    if (!rs.valid || rs.z_enable != gx.z_enable || rs.z_func != gx.z_func) {
         static const GLenum funcs[8] = { GL_NEVER, GL_LESS, GL_EQUAL, GL_LEQUAL,
                                          GL_GREATER, GL_NOTEQUAL, GL_GEQUAL, GL_ALWAYS };
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(funcs[gx.z_func & 7]);
-    } else {
-        glDisable(GL_DEPTH_TEST);
-    }
-    glDepthMask(gx.z_update ? GL_TRUE : GL_FALSE);
-    glColorMask(gx.color_update, gx.color_update, gx.color_update, gx.alpha_update);
-
-    if (gx.blend_mode == GX_BM_NONE) {
-        glDisable(GL_BLEND);
-        glDisable(GL_COLOR_LOGIC_OP);
-    } else if (gx.blend_mode == GX_BM_LOGIC) {
-        static const GLenum ops[16] = { GL_CLEAR, GL_AND, GL_AND_REVERSE, GL_COPY, GL_AND_INVERTED,
-                                        GL_NOOP, GL_XOR, GL_OR, GL_NOR, GL_EQUIV, GL_INVERT,
-                                        GL_OR_REVERSE, GL_COPY_INVERTED, GL_OR_INVERTED, GL_NAND, GL_SET };
-        glDisable(GL_BLEND);
-        glEnable(GL_COLOR_LOGIC_OP);
-        glLogicOp(ops[gx.logic_op & 15]);
-    } else {
-        static const GLenum factors[8] = { GL_ZERO, GL_ONE, GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR,
-                                           GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_DST_ALPHA,
-                                           GL_ONE_MINUS_DST_ALPHA };
-        GLenum src = factors[gx.blend_src & 7], dst = factors[gx.blend_dst & 7];
-        /* GX_BL_DSTCLR / INVDSTCLR share codes with SRCCLR for the source factor */
-        if (gx.blend_src == GX_BL_SRCCLR) src = GL_DST_COLOR;
-        if (gx.blend_src == GX_BL_INVSRCCLR) src = GL_ONE_MINUS_DST_COLOR;
-        glDisable(GL_COLOR_LOGIC_OP);
-        glEnable(GL_BLEND);
-        if (gx.blend_mode == GX_BM_SUBTRACT) {
-            pc_glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
-            glBlendFunc(GL_ONE, GL_ONE);
+        if (gx.z_enable) {
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(funcs[gx.z_func & 7]);
         } else {
-            pc_glBlendEquation(GL_FUNC_ADD);
-            glBlendFunc(src, dst);
+            glDisable(GL_DEPTH_TEST);
         }
+        rs.z_enable = gx.z_enable;
+        rs.z_func = gx.z_func;
     }
+    if (!rs.valid || rs.z_update != gx.z_update) {
+        glDepthMask(gx.z_update ? GL_TRUE : GL_FALSE);
+        rs.z_update = gx.z_update;
+    }
+    if (!rs.valid || rs.color_update != gx.color_update || rs.alpha_update != gx.alpha_update) {
+        glColorMask(gx.color_update, gx.color_update, gx.color_update, gx.alpha_update);
+        rs.color_update = gx.color_update;
+        rs.alpha_update = gx.alpha_update;
+    }
+
+    if (!rs.valid || rs.blend_mode != gx.blend_mode || rs.blend_src != gx.blend_src || rs.blend_dst != gx.blend_dst ||
+        rs.logic_op != gx.logic_op)
+    {
+        if (gx.blend_mode == GX_BM_NONE) {
+            glDisable(GL_BLEND);
+            glDisable(GL_COLOR_LOGIC_OP);
+        } else if (gx.blend_mode == GX_BM_LOGIC) {
+            static const GLenum ops[16] = { GL_CLEAR, GL_AND, GL_AND_REVERSE, GL_COPY, GL_AND_INVERTED,
+                                            GL_NOOP, GL_XOR, GL_OR, GL_NOR, GL_EQUIV, GL_INVERT,
+                                            GL_OR_REVERSE, GL_COPY_INVERTED, GL_OR_INVERTED, GL_NAND, GL_SET };
+            glDisable(GL_BLEND);
+            glEnable(GL_COLOR_LOGIC_OP);
+            glLogicOp(ops[gx.logic_op & 15]);
+        } else {
+            static const GLenum factors[8] = { GL_ZERO, GL_ONE, GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR,
+                                               GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_DST_ALPHA,
+                                               GL_ONE_MINUS_DST_ALPHA };
+            GLenum src = factors[gx.blend_src & 7], dst = factors[gx.blend_dst & 7];
+            /* GX_BL_DSTCLR / INVDSTCLR share codes with SRCCLR for the source factor */
+            if (gx.blend_src == GX_BL_SRCCLR) src = GL_DST_COLOR;
+            if (gx.blend_src == GX_BL_INVSRCCLR) src = GL_ONE_MINUS_DST_COLOR;
+            glDisable(GL_COLOR_LOGIC_OP);
+            glEnable(GL_BLEND);
+            if (gx.blend_mode == GX_BM_SUBTRACT) {
+                pc_glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
+                glBlendFunc(GL_ONE, GL_ONE);
+            } else {
+                pc_glBlendEquation(GL_FUNC_ADD);
+                glBlendFunc(src, dst);
+            }
+        }
+        rs.blend_mode = gx.blend_mode;
+        rs.blend_src = gx.blend_src;
+        rs.blend_dst = gx.blend_dst;
+        rs.logic_op = gx.logic_op;
+    }
+    rs.valid = 1;
 }
 
 static void ensure_capacity(u32 nverts)
@@ -1531,7 +1634,44 @@ static void ensure_capacity(u32 nverts)
 }
 
 /// Draw nverts vertices from a stream in the given byte order.
+/* MELEE_GX_PROFILE=1: where a frame's wall time goes, printed every 300
+ * frames (draws = vertex decode, transform, lighting and GL submission;
+ * shader and texture = the lookups within them; copy = EFB copies;
+ * present = the swap, which includes the vsync wait). */
+static double prof_ms[7]; /* frame, draws, shader, texture, copy, present, vertex decode+transform */
+static int prof_on = -1;
+
+static double prof_now(void)
+{
+    static LARGE_INTEGER freq;
+    LARGE_INTEGER now;
+    if (freq.QuadPart == 0) {
+        QueryPerformanceFrequency(&freq);
+    }
+    QueryPerformanceCounter(&now);
+    return (double) now.QuadPart * 1000.0 / (double) freq.QuadPart;
+}
+
+static void draw_stream_impl(u8 prim, u8 vat, const u8* stream, u32 nverts, int big);
+
 static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
+{
+    double t0 = prof_now();
+    {
+        /* MELEE_GX_NOSHADOW=1: skip the shadow-map passes (256x256 viewport) */
+        static int noshadow = -1;
+        if (noshadow < 0) {
+            noshadow = getenv("MELEE_GX_NOSHADOW") != NULL;
+        }
+        if (noshadow && gx.vp[2] == 256.0f && gx.vp[3] == 256.0f) {
+            return;
+        }
+    }
+    draw_stream_impl(prim, vat, stream, nverts, big);
+    prof_ms[1] += prof_now() - t0;
+}
+
+static void draw_stream_impl(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
 {
     Shader* sh;
     const u8* p = stream;
@@ -1547,13 +1687,71 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
         nverts = MAX_VERTS;
     }
     ensure_capacity(nverts);
-    for (i = 0; i < nverts; i++) {
-        Vertex v;
-        p = decode_vertex(p, vat, big, &v);
-        if (i == 0) {
-            first_vertex = v; /* for the draw log */
+    {
+        double t0 = prof_now();
+        for (i = 0; i < nverts; i++) {
+            Vertex v;
+            p = decode_vertex(p, vat, big, &v);
+            if (i == 0) {
+                first_vertex = v; /* for the draw log */
+            }
+            transform_vertex(&v, &glverts[i]);
         }
-        transform_vertex(&v, &glverts[i]);
+        prof_ms[6] += prof_now() - t0;
+    }
+    if ((debug_log && stats_draws < 8) || (debug_log_frame != 0 && pc_frame_count == debug_log_frame)) {
+        float lo[3] = { 1e30f, 1e30f, 1e30f }, hi[3] = { -1e30f, -1e30f, -1e30f };
+        int k;
+        for (i = 0; i < nverts; i++) {
+            for (k = 0; k < 3; k++) {
+                lo[k] = glverts[i].pos[k] < lo[k] ? glverts[i].pos[k] : lo[k];
+                hi[k] = glverts[i].pos[k] > hi[k] ? glverts[i].pos[k] : hi[k];
+            }
+        }
+        fprintf(stderr, "[gx]   bbox eye=(%.1f %.1f %.1f)..(%.1f %.1f %.1f)\n", lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]);
+        {
+            /* the same in EFB pixels (vertices in front of the camera) */
+            float slo[2] = { 1e30f, 1e30f }, shi[2] = { -1e30f, -1e30f };
+            int any = 0;
+            for (i = 0; i < nverts; i++) {
+                const float* pp = glverts[i].pos;
+                float cx = gx.proj[0][0] * pp[0] + gx.proj[0][1] * pp[1] + gx.proj[0][2] * pp[2] + gx.proj[0][3];
+                float cy = gx.proj[1][0] * pp[0] + gx.proj[1][1] * pp[1] + gx.proj[1][2] * pp[2] + gx.proj[1][3];
+                float cw = gx.proj[3][0] * pp[0] + gx.proj[3][1] * pp[1] + gx.proj[3][2] * pp[2] + gx.proj[3][3];
+                if (cw > 0.0f) {
+                    float x = gx.vp[0] + (cx / cw * 0.5f + 0.5f) * gx.vp[2];
+                    float y = gx.vp[1] + (0.5f - cy / cw * 0.5f) * gx.vp[3];
+                    slo[0] = x < slo[0] ? x : slo[0];
+                    shi[0] = x > shi[0] ? x : shi[0];
+                    slo[1] = y < slo[1] ? y : slo[1];
+                    shi[1] = y > shi[1] ? y : shi[1];
+                    any = 1;
+                }
+            }
+            if (any) {
+                fprintf(stderr, "[gx]   screen=(%.0f %.0f)..(%.0f %.0f)\n", slo[0], slo[1], shi[0], shi[1]);
+            }
+        }
+        if (gx.vcd[GX_VA_PNMTXIDX] != GX_NONE) {
+            /* per-vertex position matrices: which slots, and their contents */
+            u32 used = 0;
+            const u8* q = stream;
+            for (i = 0; i < nverts; i++) {
+                Vertex v;
+                q = decode_vertex(q, vat, big, &v);
+                if (v.pnmtx / 3 < 32) {
+                    used |= 1u << (v.pnmtx / 3);
+                }
+            }
+            for (k = 0; k < 32; k++) {
+                if (used & (1u << k)) {
+                    fprintf(stderr, "[gx]   pnmtx %d: [%.2f %.2f %.2f %.2f] [%.2f %.2f %.2f %.2f] [%.2f %.2f %.2f %.2f]\n", k * 3,
+                            gx.mtx[k * 3][0], gx.mtx[k * 3][1], gx.mtx[k * 3][2], gx.mtx[k * 3][3], gx.mtx[k * 3 + 1][0],
+                            gx.mtx[k * 3 + 1][1], gx.mtx[k * 3 + 1][2], gx.mtx[k * 3 + 1][3], gx.mtx[k * 3 + 2][0],
+                            gx.mtx[k * 3 + 2][1], gx.mtx[k * 3 + 2][2], gx.mtx[k * 3 + 2][3]);
+                }
+            }
+        }
     }
     if (pc_debug_in_fighter) {
         fighter_draws++;
@@ -1675,8 +1873,23 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
     }
 
     apply_raster_state();
-    sh = get_shader();
-    pc_glUseProgram(sh->prog);
+    {
+        double t0 = prof_now();
+        sh = get_shader();
+        prof_ms[2] += prof_now() - t0;
+    }
+    if (sh->prog != cur_prog) {
+        pc_glUseProgram(sh->prog);
+        cur_prog = sh->prog;
+        if (!sh->uniforms_valid) {
+            /* the sampler units never change */
+            for (t = 0; t < 8; t++) {
+                if (sh->u_tex[t] >= 0) {
+                    pc_glUniform1i(sh->u_tex[t], t);
+                }
+            }
+        }
+    }
 
     /* projection, column-major for GL */
     for (i = 0; i < 4; i++) {
@@ -1685,44 +1898,102 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
         proj[i * 4 + 2] = gx.proj[2][i];
         proj[i * 4 + 3] = gx.proj[3][i];
     }
-    pc_glUniformMatrix4fv(sh->u_proj, 1, GL_FALSE, proj);
-    pc_glUniform4fv(sh->u_kcolor, 4, &gx.kcolor[0][0]);
-    pc_glUniform4fv(sh->u_tevreg, 4, &gx.tev_reg[0][0]);
+    if (!sh->uniforms_valid || memcmp(proj, sh->last_proj, sizeof(proj)) != 0) {
+        pc_glUniformMatrix4fv(sh->u_proj, 1, GL_FALSE, proj);
+        memcpy(sh->last_proj, proj, sizeof(proj));
+    }
+    if (!sh->uniforms_valid || memcmp(&gx.kcolor[0][0], sh->last_kcolor, sizeof(sh->last_kcolor)) != 0) {
+        pc_glUniform4fv(sh->u_kcolor, 4, &gx.kcolor[0][0]);
+        memcpy(sh->last_kcolor, &gx.kcolor[0][0], sizeof(sh->last_kcolor));
+    }
+    if (!sh->uniforms_valid || memcmp(&gx.tev_reg[0][0], sh->last_tevreg, sizeof(sh->last_tevreg)) != 0) {
+        pc_glUniform4fv(sh->u_tevreg, 4, &gx.tev_reg[0][0]);
+        memcpy(sh->last_tevreg, &gx.tev_reg[0][0], sizeof(sh->last_tevreg));
+    }
     {
         float aref[4] = { gx.alpha_ref0 / 255.0f, gx.alpha_ref1 / 255.0f, 0, 0 };
-        pc_glUniform4fv(sh->u_aref, 1, aref);
+        if (!sh->uniforms_valid || memcmp(aref, sh->last_aref, sizeof(aref)) != 0) {
+            pc_glUniform4fv(sh->u_aref, 1, aref);
+            memcpy(sh->last_aref, aref, sizeof(aref));
+        }
     }
     if (sh->key.fog_type != GX_FOG_NONE) {
         float fog[4] = { gx.fog_start, gx.fog_end, gx.fog_near, gx.fog_far };
-        pc_glUniform4fv(sh->u_fog, 1, fog);
-        pc_glUniform4fv(sh->u_fogcolor, 1, gx.fog_color);
+        if (!sh->uniforms_valid || memcmp(fog, sh->last_fog, sizeof(fog)) != 0) {
+            pc_glUniform4fv(sh->u_fog, 1, fog);
+            memcpy(sh->last_fog, fog, sizeof(fog));
+        }
+        if (!sh->uniforms_valid || memcmp(gx.fog_color, sh->last_fogcolor, sizeof(sh->last_fogcolor)) != 0) {
+            pc_glUniform4fv(sh->u_fogcolor, 1, gx.fog_color);
+            memcpy(sh->last_fogcolor, gx.fog_color, sizeof(sh->last_fogcolor));
+        }
     }
+    if (sh->u_indmtx >= 0) {
+        float m[18];
+        for (i = 0; i < 3; i++) {
+            memcpy(m + i * 6, gx.ind_mtx[i + 1][0], 3 * sizeof(float));
+            memcpy(m + i * 6 + 3, gx.ind_mtx[i + 1][1], 3 * sizeof(float));
+        }
+        if (!sh->uniforms_valid || memcmp(m, sh->last_indmtx, sizeof(m)) != 0) {
+            pc_glUniform3fv(sh->u_indmtx, 6, m);
+            memcpy(sh->last_indmtx, m, sizeof(m));
+        }
+    }
+    if (sh->u_texsize >= 0) {
+        float ts[16];
+        for (t = 0; t < 8; t++) {
+            ts[t * 2] = gx.texmap[t].width > 0 ? (float) gx.texmap[t].width : 1.0f;
+            ts[t * 2 + 1] = gx.texmap[t].height > 0 ? (float) gx.texmap[t].height : 1.0f;
+        }
+        if (!sh->uniforms_valid || memcmp(ts, sh->last_texsize, sizeof(ts)) != 0) {
+            pc_glUniform2fv(sh->u_texsize, 8, ts);
+            memcpy(sh->last_texsize, ts, sizeof(ts));
+        }
+    }
+    sh->uniforms_valid = 1;
     for (t = 0; t < 8; t++) {
         if (sh->u_tex[t] >= 0 && gx.texmap[t].image != NULL) {
+            double t0 = prof_now();
             pc_glActiveTexture(GL_TEXTURE0 + t);
             bind_texture(&gx.texmap[t]);
-            pc_glUniform1i(sh->u_tex[t], t);
+            prof_ms[3] += prof_now() - t0;
         }
     }
     pc_glActiveTexture(GL_TEXTURE0);
 
-    if (sh->a_pos >= 0) {
-        pc_glEnableVertexAttribArray(sh->a_pos);
-        pc_glVertexAttribPointer(sh->a_pos, 3, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].pos);
-    }
-    if (sh->a_col0 >= 0) {
-        pc_glEnableVertexAttribArray(sh->a_col0);
-        pc_glVertexAttribPointer(sh->a_col0, 4, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].col[0]);
-    }
-    if (sh->a_col1 >= 0) {
-        pc_glEnableVertexAttribArray(sh->a_col1);
-        pc_glVertexAttribPointer(sh->a_col1, 4, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].col[1]);
-    }
-    for (t = 0; t < 8; t++) {
-        if (sh->a_tex[t] >= 0) {
-            pc_glEnableVertexAttribArray(sh->a_tex[t]);
-            pc_glVertexAttribPointer(sh->a_tex[t], 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].tex[t]);
+    if (sh != attrib_shader || glverts != attrib_base) {
+        /* the vertex layout is fixed; only the attribute locations depend
+         * on the program and the pointers on the (rarely reallocated)
+         * vertex buffer */
+        Shader* old = attrib_shader;
+        if (old != NULL) {
+            if (old->a_pos >= 0) pc_glDisableVertexAttribArray(old->a_pos);
+            if (old->a_col0 >= 0) pc_glDisableVertexAttribArray(old->a_col0);
+            if (old->a_col1 >= 0) pc_glDisableVertexAttribArray(old->a_col1);
+            for (t = 0; t < 8; t++) {
+                if (old->a_tex[t] >= 0) pc_glDisableVertexAttribArray(old->a_tex[t]);
+            }
         }
+        if (sh->a_pos >= 0) {
+            pc_glEnableVertexAttribArray(sh->a_pos);
+            pc_glVertexAttribPointer(sh->a_pos, 3, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].pos);
+        }
+        if (sh->a_col0 >= 0) {
+            pc_glEnableVertexAttribArray(sh->a_col0);
+            pc_glVertexAttribPointer(sh->a_col0, 4, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].col[0]);
+        }
+        if (sh->a_col1 >= 0) {
+            pc_glEnableVertexAttribArray(sh->a_col1);
+            pc_glVertexAttribPointer(sh->a_col1, 4, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].col[1]);
+        }
+        for (t = 0; t < 8; t++) {
+            if (sh->a_tex[t] >= 0) {
+                pc_glEnableVertexAttribArray(sh->a_tex[t]);
+                pc_glVertexAttribPointer(sh->a_tex[t], 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].tex[t]);
+            }
+        }
+        attrib_shader = sh;
+        attrib_base = glverts;
     }
 
     switch (prim) {
@@ -1750,12 +2021,6 @@ static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
     }
     if (mode != 0) {
         glDrawArrays(mode, 0, (GLsizei) nverts);
-    }
-    if (sh->a_pos >= 0) pc_glDisableVertexAttribArray(sh->a_pos);
-    if (sh->a_col0 >= 0) pc_glDisableVertexAttribArray(sh->a_col0);
-    if (sh->a_col1 >= 0) pc_glDisableVertexAttribArray(sh->a_col1);
-    for (t = 0; t < 8; t++) {
-        if (sh->a_tex[t] >= 0) pc_glDisableVertexAttribArray(sh->a_tex[t]);
     }
     stats_draws++;
     stats_verts += nverts;
@@ -1977,6 +2242,9 @@ void GXGetProjectionv(f32* p)
 
 void GXSetViewport(f32 left, f32 top, f32 wd, f32 ht, f32 nearz, f32 farz)
 {
+    if (debug_log_frame != 0 && pc_frame_count == debug_log_frame) {
+        fprintf(stderr, "[gx] GXSetViewport (%.0f %.0f %.0f %.0f)\n", left, top, wd, ht);
+    }
     gx.vp[0] = left;
     gx.vp[1] = top;
     gx.vp[2] = wd;
@@ -2274,19 +2542,49 @@ void GXSetTevClampMode(int stage, int mode)
 
 void GXSetTevDirect(GXTevStageID tev_stage)
 {
-    (void) tev_stage;
+    TevStage* t = &gx.tev[tev_stage & 15];
+    t->ind_on = 0;
+    t->ind_stage = t->ind_fmt = t->ind_bias = t->ind_mtx = t->ind_addprev = 0;
+    t->ind_coord = t->ind_map = 0xFF;
 }
 
 void GXSetTevIndirect(GXTevStageID tev_stage, GXIndTexStageID ind_stage, GXIndTexFormat format, GXIndTexBiasSel bias_sel, GXIndTexMtxID matrix_sel, GXIndTexWrap wrap_s, GXIndTexWrap wrap_t, GXBool add_prev, GXBool utc_lod, GXIndTexAlphaSel alpha_sel)
 {
-    (void) tev_stage; (void) ind_stage; (void) format; (void) bias_sel; (void) matrix_sel;
-    (void) wrap_s; (void) wrap_t; (void) add_prev; (void) utc_lod; (void) alpha_sel;
+    TevStage* t = &gx.tev[tev_stage & 15];
+    (void) wrap_s; (void) wrap_t; (void) utc_lod; (void) alpha_sel;
+    t->ind_on = 1;
+    t->ind_stage = (u8) (ind_stage & 3);
+    t->ind_fmt = (u8) format;
+    t->ind_bias = (u8) bias_sel;
+    /* only the static matrices; the dynamic S/T ones fall back to none */
+    t->ind_mtx = matrix_sel >= GX_ITM_0 && matrix_sel <= GX_ITM_2 ? (u8) matrix_sel : 0;
+    t->ind_addprev = (u8) (add_prev != 0);
+    t->ind_coord = t->ind_map = 0xFF;
 }
 
 void GXSetNumIndStages(u8 n) { (void) n; }
-void GXSetIndTexOrder(GXIndTexStageID s, GXTexCoordID c, GXTexMapID m) { (void) s; (void) c; (void) m; }
+
+void GXSetIndTexOrder(GXIndTexStageID s, GXTexCoordID c, GXTexMapID m)
+{
+    gx.ind_order[s & 3].coord = (u8) c;
+    gx.ind_order[s & 3].map = (u8) m;
+}
+
 void GXSetIndTexCoordScale(GXIndTexStageID s, GXIndTexScale a, GXIndTexScale b) { (void) s; (void) a; (void) b; }
-void GXSetIndTexMtx(GXIndTexMtxID id, f32 offset[2][3], s8 scale_exp) { (void) id; (void) offset; (void) scale_exp; }
+
+void GXSetIndTexMtx(GXIndTexMtxID id, f32 offset[2][3], s8 scale_exp)
+{
+    float k = scale_exp >= 0 ? (float) (1 << scale_exp) : 1.0f / (float) (1 << -scale_exp);
+    int r, c;
+    if (id < GX_ITM_0 || id > GX_ITM_2) {
+        return;
+    }
+    for (r = 0; r < 2; r++) {
+        for (c = 0; c < 3; c++) {
+            gx.ind_mtx[id][r][c] = offset[r][c] * k;
+        }
+    }
+}
 
 /* --- Texture coordinate generation and channels ------------------------- */
 
@@ -2478,6 +2776,11 @@ void DCFlushRange(void* addr, u32 nBytes)
 
 static void do_clear(void)
 {
+    if (debug_log_frame != 0 && pc_frame_count == debug_log_frame) {
+        fprintf(stderr, "[gx] clear color %02x%02x%02x%02x z %06x scissor=(%u %u %u %u)\n", gx.clear_color.r, gx.clear_color.g,
+                gx.clear_color.b, gx.clear_color.a, gx.clear_z, gx.scissor[0], gx.scissor[1], gx.scissor[2], gx.scissor[3]);
+    }
+    rs.valid = 0;
     glDisable(GL_SCISSOR_TEST);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glDepthMask(GL_TRUE);
@@ -2543,12 +2846,36 @@ void GXCopyDisp(void* dest, GXBool clear)
         return;
     }
     imm_flush();
+    if (debug_log_frame != 0 && pc_frame_count == debug_log_frame) {
+        fprintf(stderr, "[gx] GXCopyDisp clear=%d (present)\n", (int) clear);
+    }
     if (pc_config.screenshot_dir != NULL && pc_config.screenshot_every > 0 && frame_no >= (u32) pc_config.screenshot_from &&
         (frame_no - (u32) pc_config.screenshot_from) % (u32) pc_config.screenshot_every == 0)
     {
         save_screenshot();
     }
-    pc_window_present();
+    {
+        static double frame_start;
+        double t0 = prof_now(), t1;
+        pc_window_present();
+        t1 = prof_now();
+        prof_ms[5] += t1 - t0;
+        if (prof_on < 0) {
+            prof_on = getenv("MELEE_GX_PROFILE") != NULL;
+        }
+        if (frame_start != 0.0) {
+            prof_ms[0] += t1 - frame_start;
+        }
+        frame_start = t1;
+        if (prof_on && frame_no % 300 == 299) {
+            fprintf(stderr,
+                    "[gx] profile over %u frames: frame %.2f ms = draws %.2f (vertices %.2f, shader %.2f, texture %.2f) + "
+                    "copy %.2f + present %.2f + rest %.2f\n",
+                    300u, prof_ms[0] / 300, prof_ms[1] / 300, prof_ms[6] / 300, prof_ms[2] / 300, prof_ms[3] / 300,
+                    prof_ms[4] / 300, prof_ms[5] / 300, (prof_ms[0] - prof_ms[1] - prof_ms[4] - prof_ms[5]) / 300);
+            memset(prof_ms, 0, sizeof(prof_ms));
+        }
+    }
     frame_no++;
     if (clear) {
         do_clear();
@@ -2597,6 +2924,11 @@ void GXCopyTex(void* dest, GXBool clear)
         slot = 0;
     }
     e = &copy_cache[slot];
+    if (debug_log_frame != 0 && pc_frame_count == debug_log_frame) {
+        fprintf(stderr, "[gx] GXCopyTex dest=%p src=(%u %u %u %u) dst=%ux%u clear=%d vp=(%.0f %.0f %.0f %.0f)\n", dest,
+                tex_copy.left, tex_copy.top, tex_copy.wd, tex_copy.ht, (unsigned) tex_copy.wd, (unsigned) tex_copy.ht, (int) clear,
+                gx.vp[0], gx.vp[1], gx.vp[2], gx.vp[3]);
+    }
     if (e->tex == 0) {
         glGenTextures(1, &e->tex);
     }
@@ -2618,7 +2950,34 @@ void GXCopyTex(void* dest, GXBool clear)
         static u8* buf;
         static size_t cap;
         size_t row = (size_t) rw * 4, need = row * (size_t) rh;
-        if (rw > 0 && rh > 0) {
+        static int noblit = -1;
+        if (noblit < 0) {
+            noblit = getenv("MELEE_GX_NOBLIT") != NULL; /* the readback path instead */
+        }
+        if (rw > 0 && rh > 0 && !noblit && pc_glBlitFramebuffer != NULL && pc_glGenFramebuffers != NULL) {
+            /* blit into the texture through a framebuffer object, flipped
+             * on the way; no readback, no stall */
+            static GLuint fbo;
+            double t0 = prof_now();
+            if (fbo == 0) {
+                pc_glGenFramebuffers(1, &fbo);
+            }
+            glBindTexture(GL_TEXTURE_2D, e->tex);
+            if (e->gl_w != rw || e->gl_h != rh) {
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rw, rh, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+                e->gl_w = rw;
+                e->gl_h = rh;
+            }
+            pc_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+            pc_glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, e->tex, 0);
+            pc_glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+            glDisable(GL_SCISSOR_TEST);
+            pc_glBlitFramebuffer(rx, ry, rx + rw, ry + rh, 0, rh, rw, 0, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            pc_glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            rs.valid = 0;
+            prof_ms[4] += prof_now() - t0;
+        } else if (rw > 0 && rh > 0) {
+            e->gl_w = e->gl_h = 0;
             if (need > cap) {
                 free(buf);
                 buf = (u8*) malloc(need);
@@ -2626,8 +2985,10 @@ void GXCopyTex(void* dest, GXBool clear)
             }
             if (buf != NULL) {
                 GLsizei y;
+                double t0 = prof_now();
                 glPixelStorei(GL_PACK_ALIGNMENT, 1);
                 glReadPixels(rx, ry, rw, rh, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+                prof_ms[4] += prof_now() - t0;
                 for (y = 0; y < rh / 2; y++) {
                     u8* a = buf + (size_t) y * row;
                     u8* b = buf + (size_t) (rh - 1 - y) * row;

@@ -30,10 +30,6 @@ MCCOpen
 MCCRead
 MCCStreamOpen
 MCCWrite
-MTXLightFrustum
-MTXLightOrtho
-MTXLightPerspective
-MTXRotRad
 OSCheckActiveThreads
 OSClearContext
 OSGetResetCode

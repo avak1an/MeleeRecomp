@@ -46,6 +46,8 @@ typedef GLint(APIENTRY* PFN_glGetAttribLocation)(GLuint, const GLchar*);
 typedef void(APIENTRY* PFN_glUniform1i)(GLint, GLint);
 typedef void(APIENTRY* PFN_glUniform1f)(GLint, GLfloat);
 typedef void(APIENTRY* PFN_glUniform4fv)(GLint, GLsizei, const GLfloat*);
+typedef void(APIENTRY* PFN_glUniform3fv)(GLint, GLsizei, const GLfloat*);
+typedef void(APIENTRY* PFN_glUniform2fv)(GLint, GLsizei, const GLfloat*);
 typedef void(APIENTRY* PFN_glUniformMatrix4fv)(GLint, GLsizei, GLboolean, const GLfloat*);
 typedef void(APIENTRY* PFN_glEnableVertexAttribArray)(GLuint);
 typedef void(APIENTRY* PFN_glDisableVertexAttribArray)(GLuint);
@@ -53,6 +55,16 @@ typedef void(APIENTRY* PFN_glVertexAttribPointer)(GLuint, GLint, GLenum, GLboole
 typedef void(APIENTRY* PFN_glActiveTexture)(GLenum);
 typedef void(APIENTRY* PFN_glBlendEquation)(GLenum);
 typedef void(APIENTRY* PFN_glGenerateMipmap)(GLenum);
+typedef void(APIENTRY* PFN_glGenFramebuffers)(GLsizei, GLuint*);
+typedef void(APIENTRY* PFN_glBindFramebuffer)(GLenum, GLuint);
+typedef void(APIENTRY* PFN_glFramebufferTexture2D)(GLenum, GLenum, GLenum, GLuint, GLint);
+typedef void(APIENTRY* PFN_glBlitFramebuffer)(GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum);
+typedef GLenum(APIENTRY* PFN_glCheckFramebufferStatus)(GLenum);
+#define GL_FRAMEBUFFER 0x8D40
+#define GL_READ_FRAMEBUFFER 0x8CA8
+#define GL_DRAW_FRAMEBUFFER 0x8CA9
+#define GL_COLOR_ATTACHMENT0 0x8CE0
+#define GL_FRAMEBUFFER_COMPLETE 0x8CD5
 typedef BOOL(APIENTRY* PFN_wglSwapIntervalEXT)(int);
 
 extern PFN_glCreateShader pc_glCreateShader;
@@ -72,6 +84,8 @@ extern PFN_glGetAttribLocation pc_glGetAttribLocation;
 extern PFN_glUniform1i pc_glUniform1i;
 extern PFN_glUniform1f pc_glUniform1f;
 extern PFN_glUniform4fv pc_glUniform4fv;
+extern PFN_glUniform3fv pc_glUniform3fv;
+extern PFN_glUniform2fv pc_glUniform2fv;
 extern PFN_glUniformMatrix4fv pc_glUniformMatrix4fv;
 extern PFN_glEnableVertexAttribArray pc_glEnableVertexAttribArray;
 extern PFN_glDisableVertexAttribArray pc_glDisableVertexAttribArray;
@@ -79,6 +93,11 @@ extern PFN_glVertexAttribPointer pc_glVertexAttribPointer;
 extern PFN_glActiveTexture pc_glActiveTexture;
 extern PFN_glBlendEquation pc_glBlendEquation;
 extern PFN_glGenerateMipmap pc_glGenerateMipmap;
+extern PFN_glGenFramebuffers pc_glGenFramebuffers;
+extern PFN_glBindFramebuffer pc_glBindFramebuffer;
+extern PFN_glFramebufferTexture2D pc_glFramebufferTexture2D;
+extern PFN_glBlitFramebuffer pc_glBlitFramebuffer;
+extern PFN_glCheckFramebufferStatus pc_glCheckFramebufferStatus;
 
 /// Create the window and GL context. Returns false (after printing why)
 /// when no context can be made; the runtime then keeps running headless.

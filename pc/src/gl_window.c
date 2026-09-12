@@ -25,6 +25,8 @@ PFN_glGetAttribLocation pc_glGetAttribLocation;
 PFN_glUniform1i pc_glUniform1i;
 PFN_glUniform1f pc_glUniform1f;
 PFN_glUniform4fv pc_glUniform4fv;
+PFN_glUniform3fv pc_glUniform3fv;
+PFN_glUniform2fv pc_glUniform2fv;
 PFN_glUniformMatrix4fv pc_glUniformMatrix4fv;
 PFN_glEnableVertexAttribArray pc_glEnableVertexAttribArray;
 PFN_glDisableVertexAttribArray pc_glDisableVertexAttribArray;
@@ -32,6 +34,11 @@ PFN_glVertexAttribPointer pc_glVertexAttribPointer;
 PFN_glActiveTexture pc_glActiveTexture;
 PFN_glBlendEquation pc_glBlendEquation;
 PFN_glGenerateMipmap pc_glGenerateMipmap;
+PFN_glGenFramebuffers pc_glGenFramebuffers;
+PFN_glBindFramebuffer pc_glBindFramebuffer;
+PFN_glFramebufferTexture2D pc_glFramebufferTexture2D;
+PFN_glBlitFramebuffer pc_glBlitFramebuffer;
+PFN_glCheckFramebufferStatus pc_glCheckFramebufferStatus;
 
 static HWND hwnd;
 static HDC hdc;
@@ -201,6 +208,8 @@ int pc_window_open(int width, int height, const char* title)
     LOAD(glUniform1i);
     LOAD(glUniform1f);
     LOAD(glUniform4fv);
+    LOAD(glUniform3fv);
+    LOAD(glUniform2fv);
     LOAD(glUniformMatrix4fv);
     LOAD(glEnableVertexAttribArray);
     LOAD(glDisableVertexAttribArray);
@@ -208,6 +217,13 @@ int pc_window_open(int width, int height, const char* title)
     LOAD(glActiveTexture);
     LOAD(glBlendEquation);
     LOAD(glGenerateMipmap);
+    /* optional (OpenGL 3.0): the EFB copy blits on the GPU with them and
+     * reads the pixels back without */
+    LOAD(glGenFramebuffers);
+    LOAD(glBindFramebuffer);
+    LOAD(glFramebufferTexture2D);
+    LOAD(glBlitFramebuffer);
+    LOAD(glCheckFramebufferStatus);
     if (pc_glCreateShader == NULL || pc_glVertexAttribPointer == NULL) {
         fprintf(stderr, "[pc] GL: the driver does not provide OpenGL 2.0\n");
         return 0;

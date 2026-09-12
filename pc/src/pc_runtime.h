@@ -30,6 +30,7 @@ typedef struct PCConfig {
     int item_frame; /* --item: frame */       ///< N for the above (default 60)
     int item_slot;  /* --item: player slot the item appears next to (0 = player 1) */
     int p1_char;    /* --char: CharacterKind forced on port 1 at the character select (-1 = off) */
+    int p2_char;    /* --char N,M: port 2's character when the select screen opens */
     const char* iso;     ///< path of the disc image (NULL = auto-detect)
     const char* save_dir; ///< memory card files (NULL = "saves")
     bool quiet_stubs;    ///< --quiet-stubs: also silences informational prints

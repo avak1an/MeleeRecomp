@@ -8,6 +8,13 @@
  */
 #include "eflib.h"
 #ifdef TARGET_PC
+#include <stdlib.h>
+#ifdef TARGET_PC
+static HSD_JObj* pc_trace_effect_jobj;
+static int pc_trace_effect_frames;
+#endif
+#endif
+#ifdef TARGET_PC
 #include <pc_endian.h>
 #include <pc_hsd_swap.h>
 #endif
@@ -429,6 +436,19 @@ void efLib_Update(HSD_GObj* gobj)
         }
     }
     HSD_JObjAnimAll(jobj);
+#ifdef TARGET_PC
+    if (jobj == pc_trace_effect_jobj && pc_trace_effect_frames++ < 40) {
+        HSD_JObj* j = jobj;
+        int depth = 0;
+        while (j != NULL && depth < 4) {
+            OSReport("[pc]   effect jobj %p frame %g: scale (%g %g %g) pos (%g %g %g)\n", (void*) j,
+                     j->aobj != NULL ? j->aobj->curr_frame : -1.0f, j->scale.x, j->scale.y, j->scale.z, j->translate.x,
+                     j->translate.y, j->translate.z);
+            j = j->child != NULL ? j->child : j->next;
+            depth++;
+        }
+    }
+#endif
     if (effect->update != NULL) {
         effect->update(effect);
     }
@@ -512,6 +532,22 @@ EF_Effect* efLib_Create(int gfx_id, HSD_GObj* parent_gobj)
             HSD_GObjPLink_80390228(effect->gobj);
             return NULL;
         }
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_EFFECT") != NULL && gfx_id == atoi(getenv("MELEE_TRACE_EFFECT"))) {
+            HSD_Joint* j = desc->model_desc.joint;
+            int depth = 0;
+            OSReport("[pc] effect %d: lifetime %g anim %p matanim %p\n", gfx_id, desc->lifetime, (void*) desc->model_desc.animjoint,
+                     (void*) desc->model_desc.matanim_joint);
+            while (j != NULL && depth < 6) {
+                OSReport("[pc]   joint desc %p: flags %08x scale (%g %g %g) rot (%g %g %g) pos (%g %g %g)\n", (void*) j,
+                         (unsigned) j->flags, j->scale.x, j->scale.y, j->scale.z, j->rotation.x, j->rotation.y,
+                         j->rotation.z, j->position.x, j->position.y, j->position.z);
+                j = j->child != NULL ? j->child : j->next;
+                depth++;
+            }
+            pc_trace_effect_jobj = jobj;
+        }
+#endif
         {
             u8 kind = HSD_GObj_JObjKind;
             HSD_GObjObject_80390A70(effect->gobj, kind, jobj);
@@ -630,6 +666,14 @@ EF_Effect* efLib_Create_Attach_Scale_FacingDir(u32 gfx_id, HSD_GObj* gobj,
     if (effect != NULL) {
         Vec3 scale;
         HSD_JObjGetScale(GET_JOBJ(gobj), &scale);
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_MOTION") != NULL) {
+            Vec3 es;
+            HSD_JObjGetScale(GET_JOBJ(effect->gobj), &es);
+            OSReport("[pc] effect %u attached with scale: fighter root (%g %g %g), effect model (%g %g %g)\n", gfx_id,
+                     scale.x, scale.y, scale.z, es.x, es.y, es.z);
+        }
+#endif
         scale.x = scale.z = scale.y;
         HSD_JObjSetScale(GET_JOBJ(effect->gobj), &scale);
     }

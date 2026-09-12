@@ -27,6 +27,13 @@ set(GAME_VERSION GALE01)
 # code relies on behaviour those checks flag, such as reading a local the
 # console left as zero, so they are removed.
 string(REPLACE "/RTC1" "" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+# The decompiled game code is built unoptimized (it does not survive /O2:
+# the console left behaviour the optimizer is free to break), but the PC
+# runtime is plain C and the renderer transforms every vertex on the CPU,
+# so those sources get /O2 in every configuration. /Od is dropped from the
+# Debug flags and put back per source so the two do not conflict.
+string(REPLACE "/Od" "" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
+string(REPLACE "/Ob0" "" CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
 
 # --- Sources ----------------------------------------------------------------
 # Game and engine: everything the GameCube build links, minus the few units
@@ -44,6 +51,8 @@ set(SDK_SOURCES
 
 # PC runtime: hand-written replacements for the SDK plus generated stubs.
 file(GLOB PC_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c)
+set_source_files_properties(${MELEE_SOURCES} ${HSD_SOURCES} ${SDK_SOURCES} PROPERTIES COMPILE_OPTIONS "/Od;/Ob0")
+set_source_files_properties(${PC_SOURCES} PROPERTIES COMPILE_OPTIONS "/O2")
 set(PC_GENERATED ${CMAKE_CURRENT_SOURCE_DIR}/generated/stubs.c
                  ${CMAKE_CURRENT_SOURCE_DIR}/generated/yakumono_swap.c)
 

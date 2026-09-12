@@ -222,3 +222,88 @@ void PSVECCrossProduct(Vec* a, Vec* b, Vec* axb)
     t.z = a->x * b->y - a->y * b->x;
     *axb = t;
 }
+
+/* --- Rotation and light-projection matrices ---------------------------------
+ * The SDK's C versions (mtx.c); they were stubs, which left the fighter
+ * shadow projections, the refraction texture matrix (cloaking device, heat
+ * haze) and rotated billboards (rotated effect sprites) with zero
+ * matrices. */
+
+void MTXRotRad(Mtx m, char axis, f32 rad)
+{
+    f32 sn = sinf(rad), cs = cosf(rad);
+    axis |= 0x20;
+    switch (axis) {
+    case 'x':
+        m[0][0] = 1.0f; m[0][1] = 0.0f; m[0][2] = 0.0f; m[0][3] = 0.0f;
+        m[1][0] = 0.0f; m[1][1] = cs;   m[1][2] = -sn;  m[1][3] = 0.0f;
+        m[2][0] = 0.0f; m[2][1] = sn;   m[2][2] = cs;   m[2][3] = 0.0f;
+        break;
+    case 'y':
+        m[0][0] = cs;   m[0][1] = 0.0f; m[0][2] = sn;   m[0][3] = 0.0f;
+        m[1][0] = 0.0f; m[1][1] = 1.0f; m[1][2] = 0.0f; m[1][3] = 0.0f;
+        m[2][0] = -sn;  m[2][1] = 0.0f; m[2][2] = cs;   m[2][3] = 0.0f;
+        break;
+    case 'z':
+        m[0][0] = cs;   m[0][1] = -sn;  m[0][2] = 0.0f; m[0][3] = 0.0f;
+        m[1][0] = sn;   m[1][1] = cs;   m[1][2] = 0.0f; m[1][3] = 0.0f;
+        m[2][0] = 0.0f; m[2][1] = 0.0f; m[2][2] = 1.0f; m[2][3] = 0.0f;
+        break;
+    default:
+        break;
+    }
+}
+
+void MTXLightFrustum(Mtx m, f32 t, f32 b, f32 l, f32 r, f32 n, f32 scaleS, f32 scaleT, f32 transS, f32 transT)
+{
+    f32 tmp = 1.0f / (r - l);
+    m[0][0] = scaleS * (2.0f * n * tmp);
+    m[0][1] = 0.0f;
+    m[0][2] = scaleS * (tmp * (r + l)) - transS;
+    m[0][3] = 0.0f;
+    tmp = 1.0f / (t - b);
+    m[1][0] = 0.0f;
+    m[1][1] = scaleT * (2.0f * n * tmp);
+    m[1][2] = scaleT * (tmp * (t + b)) - transT;
+    m[1][3] = 0.0f;
+    m[2][0] = 0.0f;
+    m[2][1] = 0.0f;
+    m[2][2] = -1.0f;
+    m[2][3] = 0.0f;
+}
+
+void MTXLightPerspective(Mtx m, f32 fovY, f32 aspect, f32 scaleS, f32 scaleT, f32 transS, f32 transT)
+{
+    f32 angle = 0.5f * fovY * 0.017453293f;
+    f32 cot = 1.0f / tanf(angle);
+    m[0][0] = scaleS * (cot / aspect);
+    m[0][1] = 0.0f;
+    m[0][2] = -transS;
+    m[0][3] = 0.0f;
+    m[1][0] = 0.0f;
+    m[1][1] = cot * scaleT;
+    m[1][2] = -transT;
+    m[1][3] = 0.0f;
+    m[2][0] = 0.0f;
+    m[2][1] = 0.0f;
+    m[2][2] = -1.0f;
+    m[2][3] = 0.0f;
+}
+
+void MTXLightOrtho(Mtx m, f32 t, f32 b, f32 l, f32 r, f32 scaleS, f32 scaleT, f32 transS, f32 transT)
+{
+    f32 tmp = 1.0f / (r - l);
+    m[0][0] = 2.0f * tmp * scaleS;
+    m[0][1] = 0.0f;
+    m[0][2] = 0.0f;
+    m[0][3] = transS + scaleS * (tmp * -(r + l));
+    tmp = 1.0f / (t - b);
+    m[1][0] = 0.0f;
+    m[1][1] = 2.0f * tmp * scaleT;
+    m[1][2] = 0.0f;
+    m[1][3] = transT + scaleT * (tmp * -(t + b));
+    m[2][0] = 0.0f;
+    m[2][1] = 0.0f;
+    m[2][2] = 0.0f;
+    m[2][3] = 1.0f;
+}

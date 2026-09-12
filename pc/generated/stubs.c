@@ -202,25 +202,9 @@ int MCCWrite(enum MCC_CHANNEL chID, u32 offset, void *data, long size, enum MCC_
     { static int zero; return zero; }
 }
 
-void MTXLightFrustum(Mtx m, f32 t, f32 b, f32 l, f32 r, f32 n, f32 scaleS, f32 scaleT, f32 transS, f32 transT)
-{
-    STUB(MTXLightFrustum);
-}
 
-void MTXLightOrtho(Mtx m, f32 t, f32 b, f32 l, f32 r, f32 scaleS, f32 scaleT, f32 transS, f32 transT)
-{
-    STUB(MTXLightOrtho);
-}
 
-void MTXLightPerspective(Mtx m, f32 fovY, f32 aspect, f32 scaleS, f32 scaleT, f32 transS, f32 transT)
-{
-    STUB(MTXLightPerspective);
-}
 
-void MTXRotRad(Mtx m, char axis, f32 rad)
-{
-    STUB(MTXRotRad);
-}
 
 long OSCheckActiveThreads(void)
 {

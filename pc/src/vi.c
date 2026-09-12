@@ -23,6 +23,11 @@ int pc_debug_p1_char(void)
 {
     return pc_config.p1_char;
 }
+
+int pc_debug_p2_char(void)
+{
+    return pc_config.p2_char;
+}
 extern int pc_window_vsync_hz(void);
 
 static VIRetraceCallback pre_cb;

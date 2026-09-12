@@ -12,6 +12,7 @@
 #include "pc_runtime.h"
 #include <pc_version.h>
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -49,7 +50,9 @@ static void usage(void)
             "                  src/melee/gr/forward.h: 2 Fountain ... 11 Rainbow Cruise ... 31 Battlefield)\n"
             "  --item KIND@FRAME[:P]  spawn item KIND (number, see src/melee/it/forward.h)\n"
             "                  next to player P (default 1) at FRAME\n"
-            "  --char N        port 1 plays character N (CharacterKind, see src/melee/ft/forward.h:\n"
+            "  --trace A,B     turn on the MELEE_TRACE_A, MELEE_TRACE_B, ... logs (motion, cpu,\n"
+            "                  css, anim, light, swap, archive) for a bug report with --log\n"
+            "  --char N[,M]    port 1 plays character N (and port 2 starts on M) (CharacterKind:\n"
             "                  0 Falcon 1 DK 2 Fox 3 G&W 4 Kirby 5 Bowser 6 Link 7 Luigi 8 Mario\n"
             "                  9 Marth 10 Mewtwo 11 Ness 12 Peach 13 Pikachu 14 ICs 15 Puff 16 Samus\n"
             "                  17 Yoshi 18 Zelda 19 Sheik 20 Falco 21 YLink 22 Dr.M 23 Roy 24 Pichu 25 Ganon)\n"
@@ -115,6 +118,7 @@ int main(int argc, char** argv)
     pc_config.screenshot_every = 60;
     pc_config.item_kind = -1;
     pc_config.p1_char = -1;
+    pc_config.p2_char = -1;
 
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) {
@@ -199,7 +203,10 @@ int main(int argc, char** argv)
             pc_config.item_frame = at != NULL ? atoi(at + 1) : 0;
             pc_config.item_slot = colon != NULL ? atoi(colon + 1) - 1 : 0;
         } else if (strcmp(argv[i], "--char") == 0 && i + 1 < argc) {
-            pc_config.p1_char = atoi(argv[++i]);
+            const char* spec = argv[++i];
+            const char* comma = strchr(spec, ',');
+            pc_config.p1_char = atoi(spec);
+            pc_config.p2_char = comma != NULL ? atoi(comma + 1) : -1;
         } else if (strcmp(argv[i], "--screenshot-every") == 0 && i + 1 < argc) {
             pc_config.screenshot_every = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--screenshot-from") == 0 && i + 1 < argc) {
@@ -225,6 +232,22 @@ int main(int argc, char** argv)
             }
             if (pc_config.volume > 100) {
                 pc_config.volume = 100;
+            }
+        } else if (strcmp(argv[i], "--trace") == 0 && i + 1 < argc) {
+            /* motion,cpu,... : the MELEE_TRACE_* switches from the command
+             * line, for the launcher's extra options */
+            const char* p = argv[++i];
+            while (*p != 0) {
+                char name[64] = "MELEE_TRACE_";
+                size_t n = strlen(name);
+                while (*p != 0 && *p != ',' && n < sizeof(name) - 1) {
+                    name[n++] = (char) toupper((unsigned char) *p++);
+                }
+                name[n] = 0;
+                _putenv_s(name, "1");
+                if (*p == ',') {
+                    p++;
+                }
             }
         } else if (strcmp(argv[i], "--no-audio") == 0) {
             pc_config.no_audio = true;

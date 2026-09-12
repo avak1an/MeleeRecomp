@@ -189,7 +189,12 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
 - `--log FILE`: write everything the game prints to FILE instead of the
   console. The launcher always passes `melee.log` next to `melee.exe`, so
   that file is the log to send with a bug report.
-- `--char N`: port 1 always picks character N at the character select
+- `--trace motion,cpu`: turns on the corresponding `MELEE_TRACE_*` logs
+  from the command line, so a bug report can be recorded from the
+  launcher: put `--trace motion,cpu` in Extra options, reproduce, and send
+  `melee.log`.
+- `--char N[,M]`: port 1 always picks character N at the character select
+  (and a CPU on port 2 gets character M instead of a random one)
   (`CharacterKind` from `src/melee/ft/forward.h`, e.g. 6 Link, 8 Mario,
   9 Marth); `pc\scripts\vs-link.txt` is the VS route plus two forward
   smashes for it.
@@ -197,6 +202,13 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
 - `--screenshot-from N`: with `--screenshots`, start saving at frame N.
 - `MELEE_POKEMON=N`: every Poke Ball releases item kind N (165 Weezing);
   `MELEE_CPU_LEVEL=N`: ports 2-4 play at CPU level N.
+- `MELEE_GX_PROFILE=1`: every 300 frames, where the frame's wall time
+  went (vertex processing, shader and texture lookups, EFB copies, the
+  present, and the rest, which is the game logic and any pacing wait).
+- `MELEE_GX_NOBLIT=1`: read EFB copies back through the CPU instead of
+  blitting them on the GPU (for driver trouble); `MELEE_GX_NOSHADOW=1`
+  skips the fighter shadow-map passes; `MELEE_TRACE_EFFECT=N` logs effect
+  N's joint descriptors and animated scales when it spawns.
 - `MELEE_TRACE_ANIM=1` also logs texture blend and konst animation
   updates, the fighter's animated-texture table, and TEV constant
   compilation; `MELEE_TRACE_MOTION` also logs item spawns and the star's
@@ -222,6 +234,17 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
   exit. This is the starting point for modding: a later milestone adds a
   loose-file override so files in such a folder take precedence over the
   image.
+
+Performance: the game code is compiled unoptimized (it does not survive
+the optimizer), but the PC runtime sources under `pc/src` get `/O2` in
+every configuration, since the renderer transforms and lights every vertex
+on the CPU. The renderer also keeps the GL state it last applied (viewport,
+scissor, depth, blend, program, uniforms, vertex attributes) and only
+issues the calls whose values changed, and EFB copies are blitted on the
+GPU through a framebuffer object instead of being read back. Temple in a
+two-player match went from 13 ms to under 7 ms of work per frame on the
+development machine; before that it could not hold 60 frames per second
+and the audio starved.
 
 The window starts at 640x480 (or `--scale` times that) and can be resized
 or made full screen: the frame keeps its 4:3 shape, centred with black
@@ -770,6 +793,16 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - `gx_render.c`: `GX_VA_NBT` vertices (items with environment maps: the
   capsule, the shells, the barrel) supply their normal; without it they
   were lit by the ambient term only and looked grey and flat.
+- `mtx.c`: `MTXRotRad`, `MTXLightPerspective`, `MTXLightFrustum` and
+  `MTXLightOrtho` were SDK stubs, so everything built from them had a zero
+  matrix: the fighter shadow projections, the refraction texture matrix
+  (cloaking device, heat haze; a cloaked fighter was a black silhouette)
+  and rotated billboards (rotated effect sprites).
+- `gx_render.c`: indirect texturing (`GXSetTevIndirect`, `GXSetIndTexOrder`,
+  `GXSetIndTexMtx`): a stage's texture coordinate is offset by the
+  indirect texture's (a, b, g) values through the indirect matrix, in
+  texels of the stage's texture. The refraction material (cloaking device,
+  fire effects) warps a copy of the screen with it.
 - `gx_render.c`: a texture coordinate generated with the identity matrix
   still goes through the post-transform matrix; toon-shaded items (tomato,
   Poke Ball, barrel, crate, food) map their normal through it and were

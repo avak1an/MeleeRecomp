@@ -2043,6 +2043,21 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
         icon_idx = temp;
         icon_offset = getIconOffset(icon_idx);
     } while (icons[icon_idx].state == 0);
+#ifdef TARGET_PC
+    {
+        /* --char N,M: a CPU on port 2 gets character M instead of a random one */
+        extern int pc_debug_p2_char(void);
+        if (door == 1 && pc_debug_p2_char() >= 0) {
+            s32 k;
+            for (k = 0; k < 25; k++) {
+                if (icons[k].char_kind == pc_debug_p2_char()) {
+                    icon_idx = k;
+                    icon_offset = getIconOffset((u32) k);
+                }
+            }
+        }
+    }
+#endif
 
     mnCharSel_804D6CB0->vs.start.players[getPlayerForDoor(door)].ckind =
         (&icons[0].char_kind)[icon_offset];
@@ -2658,9 +2673,14 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                             /* --char N: port 1's pick is
                                              * always character N */
                                             extern int pc_debug_p1_char(void);
-                                            int want = pc_debug_p1_char();
+                                            extern int pc_debug_p2_char(void);
+                                            int want = door == 0 ? pc_debug_p1_char()
+                                                       : door == 1 ? pc_debug_p2_char() : -1;
                                             int k;
-                                            if (door == 0 && want >= 0) {
+                                            if (getenv("MELEE_TRACE_CSS") != NULL) {
+                                                OSReport("[pc] css drop: door %d icon %d (want %d)\n", door, i, want);
+                                            }
+                                            if (want >= 0) {
                                                 for (k = 0; k < 25; k++) {
                                                     if (icons[k].char_kind == want) {
                                                         i = k;
