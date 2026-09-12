@@ -205,7 +205,9 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
 - `MELEE_GX_PROFILE=1` (or `--profile`): every 300 frames, where the
   frame's wall time went (vertex processing, shader and texture lookups,
   EFB copies, the present, and the rest, which is the game logic and any
-  pacing wait).
+  pacing wait) and how many GL draw calls a frame took. In a vsync'd run
+  the driver blocks inside draw calls once the swap queue is full, so the
+  draws figure includes waiting; profile with `--fast` to see the work.
 - `MELEE_GX_NOBLIT=1`: read EFB copies back through the CPU instead of
   blitting them on the GPU (for driver trouble); `MELEE_GX_NOSHADOW=1`
   skips the fighter shadow-map passes; `MELEE_TRACE_EFFECT=N` logs effect
@@ -246,9 +248,15 @@ GPU through a framebuffer object instead of being read back. The shader
 cache is looked up through a hash of the TEV/texgen key and the texture
 cache through a hash of the image pointer (a four-player match compares a
 thousand draws a frame against them; the linear searches were the largest
-single cost). Temple in a two-player match went from 13 ms to under 7 ms of
-work per frame on the development machine, a four-player Green Greens from
-14.5 to under 10; before that it could not hold 60 frames per second
+single cost), the key is only rebuilt when a GX call changed something in
+it, a palette is hashed once per frame, and consecutive draws whose GL
+state is identical are merged into one indexed draw call (strips and fans
+become triangle lists; every state change, copy, clear, readback or present
+flushes the pending batch first). The four-player results screen, the
+heaviest scene at 6800 draws and 118,000 vertices a frame, went from 20 ms
+to 13 ms per frame with 640 GL draws; Temple in a two-player match from 13
+ms to under 7 ms and a four-player Green Greens from 14.5 to under 8;
+before that the port could not hold 60 frames per second
 and the audio starved.
 
 The window starts at 640x480 (or `--scale` times that) and can be resized
