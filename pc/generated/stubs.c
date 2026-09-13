@@ -34,22 +34,8 @@ int AXFXChorusShutdown(struct AXFX_CHORUS* c)
     { static int zero; return zero; }
 }
 
-void AXFXDelayCallback(struct AXFX_BUFFERUPDATE* bufferUpdate, struct AXFX_DELAY* delay)
-{
-    STUB(AXFXDelayCallback);
-}
 
-int AXFXDelayInit(struct AXFX_DELAY* delay)
-{
-    STUB(AXFXDelayInit);
-    { static int zero; return zero; }
-}
 
-int AXFXDelayShutdown(struct AXFX_DELAY* delay)
-{
-    STUB(AXFXDelayShutdown);
-    { static int zero; return zero; }
-}
 
 void AXFXReverbHiCallback(struct AXFX_BUFFERUPDATE* bufferUpdate, struct AXFX_REVERBHI* reverb)
 {
@@ -68,22 +54,8 @@ int AXFXReverbHiShutdown(struct AXFX_REVERBHI* rev)
     { static int zero; return zero; }
 }
 
-void AXFXReverbStdCallback(struct AXFX_BUFFERUPDATE* bufferUpdate, struct AXFX_REVERBSTD* reverb)
-{
-    STUB(AXFXReverbStdCallback);
-}
 
-int AXFXReverbStdInit(struct AXFX_REVERBSTD* rev)
-{
-    STUB(AXFXReverbStdInit);
-    { static int zero; return zero; }
-}
 
-int AXFXReverbStdShutdown(struct AXFX_REVERBSTD* rev)
-{
-    STUB(AXFXReverbStdShutdown);
-    { static int zero; return zero; }
-}
 
 BOOL DBIsDebuggerPresent(void)
 {

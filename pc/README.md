@@ -209,7 +209,11 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
   the driver blocks inside draw calls once the swap queue is full, so the
   draws figure includes waiting; profile with `--fast` to see the work.
 - `MELEE_GX_NOBLIT=1`: read EFB copies back through the CPU instead of
-  blitting them on the GPU (for driver trouble); `MELEE_GX_NOSHADOW=1`
+  blitting them on the GPU (for driver trouble); `MELEE_GX_CPU=1` transforms
+  vertices on the CPU instead of in the vertex shader, `MELEE_GX_NORING=1`
+  uses client-side vertex arrays instead of the mapped ring buffer,
+  `MELEE_GX_DUMP_VS=1` prints the generated vertex shaders,
+  `MELEE_AX_NOAUX=1` mutes the effect buses; `MELEE_GX_NOSHADOW=1`
   skips the fighter shadow-map passes; `MELEE_TRACE_EFFECT=N` logs effect
   N's joint descriptors and animated scales when it spawns.
 - `MELEE_TRACE_ANIM=1` also logs texture blend and konst animation
@@ -337,14 +341,24 @@ arrives two ways and is decoded by the same code: immediate mode (the
 `GXPosition3f32`-style inline functions in `GXVert.h` write to the
 recorder on PC) and display lists from disc (the same command format,
 big-endian). Vertices are decoded with the current vertex descriptor,
-attribute formats and index arrays, then transformed on the CPU as the
-console's XF unit would: position/normal matrices from the matrix memory,
-per-vertex lighting from the channel controls (ambient and material
-registers, up to eight lights with the spot and specular attenuation
-functions: a specular light's position is the direction to it and its
-direction the half-angle vector, as the hardware defines them), texture-coordinate
-generation (source, texture matrix and the post-transform matrix HSD
-uses for every texture's own translate/scale/rotate). The fragment side is a GLSL shader generated from the TEV
+attribute formats and index arrays, then transformed as the console's XF
+unit would: position/normal matrices from the matrix memory, per-vertex
+lighting from the channel controls (ambient and material registers, up to
+eight lights with the spot and specular attenuation functions: a specular
+light's position is the direction to it and its direction the half-angle
+vector, as the hardware defines them), texture-coordinate generation
+(source, texture matrix and the post-transform matrix HSD uses for every
+texture's own translate/scale/rotate). By default that transform runs on
+the GPU: the raw vertex goes up with its matrix slot and a generated
+vertex shader (one per texgen/channel configuration, cached with the
+fragment shader) reads the matrices, lights and material colours from
+blocks in a float texture. A block is appended only when its GX state
+changed since the last draw, so a batch spans any number of matrix loads.
+`MELEE_GX_CPU=1` selects the CPU transform (the same code, kept as the
+reference; the two paths render the same pixels). Vertices are written
+into a persistently mapped ring buffer when the driver has GL 4.4 (three
+regions guarded by fences), so a draw call copies nothing;
+`MELEE_GX_NORING=1` falls back to client-side arrays. The fragment side is a GLSL shader generated from the TEV
 stage configuration (all inputs, compare ops, bias/scale, swap tables,
 konstants, alpha compare). Textures are decoded from the console formats
 (I4/I8/IA4/IA8/RGB565/RGB5A3/RGBA8/CMPR and the C4/C8/C14X2 palette
@@ -496,7 +510,8 @@ such copies and drew it upside down before.
 | `src/pad.c` | XInput and keyboard controllers, keyboard layout files, autoplay, scripted input. |
 | `src/gcadapter.c` | The official GameCube controller adapter over WinUSB: report reader thread, rumble, hot-plug. |
 | `src/card.c` | Memory card: a directory of save files, with the SDK's asynchronous completion semantics. |
-| `src/ax.c` | The AX sound driver: voice pool with priority stealing, ADPCM/PCM decoding from ARAM, sample-rate conversion, volume ramps, waveOut output, the AI interface. |
+| `src/ax.c` | The AX sound driver: voice pool with priority stealing, ADPCM/PCM decoding from ARAM, sample-rate conversion, volume ramps, the two auxiliary effect buses, waveOut output, the AI interface. |
+| `src/axfx.c` | The AX auxiliary effects the game registers: the standard reverb (the SDK's per-sample core, PowerPC assembly in the reference source, written out in C) and the delay. |
 | `src/thp.c` | THP movie decoder (baseline JPEG without byte stuffing) writing GX-tiled Y/U/V planes. |
 | `launcher/launcher.c` | The Win32 launcher: settings window, disc verification, disc extraction, mod list, build from source, Play. |
 | `dist/melee-launcher.exe` | The committed launcher build (copied there by every build; `dist/.gitignore` un-ignores it). |
@@ -895,10 +910,12 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - The particle list walker still drops a list and logs
   `particle list ... is corrupt` if a link is ever bad; the cause found so
   far (the table block above) is fixed.
-- The mixer ignores the auxiliary effect buses (reverb, chorus, delay:
-  the `AXFX*` functions are still stubs), interaural delay (`ITD`) and the
-  low-pass filter; sample-rate conversion is linear rather than the DSP's
-  4-tap filter. Volumes are not calibrated against the console.
+- The mixer ignores interaural delay (`ITD`) and the low-pass filter;
+  sample-rate conversion is linear rather than the DSP's 4-tap filter.
+  Volumes are not calibrated against the console. Of the auxiliary
+  effects only the two the game uses exist (the standard reverb on bus A,
+  the delay on bus B; `src/axfx.c`); the chorus and the "hi" reverb are
+  still stubs.
 - Save files are the PC layout of the game's structures; converting to or
   from real memory-card dumps (`.gci`) would need a byte swap of the game's
   save-data structs.

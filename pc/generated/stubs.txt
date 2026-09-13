@@ -1,15 +1,9 @@
 AXFXChorusCallback
 AXFXChorusInit
 AXFXChorusShutdown
-AXFXDelayCallback
-AXFXDelayInit
-AXFXDelayShutdown
 AXFXReverbHiCallback
 AXFXReverbHiInit
 AXFXReverbHiShutdown
-AXFXReverbStdCallback
-AXFXReverbStdInit
-AXFXReverbStdShutdown
 DBIsDebuggerPresent
 DCInvalidateRange
 FIOExit

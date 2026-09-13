@@ -38,6 +38,15 @@ PFN_glGenFramebuffers pc_glGenFramebuffers;
 PFN_glBindFramebuffer pc_glBindFramebuffer;
 PFN_glFramebufferTexture2D pc_glFramebufferTexture2D;
 PFN_glBlitFramebuffer pc_glBlitFramebuffer;
+PFN_glDrawRangeElements pc_glDrawRangeElements;
+PFN_glGenBuffers pc_glGenBuffers;
+PFN_glBindBuffer pc_glBindBuffer;
+PFN_glBufferStorage pc_glBufferStorage;
+PFN_glMapBufferRange pc_glMapBufferRange;
+PFN_glFenceSync pc_glFenceSync;
+PFN_glClientWaitSync pc_glClientWaitSync;
+PFN_glDeleteSync pc_glDeleteSync;
+PFN_glDrawElementsBaseVertex pc_glDrawElementsBaseVertex;
 PFN_glCheckFramebufferStatus pc_glCheckFramebufferStatus;
 
 static HWND hwnd;
@@ -223,6 +232,15 @@ int pc_window_open(int width, int height, const char* title)
     LOAD(glBindFramebuffer);
     LOAD(glFramebufferTexture2D);
     LOAD(glBlitFramebuffer);
+    LOAD(glDrawRangeElements);
+    LOAD(glGenBuffers);
+    LOAD(glBindBuffer);
+    LOAD(glBufferStorage);
+    LOAD(glMapBufferRange);
+    LOAD(glFenceSync);
+    LOAD(glClientWaitSync);
+    LOAD(glDeleteSync);
+    LOAD(glDrawElementsBaseVertex);
     LOAD(glCheckFramebufferStatus);
     if (pc_glCreateShader == NULL || pc_glVertexAttribPointer == NULL) {
         fprintf(stderr, "[pc] GL: the driver does not provide OpenGL 2.0\n");

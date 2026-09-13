@@ -42,6 +42,14 @@ static AXVPB voices[AX_MAX_VOICES];
 static u8 voice_used[AX_MAX_VOICES];
 static void (*frame_callback)(void);
 static int ax_ready;
+/* the auxiliary effect buses: each voice sends a share of itself to bus A
+ * (the game's reverb) and bus B (its delay); the registered effect
+ * processes the bus in place and the result is added to the main mix */
+typedef void (*AuxCallback)(void*, void*);
+static AuxCallback aux_cb[2];
+static void* aux_ctx[2];
+static s32 aux_buf[2][3][AX_FRAME]; /* left, right, surround; consecutive */
+static int aux_off = -1;             /* MELEE_AX_NOAUX=1: dry, as before */
 
 AXVPB* AXAcquireVoice(u32 priority, void (*callback)(void*), u32 userContext)
 {
@@ -100,20 +108,14 @@ void AXRegisterCallback(void (*callback)())
 
 void AXRegisterAuxACallback(void (*callback)(void*, void*), void* context)
 {
-    (void) callback;
-    (void) context; /* effects sends are not mixed */
+    aux_cb[0] = (AuxCallback) callback;
+    aux_ctx[0] = context;
 }
 
 void AXRegisterAuxBCallback(void (*callback)(void*, void*), void* context)
 {
-    (void) callback;
-    (void) context;
-}
-
-void AXFXSetHooks(void* (*alloc_hook)(unsigned long), void (*free_hook)(void*))
-{
-    (void) alloc_hook;
-    (void) free_hook;
+    aux_cb[1] = (AuxCallback) callback;
+    aux_ctx[1] = context;
 }
 
 /* --- voice parameters --------------------------------------------------- */
@@ -323,6 +325,9 @@ static void mix_voice(AXVPB* v)
     u32 frac = pb->src.currentAddressFrac;
     s32 vol = pb->ve.currentVolume;
     s32 vl = (s16) pb->mix.vL, vr = (s16) pb->mix.vR;
+    s32 al = (s16) pb->mix.vAuxAL, ar = (s16) pb->mix.vAuxAR, as = (s16) pb->mix.vAuxAS;
+    s32 bl = (s16) pb->mix.vAuxBL, br = (s16) pb->mix.vAuxBR, bs = (s16) pb->mix.vAuxBS;
+    int sends = (al | ar | as | bl | br | bs) != 0;
     s16 prev = (s16) pb->src.last_samples[3];
     s16 curs = (s16) pb->src.last_samples[2];
     int i;
@@ -355,6 +360,14 @@ static void mix_voice(AXVPB* v)
         s = (s * vol) >> 15;
         mix_buf[i * 2] += (s * vl) >> 15;
         mix_buf[i * 2 + 1] += (s * vr) >> 15;
+        if (sends) {
+            aux_buf[0][0][i] += (s * al) >> 15;
+            aux_buf[0][1][i] += (s * ar) >> 15;
+            aux_buf[0][2][i] += (s * as) >> 15;
+            aux_buf[1][0][i] += (s * bl) >> 15;
+            aux_buf[1][1][i] += (s * br) >> 15;
+            aux_buf[1][2][i] += (s * bs) >> 15;
+        }
     }
     pb->src.currentAddressFrac = (u16) frac;
     pb->src.last_samples[3] = (u16) prev;
@@ -363,6 +376,35 @@ static void mix_voice(AXVPB* v)
     ramp(&pb->ve.currentVolume, (u16) pb->ve.currentDelta);
     ramp(&pb->mix.vL, pb->mix.vDeltaL);
     ramp(&pb->mix.vR, pb->mix.vDeltaR);
+    ramp(&pb->mix.vAuxAL, pb->mix.vDeltaAuxAL);
+    ramp(&pb->mix.vAuxAR, pb->mix.vDeltaAuxAR);
+    ramp(&pb->mix.vAuxAS, pb->mix.vDeltaAuxAS);
+    ramp(&pb->mix.vAuxBL, pb->mix.vDeltaAuxBL);
+    ramp(&pb->mix.vAuxBR, pb->mix.vDeltaAuxBR);
+    ramp(&pb->mix.vAuxBS, pb->mix.vDeltaAuxBS);
+}
+
+/* Run the effect on a bus and add its output to the main mix. The surround
+ * share goes to both speakers at half level: the output is stereo. */
+static void mix_aux(int bus)
+{
+    struct {
+        long* left;
+        long* right;
+        long* surround;
+    } upd;
+    int i;
+    if (aux_cb[bus] == NULL) {
+        return;
+    }
+    upd.left = (long*) aux_buf[bus][0];
+    upd.right = (long*) aux_buf[bus][1];
+    upd.surround = (long*) aux_buf[bus][2];
+    aux_cb[bus](&upd, aux_ctx[bus]);
+    for (i = 0; i < AX_FRAME; i++) {
+        mix_buf[i * 2] += aux_buf[bus][0][i] + (aux_buf[bus][2][i] >> 1);
+        mix_buf[i * 2 + 1] += aux_buf[bus][1][i] + (aux_buf[bus][2][i] >> 1);
+    }
 }
 
 /* --- output device ------------------------------------------------------ */
@@ -540,10 +582,18 @@ static void ax_step(void)
         frame_callback();
     }
     memset(mix_buf, 0, sizeof(mix_buf));
+    memset(aux_buf, 0, sizeof(aux_buf));
     for (i = 0; i < AX_MAX_VOICES; i++) {
         if (voice_used[i]) {
             mix_voice(&voices[i]);
         }
+    }
+    if (aux_off < 0) {
+        aux_off = getenv("MELEE_AX_NOAUX") != NULL;
+    }
+    if (!aux_off) {
+        mix_aux(0);
+        mix_aux(1);
     }
     out_push(mix_buf);
     dump_push(mix_buf);

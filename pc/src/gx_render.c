@@ -130,6 +130,58 @@ typedef struct GLVertex {
     float tex[8][2];
 } GLVertex;
 
+/* GPU vertex path (the default): the vertex goes up untransformed and a
+ * generated vertex shader does the matrix, the lighting and the texture
+ * coordinate generation, reading matrices, lights and material colours
+ * from blocks in a float texture. A block is appended only when its GX
+ * state changed since the last draw, so a batch spans any number of
+ * matrix loads. blk = (matrix block, texture-matrix block, light block,
+ * material block) as texel indices; pnm = the vertex's position matrix
+ * row (GX_PNMTX0..9 = 0, 3, ..., 27). MELEE_GX_CPU=1 selects the CPU
+ * path (transform_vertex), which is also what the draw log measures. */
+typedef struct GLVertexG {
+    float pos[3];
+    float nrm[3], bnm[3], tan[3];
+    float col[2][4];
+    float tex[8][2];
+    float blk[4];
+    float pnm;
+} GLVertexG;
+
+static int gpu_path = -1;
+static GLVertexG* gverts;
+static u32 gverts_cap;
+
+/* Vertex ring: with GL 4.4 the vertices of every batch are written straight
+ * into a persistently mapped buffer and drawn from there with a base
+ * vertex, so a draw call copies nothing (the driver's copy of client-side
+ * arrays was the largest cost of a draw). The ring has three regions
+ * guarded by fences: a batch never straddles two, and a region is only
+ * written again once the draws that read it last time are done. Without
+ * the extensions (or with MELEE_GX_NORING=1) the client arrays stay. */
+#define RING_BYTES (48u << 20)
+#define RING_REGIONS 3
+static int use_ring = -1;
+static u8* ring_map;
+static GLuint ring_vbo;
+static u32 ring_stride, ring_verts, ring_region_verts;
+static u32 ring_base_v, ring_pos_v; /* the current batch's first vertex; the next free one */
+static int ring_region = -1;
+static GLsync ring_fence[RING_REGIONS];
+#define PARAM_W 1024
+#define PARAM_H 1024
+#define PARAM_TEXELS (PARAM_W * PARAM_H)
+#define PARAM_UNIT 8
+#define PN_BLOCK 60   /* matrix rows 0..29 + normal matrices 0..9 (3 rows each) */
+#define TX_BLOCK 164  /* matrix rows 30..127 + normal matrices 10..31 */
+#define LT_BLOCK 32   /* 8 lights x 4 texels */
+#define MT_BLOCK 4    /* material 0, 1, ambient 0, 1 */
+static float* param_img;          /* CPU copy of the parameter texture */
+static u32 param_pos, param_uploaded; /* texel cursors */
+static GLuint param_tex;
+static int blk_idx[4] = { -1, -1, -1, -1 };
+static int blk_dirty[4] = { 1, 1, 1, 1 };
+
 static u8 imm_buf[1 << 20];
 static Vertex first_vertex; /* first vertex of the current draw (draw log) */
 static u32 imm_len;
@@ -148,9 +200,10 @@ static u32 indices_cap;
  * in indices, and every GL state change, copy, clear, readback or present
  * flushes them first. A results screen has 6800 draws a frame, most of
  * them strips of one model sharing every state. */
-static u32 batch_verts, batch_idx;
+static u32 batch_verts, batch_idx, batch_min; /* batch_min: first vertex the batch refers to */
 static u32 stats_gl_draws;
-static GLuint unit_tex[8];      /* the texture bound to each unit (0xFFFFFFFF = unknown) */
+static double prof_ms[9]; /* frame, draws, shader, texture, copy, present, vertex decode+transform, param upload, gl draw */
+static GLuint unit_tex[9];      /* the texture bound to each unit (0xFFFFFFFF = unknown); 8 = the parameter texture */
 static int active_unit;
 static void flush_batch(void);
 static void use_unit(int unit);
@@ -1251,6 +1304,19 @@ static GLuint bind_texture(const PCTexObj* t, int unit)
 
 /* --- TEV shader generation ---------------------------------------------- */
 
+/* what the generated vertex shader depends on (GPU path only) */
+typedef struct VSKey {
+    u8 on, num_texgen, num_chans, want_nbt;
+    struct {
+        u8 type, src, normalize, pad;
+        u32 mtx, pt;
+    } texgen[8];
+    struct {
+        u8 enable, amb_src, mat_src, diff_fn, attn_fn, pad[3];
+        u32 light_mask;
+    } chan[4];
+} VSKey;
+
 typedef struct ShaderKey {
     TevStage tev[16];
     u8 num_tev;
@@ -1258,6 +1324,7 @@ typedef struct ShaderKey {
     u8 swap_table[4][4];
     u8 texmap_valid[8];
     u8 fog_type;
+    VSKey vs;
 } ShaderKey;
 
 typedef struct Shader {
@@ -1267,6 +1334,7 @@ typedef struct Shader {
     GLint u_indmtx, u_texsize; /* -1 unless a stage uses indirect texturing */
     float last_indmtx[18], last_texsize[16];
     GLint a_pos, a_col0, a_col1, a_tex[8];
+    GLint a_nrm, a_bnm, a_tan, a_blk, a_pnm; /* GPU path attributes */
     int used;
     /* the uniform values last uploaded, so unchanged ones are skipped */
     int uniforms_valid;
@@ -1283,6 +1351,7 @@ static int num_shaders;
 #define SHADER_WAYS 4
 static u16 shader_buckets[SHADER_BUCKETS][SHADER_WAYS];
 static Shader* last_shader; /* consecutive draws mostly share a key */
+static GLuint cur_prog;     /* the program in use */
 static int key_dirty = 1;    /* some key state changed since last_shader was chosen */
 
 static char shader_src[32768];
@@ -1512,6 +1581,180 @@ static GLuint compile(GLenum type, const char* src)
     return sh;
 }
 
+/* The vertex shader of the GPU path, mirroring transform_vertex(),
+ * light_channel() and texgen() step for step. P(i) reads texel i of the
+ * parameter texture; M(r) a row of GX matrix memory and N(n, r) a row of
+ * normal matrix n, both split between the two matrix blocks. */
+static void emit_vs(const VSKey* k)
+{
+    int i, j;
+    shader_len = 0;
+    emit("#version 120\n"
+         "uniform mat4 u_proj;\n"
+         "uniform sampler2D u_params;\n"
+         "attribute vec3 a_pos, a_nrm, a_bnm, a_tan;\n"
+         "attribute vec4 a_col0, a_col1, a_blk;\n"
+         "attribute float a_pnm;\n"
+         "attribute vec2 a_tex0, a_tex1, a_tex2, a_tex3, a_tex4, a_tex5, a_tex6, a_tex7;\n"
+         "varying vec4 v_col0, v_col1;\n"
+         "varying vec2 v_tex0, v_tex1, v_tex2, v_tex3, v_tex4, v_tex5, v_tex6, v_tex7;\n"
+         "varying float v_depth;\n"
+         "vec4 P(float i) { float y = floor((i + 0.5) * (1.0 / %d.0)); float x = i - y * %d.0;\n"
+         "    return texture2D(u_params, vec2((x + 0.5) * (1.0 / %d.0), (y + 0.5) * (1.0 / %d.0))); }\n"
+         "vec4 M(float r) { return r < 30.0 ? P(a_blk.x + r) : P(a_blk.y + (r - 30.0)); }\n"
+         "vec4 N(float n, float r) { return n < 10.0 ? P(a_blk.x + 30.0 + n * 3.0 + r) : P(a_blk.y + 98.0 + (n - 10.0) * 3.0 + r); }\n"
+         "vec3 safe_normalize(vec3 v) { float l = length(v); return l > 1e-12 ? v / l : v; }\n"
+         "void main() {\n"
+         "    vec4 ip = vec4(a_pos, 1.0);\n"
+         "    vec3 pos = vec3(dot(M(a_pnm), ip), dot(M(a_pnm + 1.0), ip), dot(M(a_pnm + 2.0), ip));\n"
+         "    float nn = floor(a_pnm / 3.0 + 0.5);\n"
+         "    vec3 n0 = N(nn, 0.0).xyz, n1 = N(nn, 1.0).xyz, n2 = N(nn, 2.0).xyz;\n"
+         "    vec3 nrm = safe_normalize(vec3(dot(n0, a_nrm), dot(n1, a_nrm), dot(n2, a_nrm)));\n",
+         PARAM_W, PARAM_W, PARAM_W, PARAM_H);
+    if (k->want_nbt) {
+        emit("    vec3 bnm = vec3(dot(n0, a_bnm), dot(n1, a_bnm), dot(n2, a_bnm));\n"
+             "    vec3 tan = vec3(dot(n0, a_tan), dot(n1, a_tan), dot(n2, a_tan));\n");
+    }
+    /* colour channels: rgb from channel i, alpha from channel 2 + i */
+    for (i = 0; i < 2; i++) {
+        if (i >= k->num_chans) {
+            emit("    vec4 c%d = a_col%d;\n", i, i);
+            continue;
+        }
+        for (j = i; j < 4; j += 2) {
+            const VSKey* kk = k;
+            u8 en = kk->chan[j].enable, mat_src = kk->chan[j].mat_src, amb_src = kk->chan[j].amb_src;
+            u8 diff_fn = kk->chan[j].diff_fn, attn_fn = kk->chan[j].attn_fn;
+            u32 mask = kk->chan[j].light_mask;
+            int l;
+            emit("    vec4 ch%d;\n    {\n", j);
+            if (mat_src == GX_SRC_VTX) {
+                emit("        vec4 mat = a_col%d;\n", i);
+            } else {
+                emit("        vec4 mat = P(a_blk.w + %d.0);\n", i);
+            }
+            if (!en) {
+                emit("        ch%d = mat;\n", j);
+            } else {
+                if (amb_src == GX_SRC_VTX) {
+                    emit("        vec4 illum = a_col%d;\n", i);
+                } else {
+                    emit("        vec4 illum = P(a_blk.w + %d.0);\n", 2 + i);
+                }
+                for (l = 0; l < 8; l++) {
+                    if (!(mask & (1u << l))) {
+                        continue;
+                    }
+                    emit("        {\n"
+                         "            vec4 L0 = P(a_blk.z + %d.0), L1 = P(a_blk.z + %d.0), L2 = P(a_blk.z + %d.0), L3 = P(a_blk.z + %d.0);\n"
+                         "            vec3 ldir = L0.xyz - pos;\n"
+                         "            float dist = length(ldir);\n"
+                         "            if (dist > 1e-12) ldir /= dist;\n"
+                         "            float attn = 1.0;\n",
+                         l * 4, l * 4 + 1, l * 4 + 2, l * 4 + 3);
+                    if (attn_fn == GX_AF_SPOT) {
+                        emit("            {\n"
+                             "                float cosa = -dot(ldir, L1.xyz);\n"
+                             "                float a = max(L0.w + L1.w * cosa + L3.w * cosa * cosa, 0.0);\n"
+                             "                float kk = L3.x + L3.y * dist + L3.z * dist * dist;\n"
+                             "                attn = kk > 1e-12 ? a / kk : 0.0;\n"
+                             "            }\n");
+                    } else if (attn_fn == GX_AF_SPEC) {
+                        emit("            {\n"
+                             "                float nl = dot(ldir, nrm);\n"
+                             "                float h = nl >= 0.0 ? max(dot(L1.xyz, nrm), 0.0) : 0.0;\n"
+                             "                vec3 kv = L3.xyz;\n");
+                        if (diff_fn != GX_DF_NONE) {
+                            emit("                { float m = length(kv); if (m > 1e-12) kv /= m; }\n");
+                        }
+                        emit("                float a = max(L0.w + L1.w * h + L3.w * h * h, 0.0);\n"
+                             "                float kk = kv.x + kv.y * h + kv.z * h * h;\n"
+                             "                attn = kk > 1e-12 ? a / kk : 0.0;\n"
+                             "            }\n");
+                    }
+                    if (diff_fn == GX_DF_NONE) {
+                        emit("            float diff = 1.0;\n");
+                    } else if (diff_fn == GX_DF_CLAMP) {
+                        emit("            float diff = max(dot(ldir, nrm), 0.0);\n");
+                    } else {
+                        emit("            float diff = dot(ldir, nrm);\n");
+                    }
+                    emit("            illum += attn * diff * L2;\n"
+                         "        }\n");
+                }
+                emit("        ch%d = mat * clamp(illum, 0.0, 1.0);\n", j);
+            }
+            emit("    }\n");
+        }
+        emit("    vec4 c%d = vec4(ch%d.rgb, ch%d.a);\n", i, i, i + 2);
+    }
+    emit("    v_col0 = c0;\n    v_col1 = c1;\n");
+    /* texture coordinates */
+    for (i = 0; i < 8; i++) {
+        u8 type, src;
+        if (i >= k->num_texgen) {
+            emit("    v_tex%d = a_tex%d;\n", i, i);
+            continue;
+        }
+        type = k->texgen[i].type;
+        src = k->texgen[i].src;
+        emit("    {\n");
+        if (type >= GX_TG_BUMP0 && type <= GX_TG_BUMP7) {
+            int srcc = (int) src - GX_TG_TEXCOORD0;
+            int l = type - GX_TG_BUMP0;
+            if (srcc < 0 || srcc >= i || !k->want_nbt) {
+                emit("        v_tex%d = vec2(0.0);\n", i);
+            } else {
+                emit("        vec3 ld = safe_normalize(P(a_blk.z + %d.0).xyz - pos);\n"
+                     "        v_tex%d = v_tex%d + vec2(dot(ld, bnm), dot(ld, tan));\n",
+                     l * 4, i, srcc);
+            }
+            emit("    }\n");
+            continue;
+        }
+        if (src >= GX_TG_TEX0 && src <= GX_TG_TEX7) {
+            emit("        vec4 tin = vec4(a_tex%d, 1.0, 1.0);\n", src - GX_TG_TEX0);
+        } else if (src == GX_TG_POS) {
+            emit("        vec4 tin = vec4(pos, 1.0);\n");
+        } else if (src == GX_TG_NRM) {
+            emit("        vec4 tin = vec4(nrm, 1.0);\n");
+        } else {
+            emit("        v_tex%d = vec2(0.0);\n    }\n", i);
+            continue;
+        }
+        if (k->texgen[i].normalize) {
+            emit("        tin.xyz = safe_normalize(tin.xyz);\n");
+        }
+        if (k->texgen[i].mtx >= MTX_ROWS - 2) {
+            emit("        float s = tin.x, t = tin.y, q = %s;\n", type == GX_TG_MTX3x4 ? "tin.z" : "1.0");
+        } else {
+            emit("        float s = dot(M(%u.0), tin), t = dot(M(%u.0), tin);\n", k->texgen[i].mtx,
+                 k->texgen[i].mtx + 1);
+            if (type == GX_TG_MTX3x4) {
+                emit("        float q = dot(M(%u.0), tin);\n", k->texgen[i].mtx + 2);
+            } else {
+                emit("        float q = 1.0;\n");
+            }
+        }
+        if (k->texgen[i].pt != GX_PTIDENTITY && k->texgen[i].pt + 3 <= MTX_ROWS) {
+            emit("        {\n"
+                 "            vec4 stq = vec4(s, t, q, 1.0);\n"
+                 "            float ps = dot(M(%u.0), stq), pt = dot(M(%u.0), stq), pq = dot(M(%u.0), stq);\n"
+                 "            s = ps; t = pt; q = pq;\n"
+                 "        }\n",
+                 k->texgen[i].pt, k->texgen[i].pt + 1, k->texgen[i].pt + 2);
+        }
+        emit("        if (q != 0.0 && q != 1.0) { s /= q; t /= q; }\n"
+             "        v_tex%d = vec2(s, t);\n"
+             "    }\n", i);
+    }
+    emit("    vec4 p = u_proj * vec4(pos, 1.0);\n"
+         "    p.z = p.z * 2.0 + p.w;\n"
+         "    gl_Position = p;\n"
+         "    v_depth = -pos.z;\n"
+         "}\n");
+}
+
 static Shader* get_shader(void)
 {
     ShaderKey key;
@@ -1559,6 +1802,31 @@ static Shader* get_shader(void)
         key.texmap_valid[i] = gx.texmap[i].image != NULL;
     }
     key.fog_type = gx.fog_type;
+    if (gpu_path > 0) {
+        key.vs.on = 1;
+        key.vs.num_texgen = gx.num_texgen;
+        key.vs.num_chans = gx.num_chans;
+        for (i = 0; i < gx.num_texgen; i++) {
+            key.vs.texgen[i].type = gx.texgen[i].type;
+            key.vs.texgen[i].src = gx.texgen[i].src;
+            key.vs.texgen[i].normalize = gx.texgen[i].normalize;
+            key.vs.texgen[i].mtx = gx.texgen[i].mtx;
+            key.vs.texgen[i].pt = gx.texgen[i].pt_mtx;
+            if (gx.texgen[i].type >= GX_TG_BUMP0 && gx.texgen[i].type <= GX_TG_BUMP7) {
+                key.vs.want_nbt = 1;
+            }
+        }
+        for (i = 0; i < 4; i++) {
+            if ((i & 1) < gx.num_chans) {
+                key.vs.chan[i].enable = gx.chan[i].enable;
+                key.vs.chan[i].amb_src = gx.chan[i].amb_src;
+                key.vs.chan[i].mat_src = gx.chan[i].mat_src;
+                key.vs.chan[i].diff_fn = gx.chan[i].diff_fn;
+                key.vs.chan[i].attn_fn = gx.chan[i].attn_fn;
+                key.vs.chan[i].light_mask = gx.chan[i].light_mask & 0xFF;
+            }
+        }
+    }
     if (last_shader != NULL && memcmp(&last_shader->key, &key, sizeof(key)) == 0) {
         return last_shader;
     }
@@ -1652,8 +1920,17 @@ static Shader* get_shader(void)
         emit("    gl_FragColor = clamp(prev, 0.0, 1.0);\n}\n");
     }
 
-    vs = compile(GL_VERTEX_SHADER, vsrc);
     fs = compile(GL_FRAGMENT_SHADER, shader_src);
+    if (key.vs.on) {
+        static int dumped;
+        emit_vs(&key.vs);
+        if (getenv("MELEE_GX_DUMP_VS") != NULL && dumped++ < 64) {
+            fprintf(stderr, "[gx] vertex shader %d:" "%c" "%s--- end ---" "%c", dumped, 10, shader_src, 10);
+        }
+        vs = compile(GL_VERTEX_SHADER, shader_src);
+    } else {
+        vs = compile(GL_VERTEX_SHADER, vsrc);
+    }
     sh->prog = pc_glCreateProgram();
     pc_glAttachShader(sh->prog, vs);
     pc_glAttachShader(sh->prog, fs);
@@ -1671,6 +1948,20 @@ static Shader* get_shader(void)
     sh->a_pos = pc_glGetAttribLocation(sh->prog, "a_pos");
     sh->a_col0 = pc_glGetAttribLocation(sh->prog, "a_col0");
     sh->a_col1 = pc_glGetAttribLocation(sh->prog, "a_col1");
+    sh->a_nrm = pc_glGetAttribLocation(sh->prog, "a_nrm");
+    sh->a_bnm = pc_glGetAttribLocation(sh->prog, "a_bnm");
+    sh->a_tan = pc_glGetAttribLocation(sh->prog, "a_tan");
+    sh->a_blk = pc_glGetAttribLocation(sh->prog, "a_blk");
+    sh->a_pnm = pc_glGetAttribLocation(sh->prog, "a_pnm");
+    {
+        GLint u = pc_glGetUniformLocation(sh->prog, "u_params");
+        if (u >= 0) {
+            GLint prev_prog = (GLint) cur_prog;
+            pc_glUseProgram(sh->prog);
+            pc_glUniform1i(u, PARAM_UNIT);
+            pc_glUseProgram((GLuint) prev_prog);
+        }
+    }
     for (i = 0; i < 8; i++) {
         char name[16];
         snprintf(name, sizeof(name), "u_tex%d", i);
@@ -1698,9 +1989,9 @@ static struct {
     int color_update, alpha_update;
     int blend_mode, blend_src, blend_dst, logic_op;
 } rs;
-static GLuint cur_prog;         /* the program in use */
+/* cur_prog (the program in use) is declared with the shader cache */
 static Shader* attrib_shader;   /* whose vertex attributes are set up ... */
-static GLVertex* attrib_base;   /* ... for this vertex buffer */
+static void* attrib_base;       /* ... for this vertex buffer */
 
 static void apply_raster_state(void)
 {
@@ -1820,10 +2111,17 @@ static void apply_raster_state(void)
 
 static void ensure_capacity(u32 nverts, u32 nindices)
 {
-    if (nverts > glverts_cap) {
-        flush_batch(); /* the attribute pointers refer to the old buffer */
+    if (nverts > glverts_cap && !(use_ring > 0 && gpu_path <= 0)) {
+        if (use_ring <= 0) {
+            flush_batch(); /* the attribute pointers refer to the old buffer */
+        }
         glverts_cap = nverts + 4096;
         glverts = (GLVertex*) realloc(glverts, glverts_cap * sizeof(GLVertex));
+    }
+    if (gpu_path > 0 && use_ring <= 0 && nverts > gverts_cap) {
+        flush_batch();
+        gverts_cap = nverts + 4096;
+        gverts = (GLVertexG*) realloc(gverts, gverts_cap * sizeof(GLVertexG));
     }
     if (nindices > indices_cap) {
         indices_cap = nindices + 4096;
@@ -1831,14 +2129,221 @@ static void ensure_capacity(u32 nverts, u32 nindices)
     }
 }
 
+static double prof_now(void);
+
+static void upload_params(void)
+{
+    if (gpu_path > 0 && param_uploaded < param_pos) {
+        double t0 = prof_now();
+        u32 a = param_uploaded, b = param_pos;
+        use_unit(PARAM_UNIT);
+        /* only the texels written since the last upload, row by row */
+        while (a < b) {
+            u32 y = a / PARAM_W, x = a % PARAM_W, n = b - a;
+            if (n > PARAM_W - x) {
+                n = PARAM_W - x;
+            }
+            glTexSubImage2D(GL_TEXTURE_2D, 0, (GLint) x, (GLint) y, (GLsizei) n, 1, GL_RGBA, GL_FLOAT,
+                            param_img + (size_t) a * 4);
+            a += n;
+        }
+        param_uploaded = param_pos;
+        prof_ms[7] += prof_now() - t0;
+    }
+}
+
 static void flush_batch(void)
 {
     if (batch_idx != 0) {
-        glDrawElements(GL_TRIANGLES, (GLsizei) batch_idx, GL_UNSIGNED_SHORT, indices);
+        double t0;
+        upload_params();
+        t0 = prof_now();
+        if (use_ring > 0) {
+            pc_glDrawElementsBaseVertex(GL_TRIANGLES, (GLsizei) batch_idx, GL_UNSIGNED_SHORT, indices, (GLint) ring_base_v);
+        } else if (pc_glDrawRangeElements != NULL) {
+            /* the vertex range spares the driver a scan of the indices
+             * before it copies the client-side arrays */
+            pc_glDrawRangeElements(GL_TRIANGLES, batch_min, batch_verts - 1, (GLsizei) batch_idx, GL_UNSIGNED_SHORT, indices);
+        } else {
+            glDrawElements(GL_TRIANGLES, (GLsizei) batch_idx, GL_UNSIGNED_SHORT, indices);
+        }
+        prof_ms[8] += prof_now() - t0;
         stats_gl_draws++;
+    }
+    if (use_ring > 0) {
+        /* the batch's vertices stay until their region is reused; the base
+         * moves with the cursor so a flush with nothing pending changes
+         * nothing */
+        ring_pos_v = ring_base_v + batch_verts;
+        ring_base_v = ring_pos_v;
     }
     batch_idx = 0;
     batch_verts = 0;
+}
+
+static void ring_init(void)
+{
+    const char* ver = (const char*) glGetString(GL_VERSION);
+    use_ring = 0;
+    if (getenv("MELEE_GX_NORING") != NULL || pc_glBufferStorage == NULL || pc_glMapBufferRange == NULL ||
+        pc_glDrawElementsBaseVertex == NULL || pc_glFenceSync == NULL || pc_glClientWaitSync == NULL ||
+        pc_glGenBuffers == NULL || pc_glBindBuffer == NULL || ver == NULL || ver[0] < '4')
+    {
+        fprintf(stderr, "[gx] vertex buffer: client arrays\n");
+        return;
+    }
+    ring_stride = gpu_path > 0 ? sizeof(GLVertexG) : sizeof(GLVertex);
+    ring_verts = RING_BYTES / ring_stride;
+    ring_region_verts = ring_verts / RING_REGIONS;
+    pc_glGenBuffers(1, &ring_vbo);
+    pc_glBindBuffer(GL_ARRAY_BUFFER, ring_vbo);
+    pc_glBufferStorage(GL_ARRAY_BUFFER, (GLsizeiptr) RING_BYTES, NULL,
+                       GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+    ring_map = (u8*) pc_glMapBufferRange(GL_ARRAY_BUFFER, 0, (GLsizeiptr) RING_BYTES,
+                                          GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
+    if (ring_map == NULL || glGetError() != GL_NO_ERROR) {
+        pc_glBindBuffer(GL_ARRAY_BUFFER, 0);
+        fprintf(stderr, "[gx] vertex buffer: client arrays (the mapped ring could not be created)\n");
+        return;
+    }
+    use_ring = 1;
+    ring_region = -1;
+    ring_base_v = ring_pos_v = 0;
+    attrib_shader = NULL; /* pointers become buffer offsets */
+    fprintf(stderr, "[gx] vertex buffer: persistently mapped ring (%u MB)\n", RING_BYTES >> 20);
+}
+
+/* Room in the ring for the next primitive's vertices; positions the batch. */
+static void ring_begin(u32 nverts)
+{
+    u32 end, region;
+    if (batch_idx == 0 && batch_verts == 0) {
+        ring_base_v = ring_pos_v;
+    }
+    end = ring_base_v + batch_verts + nverts;
+    region = (end - 1) / ring_region_verts;
+    if (region >= RING_REGIONS || (int) region != ring_region) {
+        /* leaving a region: draw what is pending, fence the region left
+         * behind, and start on the next one at its beginning once the
+         * draws that used it a cycle ago are done */
+        flush_batch();
+        if (ring_region >= 0) {
+            if (ring_fence[ring_region] != NULL) {
+                pc_glDeleteSync(ring_fence[ring_region]);
+            }
+            ring_fence[ring_region] = pc_glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        }
+        if (region >= RING_REGIONS) {
+            region = 0;
+        }
+        if (ring_fence[region] != NULL) {
+            pc_glClientWaitSync(ring_fence[region], GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull);
+            pc_glDeleteSync(ring_fence[region]);
+            ring_fence[region] = NULL;
+        }
+        ring_region = (int) region;
+        ring_base_v = ring_pos_v = region * ring_region_verts;
+    }
+    if (gpu_path > 0) {
+        gverts = (GLVertexG*) (ring_map + (size_t) ring_base_v * ring_stride);
+    } else {
+        glverts = (GLVertex*) (ring_map + (size_t) ring_base_v * ring_stride);
+    }
+}
+
+/* Append a block of texels to the parameter texture; returns its index. */
+static u32 param_append(const float* data, u32 texels)
+{
+    u32 at;
+    if (param_pos + texels > PARAM_TEXELS) {
+        /* wrap: everything pending is drawn first, so nothing refers to
+         * the rows about to be rewritten */
+        flush_batch();
+        param_pos = param_uploaded = 0;
+        blk_idx[0] = blk_idx[1] = blk_idx[2] = blk_idx[3] = -1;
+    }
+    at = param_pos;
+    memcpy(param_img + (size_t) at * 4, data, (size_t) texels * 16);
+    param_pos += texels;
+    return at;
+}
+
+/* The blocks a draw's vertices refer to, rewritten when their state changed. */
+static void ensure_blocks(void)
+{
+    static float buf[TX_BLOCK * 4];
+    int i, j;
+    if (param_pos + PN_BLOCK + TX_BLOCK + LT_BLOCK + MT_BLOCK > PARAM_TEXELS) {
+        /* wrap before any block of this draw is written, so a draw never
+         * refers to blocks on both sides of the wrap */
+        flush_batch();
+        param_pos = param_uploaded = 0;
+        blk_idx[0] = blk_idx[1] = blk_idx[2] = blk_idx[3] = -1;
+    }
+    if (blk_dirty[0] || blk_idx[0] < 0) {
+        memcpy(buf, gx.mtx[0], 30 * 4 * sizeof(float));
+        for (i = 0; i < 10; i++) {
+            for (j = 0; j < 3; j++) {
+                float* t = buf + (30 + i * 3 + j) * 4;
+                t[0] = gx.nrm[i][j][0];
+                t[1] = gx.nrm[i][j][1];
+                t[2] = gx.nrm[i][j][2];
+                t[3] = 0.0f;
+            }
+        }
+        blk_idx[0] = (int) param_append(buf, PN_BLOCK);
+        blk_dirty[0] = 0;
+    }
+    if (blk_dirty[1] || blk_idx[1] < 0) {
+        memcpy(buf, gx.mtx[30], 98 * 4 * sizeof(float));
+        for (i = 0; i < 22; i++) {
+            for (j = 0; j < 3; j++) {
+                float* t = buf + (98 + i * 3 + j) * 4;
+                t[0] = gx.nrm[10 + i][j][0];
+                t[1] = gx.nrm[10 + i][j][1];
+                t[2] = gx.nrm[10 + i][j][2];
+                t[3] = 0.0f;
+            }
+        }
+        blk_idx[1] = (int) param_append(buf, TX_BLOCK);
+        blk_dirty[1] = 0;
+    }
+    if (blk_dirty[2] || blk_idx[2] < 0) {
+        for (i = 0; i < 8; i++) {
+            const Light* l = &gx.lights[i];
+            float* t = buf + i * 16;
+            t[0] = l->pos[0]; t[1] = l->pos[1]; t[2] = l->pos[2]; t[3] = l->a0;
+            t[4] = l->dir[0]; t[5] = l->dir[1]; t[6] = l->dir[2]; t[7] = l->a1;
+            t[8] = l->color[0]; t[9] = l->color[1]; t[10] = l->color[2]; t[11] = l->color[3];
+            t[12] = l->k0; t[13] = l->k1; t[14] = l->k2; t[15] = l->a2;
+        }
+        blk_idx[2] = (int) param_append(buf, LT_BLOCK);
+        blk_dirty[2] = 0;
+    }
+    if (blk_dirty[3] || blk_idx[3] < 0) {
+        memcpy(buf, gx.mat_color[0], 4 * sizeof(float));
+        memcpy(buf + 4, gx.mat_color[1], 4 * sizeof(float));
+        memcpy(buf + 8, gx.amb_color[0], 4 * sizeof(float));
+        memcpy(buf + 12, gx.amb_color[1], 4 * sizeof(float));
+        blk_idx[3] = (int) param_append(buf, MT_BLOCK);
+        blk_dirty[3] = 0;
+    }
+}
+
+static void fill_gvertex(const Vertex* v, GLVertexG* g)
+{
+    u32 slot = v->pnmtx;
+    memcpy(g->pos, v->pos, sizeof(g->pos));
+    memcpy(g->nrm, v->nrm, sizeof(g->nrm));
+    memcpy(g->bnm, v->bnm, sizeof(g->bnm));
+    memcpy(g->tan, v->tan, sizeof(g->tan));
+    memcpy(g->col, v->col, sizeof(g->col));
+    memcpy(g->tex, v->tex, sizeof(g->tex));
+    g->blk[0] = (float) blk_idx[0];
+    g->blk[1] = (float) blk_idx[1];
+    g->blk[2] = (float) blk_idx[2];
+    g->blk[3] = (float) blk_idx[3];
+    g->pnm = (float) (slot < 30 ? slot : 0);
 }
 
 static void use_unit(int unit)
@@ -1865,7 +2370,7 @@ static void forget_texture(GLuint tex)
 {
     int u;
     flush_batch();
-    for (u = 0; u < 8; u++) {
+    for (u = 0; u < 9; u++) {
         if (unit_tex[u] == tex) {
             unit_tex[u] = 0xFFFFFFFFu;
         }
@@ -1877,7 +2382,7 @@ static void forget_texture(GLuint tex)
  * frames (draws = vertex decode, transform, lighting and GL submission;
  * shader and texture = the lookups within them; copy = EFB copies;
  * present = the swap, which includes the vsync wait). */
-static double prof_ms[7]; /* frame, draws, shader, texture, copy, present, vertex decode+transform */
+/* prof_ms is declared with the batching state */
 static int prof_on = -1;
 
 static double prof_now(void)
@@ -1891,35 +2396,290 @@ static double prof_now(void)
     return (double) now.QuadPart * 1000.0 / (double) freq.QuadPart;
 }
 
-static void draw_stream_impl(u8 prim, u8 vat, const u8* stream, u32 nverts, int big);
+static Shader* draw_setup(void);
+static void draw_prims(Shader* sh, u8 prim, u8 vat, const u8* stream, u32 nverts, int big);
+
+/* MELEE_GX_NOSHADOW=1: skip the shadow-map passes (256x256 viewport) */
+static int skip_shadow_pass(void)
+{
+    static int noshadow = -1;
+    if (noshadow < 0) {
+        noshadow = getenv("MELEE_GX_NOSHADOW") != NULL;
+    }
+    return noshadow && gx.vp[2] == 256.0f && gx.vp[3] == 256.0f;
+}
 
 static void draw_stream(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
 {
     double t0 = prof_now();
-    {
-        /* MELEE_GX_NOSHADOW=1: skip the shadow-map passes (256x256 viewport) */
-        static int noshadow = -1;
-        if (noshadow < 0) {
-            noshadow = getenv("MELEE_GX_NOSHADOW") != NULL;
-        }
-        if (noshadow && gx.vp[2] == 256.0f && gx.vp[3] == 256.0f) {
-            return;
-        }
+    Shader* sh;
+    if (skip_shadow_pass()) {
+        return;
     }
-    draw_stream_impl(prim, vat, stream, nverts, big);
+    sh = draw_setup();
+    if (sh != NULL) {
+        draw_prims(sh, prim, vat, stream, nverts, big);
+    }
     prof_ms[1] += prof_now() - t0;
 }
 
-static void draw_stream_impl(u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
+#ifndef GL_RGBA32F
+#define GL_RGBA32F 0x8814
+#endif
+
+/* First draw: the GPU path needs float textures (GL 3.0, or the ARB
+ * extension every driver of the last fifteen years has). */
+static void gpu_path_init(void)
+{
+    const char* ver = (const char*) glGetString(GL_VERSION);
+    const char* ext = (const char*) glGetString(GL_EXTENSIONS);
+    int ok = (ver != NULL && ver[0] >= '3') || (ext != NULL && strstr(ext, "GL_ARB_texture_float") != NULL);
+    if (gpu_path == 0 || !ok) {
+        gpu_path = 0;
+        fprintf(stderr, "[gx] vertex path: CPU%s\n", ok ? " (MELEE_GX_CPU)" : " (no float textures)");
+        return;
+    }
+    param_img = (float*) calloc((size_t) PARAM_TEXELS * 4, sizeof(float));
+    if (param_img == NULL) {
+        gpu_path = 0;
+        return;
+    }
+    glGenTextures(1, &param_tex);
+    use_unit(PARAM_UNIT);
+    glBindTexture(GL_TEXTURE_2D, param_tex);
+    unit_tex[PARAM_UNIT] = param_tex;
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, PARAM_W, PARAM_H, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    if (glGetError() != GL_NO_ERROR) {
+        gpu_path = 0;
+        fprintf(stderr, "[gx] vertex path: CPU (the parameter texture could not be created)\n");
+        return;
+    }
+    gpu_path = 1;
+    blk_dirty[0] = blk_dirty[1] = blk_dirty[2] = blk_dirty[3] = 1;
+    key_dirty = 1;
+    fprintf(stderr, "[gx] vertex path: GPU\n");
+}
+
+/* what the attribute pointers were last set up for */
+static void* vbuf_id(void)
+{
+    if (use_ring > 0) {
+        return (void*) 1; /* offsets into the ring: fixed */
+    }
+    return gpu_path > 0 ? (void*) gverts : (void*) glverts;
+}
+
+/* the vertex attribute pointers of a program, into the current vertex buffer */
+static void setup_attribs(Shader* sh)
+{
+    int t;
+    const u8* vbase = use_ring > 0 ? NULL : (gpu_path > 0 ? (const u8*) gverts : (const u8*) glverts);
+    {
+        /* the vertex layout is fixed; only the attribute locations depend
+         * on the program and the pointers on the (rarely reallocated)
+         * vertex buffer */
+        Shader* old = attrib_shader;
+        flush_batch();
+        if (old != NULL) {
+            if (old->a_pos >= 0) pc_glDisableVertexAttribArray(old->a_pos);
+            if (old->a_col0 >= 0) pc_glDisableVertexAttribArray(old->a_col0);
+            if (old->a_col1 >= 0) pc_glDisableVertexAttribArray(old->a_col1);
+            if (old->a_nrm >= 0) pc_glDisableVertexAttribArray(old->a_nrm);
+            if (old->a_bnm >= 0) pc_glDisableVertexAttribArray(old->a_bnm);
+            if (old->a_tan >= 0) pc_glDisableVertexAttribArray(old->a_tan);
+            if (old->a_blk >= 0) pc_glDisableVertexAttribArray(old->a_blk);
+            if (old->a_pnm >= 0) pc_glDisableVertexAttribArray(old->a_pnm);
+            for (t = 0; t < 8; t++) {
+                if (old->a_tex[t] >= 0) pc_glDisableVertexAttribArray(old->a_tex[t]);
+            }
+        }
+        if (gpu_path > 0) {
+            const GLsizei st = sizeof(GLVertexG);
+#define GATTR(loc, n, field) \
+    if ((loc) >= 0) { \
+        pc_glEnableVertexAttribArray(loc); \
+        pc_glVertexAttribPointer(loc, n, GL_FLOAT, GL_FALSE, st, vbase + offsetof(GLVertexG, field)); \
+    }
+            GATTR(sh->a_pos, 3, pos);
+            GATTR(sh->a_nrm, 3, nrm);
+            GATTR(sh->a_bnm, 3, bnm);
+            GATTR(sh->a_tan, 3, tan);
+            GATTR(sh->a_col0, 4, col[0]);
+            GATTR(sh->a_col1, 4, col[1]);
+            GATTR(sh->a_blk, 4, blk);
+            GATTR(sh->a_pnm, 1, pnm);
+            for (t = 0; t < 8; t++) {
+                GATTR(sh->a_tex[t], 2, tex[t]);
+            }
+#undef GATTR
+        } else {
+            if (sh->a_pos >= 0) {
+                pc_glEnableVertexAttribArray(sh->a_pos);
+                pc_glVertexAttribPointer(sh->a_pos, 3, GL_FLOAT, GL_FALSE, sizeof(GLVertex), vbase + offsetof(GLVertex, pos));
+            }
+            if (sh->a_col0 >= 0) {
+                pc_glEnableVertexAttribArray(sh->a_col0);
+                pc_glVertexAttribPointer(sh->a_col0, 4, GL_FLOAT, GL_FALSE, sizeof(GLVertex), vbase + offsetof(GLVertex, col[0]));
+            }
+            if (sh->a_col1 >= 0) {
+                pc_glEnableVertexAttribArray(sh->a_col1);
+                pc_glVertexAttribPointer(sh->a_col1, 4, GL_FLOAT, GL_FALSE, sizeof(GLVertex), vbase + offsetof(GLVertex, col[1]));
+            }
+            for (t = 0; t < 8; t++) {
+                if (sh->a_tex[t] >= 0) {
+                    pc_glEnableVertexAttribArray(sh->a_tex[t]);
+                    pc_glVertexAttribPointer(sh->a_tex[t], 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), vbase + offsetof(GLVertex, tex[t]));
+                }
+            }
+        }
+        attrib_base = vbuf_id();
+        attrib_shader = sh;
+    }
+}
+
+/* Everything a draw needs before its vertices: raster state, program,
+ * uniforms, textures, attribute pointers, parameter blocks. A display
+ * list does this once for all its primitives. Returns NULL when there is
+ * nothing to render into. */
+static Shader* draw_setup(void)
 {
     Shader* sh;
-    const u8* p = stream;
-    u32 i, base;
-    int t;
-    GLenum mode;
+    int i, t;
     float proj[16];
 
-    if (!rendering || nverts == 0) {
+    if (!rendering) {
+        return NULL;
+    }
+    if (gpu_path < 0) {
+        gpu_path_init();
+    }
+    if (use_ring < 0) {
+        ring_init();
+    }
+    build_active_attrs();
+    xform_want_nbt = 0;
+    for (i = 0; i < gx.num_texgen; i++) {
+        if (gx.texgen[i].type >= GX_TG_BUMP0 && gx.texgen[i].type <= GX_TG_BUMP7) {
+            xform_want_nbt = 1;
+        }
+    }
+    apply_raster_state();
+    {
+        double t0 = prof_now();
+        sh = get_shader();
+        prof_ms[2] += prof_now() - t0;
+    }
+    if (sh->prog != cur_prog) {
+        flush_batch();
+        pc_glUseProgram(sh->prog);
+        cur_prog = sh->prog;
+        if (!sh->uniforms_valid) {
+            /* the sampler units never change */
+            for (t = 0; t < 8; t++) {
+                if (sh->u_tex[t] >= 0) {
+                    pc_glUniform1i(sh->u_tex[t], t);
+                }
+            }
+        }
+    }
+
+    /* projection, column-major for GL */
+    for (i = 0; i < 4; i++) {
+        proj[i * 4 + 0] = gx.proj[0][i];
+        proj[i * 4 + 1] = gx.proj[1][i];
+        proj[i * 4 + 2] = gx.proj[2][i];
+        proj[i * 4 + 3] = gx.proj[3][i];
+    }
+    if (!sh->uniforms_valid || memcmp(proj, sh->last_proj, sizeof(proj)) != 0) {
+        flush_batch();
+        pc_glUniformMatrix4fv(sh->u_proj, 1, GL_FALSE, proj);
+        memcpy(sh->last_proj, proj, sizeof(proj));
+    }
+    if (!sh->uniforms_valid || memcmp(&gx.kcolor[0][0], sh->last_kcolor, sizeof(sh->last_kcolor)) != 0) {
+        flush_batch();
+        pc_glUniform4fv(sh->u_kcolor, 4, &gx.kcolor[0][0]);
+        memcpy(sh->last_kcolor, &gx.kcolor[0][0], sizeof(sh->last_kcolor));
+    }
+    if (!sh->uniforms_valid || memcmp(&gx.tev_reg[0][0], sh->last_tevreg, sizeof(sh->last_tevreg)) != 0) {
+        flush_batch();
+        pc_glUniform4fv(sh->u_tevreg, 4, &gx.tev_reg[0][0]);
+        memcpy(sh->last_tevreg, &gx.tev_reg[0][0], sizeof(sh->last_tevreg));
+    }
+    {
+        float aref[4] = { gx.alpha_ref0 / 255.0f, gx.alpha_ref1 / 255.0f, 0, 0 };
+        if (!sh->uniforms_valid || memcmp(aref, sh->last_aref, sizeof(aref)) != 0) {
+            flush_batch();
+            pc_glUniform4fv(sh->u_aref, 1, aref);
+            memcpy(sh->last_aref, aref, sizeof(aref));
+        }
+    }
+    if (sh->key.fog_type != GX_FOG_NONE) {
+        float fog[4] = { gx.fog_start, gx.fog_end, gx.fog_near, gx.fog_far };
+        if (!sh->uniforms_valid || memcmp(fog, sh->last_fog, sizeof(fog)) != 0) {
+            flush_batch();
+            pc_glUniform4fv(sh->u_fog, 1, fog);
+            memcpy(sh->last_fog, fog, sizeof(fog));
+        }
+        if (!sh->uniforms_valid || memcmp(gx.fog_color, sh->last_fogcolor, sizeof(sh->last_fogcolor)) != 0) {
+            flush_batch();
+            pc_glUniform4fv(sh->u_fogcolor, 1, gx.fog_color);
+            memcpy(sh->last_fogcolor, gx.fog_color, sizeof(sh->last_fogcolor));
+        }
+    }
+    if (sh->u_indmtx >= 0) {
+        float m[18];
+        for (i = 0; i < 3; i++) {
+            memcpy(m + i * 6, gx.ind_mtx[i + 1][0], 3 * sizeof(float));
+            memcpy(m + i * 6 + 3, gx.ind_mtx[i + 1][1], 3 * sizeof(float));
+        }
+        if (!sh->uniforms_valid || memcmp(m, sh->last_indmtx, sizeof(m)) != 0) {
+            flush_batch();
+            pc_glUniform3fv(sh->u_indmtx, 6, m);
+            memcpy(sh->last_indmtx, m, sizeof(m));
+        }
+    }
+    if (sh->u_texsize >= 0) {
+        float ts[16];
+        for (t = 0; t < 8; t++) {
+            ts[t * 2] = gx.texmap[t].width > 0 ? (float) gx.texmap[t].width : 1.0f;
+            ts[t * 2 + 1] = gx.texmap[t].height > 0 ? (float) gx.texmap[t].height : 1.0f;
+        }
+        if (!sh->uniforms_valid || memcmp(ts, sh->last_texsize, sizeof(ts)) != 0) {
+            flush_batch();
+            pc_glUniform2fv(sh->u_texsize, 8, ts);
+            memcpy(sh->last_texsize, ts, sizeof(ts));
+        }
+    }
+    sh->uniforms_valid = 1;
+    for (t = 0; t < 8; t++) {
+        if (sh->u_tex[t] >= 0 && gx.texmap[t].image != NULL) {
+            double t0 = prof_now();
+            bind_texture(&gx.texmap[t], t);
+            prof_ms[3] += prof_now() - t0;
+        }
+    }
+
+    if (sh != attrib_shader || vbuf_id() != attrib_base) {
+        setup_attribs(sh);
+    }
+    if (gpu_path > 0) {
+        ensure_blocks();
+    }
+    return sh;
+}
+
+/* One primitive's vertices into the batch (after draw_setup). */
+static void draw_prims(Shader* sh, u8 prim, u8 vat, const u8* stream, u32 nverts, int big)
+{
+    const u8* p = stream;
+    u32 i, base;
+    GLenum mode;
+
+    if (nverts == 0) {
         return;
     }
     if (nverts > MAX_VERTS) {
@@ -1929,23 +2689,30 @@ static void draw_stream_impl(u8 prim, u8 vat, const u8* stream, u32 nverts, int 
         flush_batch(); /* 16-bit indices */
     }
     ensure_capacity(batch_verts + nverts, batch_idx + nverts * 3);
-    base = batch_verts;
-    build_active_attrs();
-    xform_want_nbt = 0;
-    for (i = 0; i < gx.num_texgen; i++) {
-        if (gx.texgen[i].type >= GX_TG_BUMP0 && gx.texgen[i].type <= GX_TG_BUMP7) {
-            xform_want_nbt = 1;
-        }
+    if (use_ring > 0) {
+        ring_begin(nverts);
     }
+    if (vbuf_id() != attrib_base) {
+        setup_attribs(sh); /* the vertex buffer moved */
+    }
+    base = batch_verts;
     {
         double t0 = prof_now();
+        int logging = (debug_log && stats_draws < 8) || (debug_log_frame != 0 && pc_frame_count == debug_log_frame);
         for (i = 0; i < nverts; i++) {
             Vertex v;
             p = decode_vertex(p, vat, big, &v);
             if (i == 0) {
                 first_vertex = v; /* for the draw log */
             }
-            transform_vertex(&v, &glverts[base + i]);
+            if (gpu_path > 0) {
+                fill_gvertex(&v, &gverts[base + i]);
+                if (logging) {
+                    transform_vertex(&v, &glverts[base + i]); /* eye-space positions for the log */
+                }
+            } else {
+                transform_vertex(&v, &glverts[base + i]);
+            }
         }
         prof_ms[6] += prof_now() - t0;
     }
@@ -2127,138 +2894,9 @@ static void draw_stream_impl(u8 prim, u8 vat, const u8* stream, u32 nverts, int 
         }
     }
 
-    apply_raster_state();
-    {
-        double t0 = prof_now();
-        sh = get_shader();
-        prof_ms[2] += prof_now() - t0;
+    if (batch_idx == 0) {
+        batch_min = base;
     }
-    if (sh->prog != cur_prog) {
-        flush_batch();
-        pc_glUseProgram(sh->prog);
-        cur_prog = sh->prog;
-        if (!sh->uniforms_valid) {
-            /* the sampler units never change */
-            for (t = 0; t < 8; t++) {
-                if (sh->u_tex[t] >= 0) {
-                    pc_glUniform1i(sh->u_tex[t], t);
-                }
-            }
-        }
-    }
-
-    /* projection, column-major for GL */
-    for (i = 0; i < 4; i++) {
-        proj[i * 4 + 0] = gx.proj[0][i];
-        proj[i * 4 + 1] = gx.proj[1][i];
-        proj[i * 4 + 2] = gx.proj[2][i];
-        proj[i * 4 + 3] = gx.proj[3][i];
-    }
-    if (!sh->uniforms_valid || memcmp(proj, sh->last_proj, sizeof(proj)) != 0) {
-        flush_batch();
-        pc_glUniformMatrix4fv(sh->u_proj, 1, GL_FALSE, proj);
-        memcpy(sh->last_proj, proj, sizeof(proj));
-    }
-    if (!sh->uniforms_valid || memcmp(&gx.kcolor[0][0], sh->last_kcolor, sizeof(sh->last_kcolor)) != 0) {
-        flush_batch();
-        pc_glUniform4fv(sh->u_kcolor, 4, &gx.kcolor[0][0]);
-        memcpy(sh->last_kcolor, &gx.kcolor[0][0], sizeof(sh->last_kcolor));
-    }
-    if (!sh->uniforms_valid || memcmp(&gx.tev_reg[0][0], sh->last_tevreg, sizeof(sh->last_tevreg)) != 0) {
-        flush_batch();
-        pc_glUniform4fv(sh->u_tevreg, 4, &gx.tev_reg[0][0]);
-        memcpy(sh->last_tevreg, &gx.tev_reg[0][0], sizeof(sh->last_tevreg));
-    }
-    {
-        float aref[4] = { gx.alpha_ref0 / 255.0f, gx.alpha_ref1 / 255.0f, 0, 0 };
-        if (!sh->uniforms_valid || memcmp(aref, sh->last_aref, sizeof(aref)) != 0) {
-            flush_batch();
-            pc_glUniform4fv(sh->u_aref, 1, aref);
-            memcpy(sh->last_aref, aref, sizeof(aref));
-        }
-    }
-    if (sh->key.fog_type != GX_FOG_NONE) {
-        float fog[4] = { gx.fog_start, gx.fog_end, gx.fog_near, gx.fog_far };
-        if (!sh->uniforms_valid || memcmp(fog, sh->last_fog, sizeof(fog)) != 0) {
-            flush_batch();
-            pc_glUniform4fv(sh->u_fog, 1, fog);
-            memcpy(sh->last_fog, fog, sizeof(fog));
-        }
-        if (!sh->uniforms_valid || memcmp(gx.fog_color, sh->last_fogcolor, sizeof(sh->last_fogcolor)) != 0) {
-            flush_batch();
-            pc_glUniform4fv(sh->u_fogcolor, 1, gx.fog_color);
-            memcpy(sh->last_fogcolor, gx.fog_color, sizeof(sh->last_fogcolor));
-        }
-    }
-    if (sh->u_indmtx >= 0) {
-        float m[18];
-        for (i = 0; i < 3; i++) {
-            memcpy(m + i * 6, gx.ind_mtx[i + 1][0], 3 * sizeof(float));
-            memcpy(m + i * 6 + 3, gx.ind_mtx[i + 1][1], 3 * sizeof(float));
-        }
-        if (!sh->uniforms_valid || memcmp(m, sh->last_indmtx, sizeof(m)) != 0) {
-            flush_batch();
-            pc_glUniform3fv(sh->u_indmtx, 6, m);
-            memcpy(sh->last_indmtx, m, sizeof(m));
-        }
-    }
-    if (sh->u_texsize >= 0) {
-        float ts[16];
-        for (t = 0; t < 8; t++) {
-            ts[t * 2] = gx.texmap[t].width > 0 ? (float) gx.texmap[t].width : 1.0f;
-            ts[t * 2 + 1] = gx.texmap[t].height > 0 ? (float) gx.texmap[t].height : 1.0f;
-        }
-        if (!sh->uniforms_valid || memcmp(ts, sh->last_texsize, sizeof(ts)) != 0) {
-            flush_batch();
-            pc_glUniform2fv(sh->u_texsize, 8, ts);
-            memcpy(sh->last_texsize, ts, sizeof(ts));
-        }
-    }
-    sh->uniforms_valid = 1;
-    for (t = 0; t < 8; t++) {
-        if (sh->u_tex[t] >= 0 && gx.texmap[t].image != NULL) {
-            double t0 = prof_now();
-            bind_texture(&gx.texmap[t], t);
-            prof_ms[3] += prof_now() - t0;
-        }
-    }
-
-    if (sh != attrib_shader || glverts != attrib_base) {
-        /* the vertex layout is fixed; only the attribute locations depend
-         * on the program and the pointers on the (rarely reallocated)
-         * vertex buffer */
-        Shader* old = attrib_shader;
-        flush_batch();
-        if (old != NULL) {
-            if (old->a_pos >= 0) pc_glDisableVertexAttribArray(old->a_pos);
-            if (old->a_col0 >= 0) pc_glDisableVertexAttribArray(old->a_col0);
-            if (old->a_col1 >= 0) pc_glDisableVertexAttribArray(old->a_col1);
-            for (t = 0; t < 8; t++) {
-                if (old->a_tex[t] >= 0) pc_glDisableVertexAttribArray(old->a_tex[t]);
-            }
-        }
-        if (sh->a_pos >= 0) {
-            pc_glEnableVertexAttribArray(sh->a_pos);
-            pc_glVertexAttribPointer(sh->a_pos, 3, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].pos);
-        }
-        if (sh->a_col0 >= 0) {
-            pc_glEnableVertexAttribArray(sh->a_col0);
-            pc_glVertexAttribPointer(sh->a_col0, 4, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].col[0]);
-        }
-        if (sh->a_col1 >= 0) {
-            pc_glEnableVertexAttribArray(sh->a_col1);
-            pc_glVertexAttribPointer(sh->a_col1, 4, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].col[1]);
-        }
-        for (t = 0; t < 8; t++) {
-            if (sh->a_tex[t] >= 0) {
-                pc_glEnableVertexAttribArray(sh->a_tex[t]);
-                pc_glVertexAttribPointer(sh->a_tex[t], 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), &glverts[0].tex[t]);
-            }
-        }
-        attrib_shader = sh;
-        attrib_base = glverts;
-    }
-
     switch (prim) {
     case GX_QUADS: {
         u32 q;
@@ -2303,8 +2941,12 @@ static void draw_stream_impl(u8 prim, u8 vat, const u8* stream, u32 nverts, int 
         }
         flush_batch();
         if (mode != 0) {
-            glDrawArrays(mode, (GLint) base, (GLsizei) nverts);
+            glDrawArrays(mode, (GLint) (use_ring > 0 ? ring_base_v + base : base), (GLsizei) nverts);
             stats_gl_draws++;
+        }
+        if (use_ring > 0) {
+            ring_pos_v = ring_base_v + base + nverts; /* keep them until the region comes round */
+            ring_base_v = ring_pos_v;
         }
         base = 0;
         nverts = 0; /* nothing of it stays in the batch */
@@ -2400,6 +3042,9 @@ void GXCallDisplayList(void* list, u32 nbytes)
         }
         fprintf(stderr, " vsize=%u\n", vertex_stream_size(p[0] & 7));
     }
+    Shader* sh = NULL;
+    int setup_done = 0;
+    double t0 = prof_now();
     while (p + 3 <= end) {
         u8 op = *p;
         u8 prim = op & 0xF8, vat = op & 7;
@@ -2425,9 +3070,19 @@ void GXCallDisplayList(void* list, u32 nbytes)
             }
             break;
         }
-        draw_stream(prim, vat, p, n, 1);
+        if (!setup_done) {
+            /* the state is set up once for every primitive of the list */
+            setup_done = 1;
+            if (!skip_shadow_pass()) {
+                sh = draw_setup();
+            }
+        }
+        if (sh != NULL) {
+            draw_prims(sh, prim, vat, p, n, 1);
+        }
         p += n * vsize;
     }
+    prof_ms[1] += prof_now() - t0;
 }
 
 /* --- Vertex descriptors and arrays ------------------------------------- */
@@ -2482,6 +3137,7 @@ void GXLoadPosMtxImm(f32 mtx[3][4], u32 id)
     static int logged;
     if (id + 2 < MTX_ROWS) {
         memcpy(gx.mtx[id], mtx, 3 * 4 * sizeof(float));
+        blk_dirty[id < 30 ? 0 : 1] = 1;
     }
     if (debug_log && logged < 3) {
         logged++;
@@ -2501,6 +3157,7 @@ void GXLoadNrmMtxImm(f32 mtx[3][4], u32 id)
             gx.nrm[slot][i][j] = mtx[i][j];
         }
     }
+    blk_dirty[slot < 10 ? 0 : 1] = 1;
 }
 
 void GXLoadTexMtxImm(f32 mtx[][4], u32 id, GXTexMtxType type)
@@ -2508,6 +3165,7 @@ void GXLoadTexMtxImm(f32 mtx[][4], u32 id, GXTexMtxType type)
     u32 rows = type == GX_MTX2x4 ? 2 : 3;
     if (id + rows <= MTX_ROWS) {
         memcpy(gx.mtx[id], mtx, rows * 4 * sizeof(float));
+        blk_dirty[id < 30 ? 0 : 1] = 1;
     }
 }
 
@@ -2905,11 +3563,13 @@ void GXSetIndTexMtx(GXIndTexMtxID id, f32 offset[2][3], s8 scale_exp)
 
 void GXSetNumTexGens(u8 nTexGens)
 {
+    key_dirty = 1;
     gx.num_texgen = nTexGens > 8 ? 8 : nTexGens;
 }
 
 void GXSetTexCoordGen2(GXTexCoordID dst_coord, GXTexGenType func, GXTexGenSrc src_param, u32 mtx, GXBool normalize, u32 pt_texmtx)
 {
+    key_dirty = 1;
     TexGen* g = &gx.texgen[dst_coord & 7];
     g->type = (u8) func;
     g->src = (u8) src_param;
@@ -2920,11 +3580,13 @@ void GXSetTexCoordGen2(GXTexCoordID dst_coord, GXTexGenType func, GXTexGenSrc sr
 
 void GXSetNumChans(u8 nChans)
 {
+    key_dirty = 1;
     gx.num_chans = nChans > 2 ? 2 : nChans;
 }
 
 void GXSetChanCtrl(GXChannelID chan, GXBool enable, GXColorSrc amb_src, GXColorSrc mat_src, u32 light_mask, GXDiffuseFn diff_fn, GXAttnFn attn_fn)
 {
+    key_dirty = 1;
     int first = 0, last = 0, i;
     switch (chan) {
     case GX_COLOR0: first = last = 0; break;
@@ -2956,6 +3618,7 @@ static void set_color4(float* dst, GXColor c)
 
 void GXSetChanAmbColor(GXChannelID chan, GXColor amb_color)
 {
+    blk_dirty[3] = 1;
     if (chan == GX_COLOR0 || chan == GX_COLOR0A0) set_color4(gx.amb_color[0], amb_color);
     if (chan == GX_COLOR1 || chan == GX_COLOR1A1) set_color4(gx.amb_color[1], amb_color);
     if (chan == GX_ALPHA0) gx.amb_color[0][3] = amb_color.a / 255.0f;
@@ -2964,6 +3627,7 @@ void GXSetChanAmbColor(GXChannelID chan, GXColor amb_color)
 
 void GXSetChanMatColor(GXChannelID chan, GXColor mat_color)
 {
+    blk_dirty[3] = 1;
     if (chan == GX_COLOR0 || chan == GX_COLOR0A0) set_color4(gx.mat_color[0], mat_color);
     if (chan == GX_COLOR1 || chan == GX_COLOR1A1) set_color4(gx.mat_color[1], mat_color);
     if (chan == GX_ALPHA0) gx.mat_color[0][3] = mat_color.a / 255.0f;
@@ -3039,6 +3703,7 @@ void GXLoadLightObjImm(GXLightObj* lt_obj, GXLightID light)
             gx.lights[i] = ((PCLightObj*) lt_obj)->l;
         }
     }
+    blk_dirty[2] = 1;
 }
 
 /* --- Textures and palettes --------------------------------------------------- */
@@ -3191,10 +3856,10 @@ void GXCopyDisp(void* dest, GXBool clear)
         if (prof_on && frame_no % 300 == 299) {
             fprintf(stderr,
                     "[gx] profile over %u frames: frame %.2f ms = draws %.2f (vertices %.2f, shader %.2f, texture %.2f) + "
-                    "copy %.2f + present %.2f + rest %.2f; %u GL draws/frame\n",
+                    "copy %.2f + present %.2f + rest %.2f; %u GL draws/frame (params %.2f, draw calls %.2f)\n",
                     300u, prof_ms[0] / 300, prof_ms[1] / 300, prof_ms[6] / 300, prof_ms[2] / 300, prof_ms[3] / 300,
                     prof_ms[4] / 300, prof_ms[5] / 300, (prof_ms[0] - prof_ms[1] - prof_ms[4] - prof_ms[5]) / 300,
-                    stats_gl_draws / 300);
+                    stats_gl_draws / 300, prof_ms[7] / 300, prof_ms[8] / 300);
             stats_gl_draws = 0;
             memset(prof_ms, 0, sizeof(prof_ms));
         }
@@ -3286,8 +3951,9 @@ void GXCopyTex(void* dest, GXBool clear)
                 pc_glGenFramebuffers(1, &fbo);
             }
             forget_texture(e->tex);
+            use_unit(0);
             glBindTexture(GL_TEXTURE_2D, e->tex);
-            unit_tex[active_unit] = e->tex;
+            unit_tex[0] = e->tex;
             if (e->gl_w != rw || e->gl_h != rh) {
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rw, rh, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
                 e->gl_w = rw;
@@ -3326,8 +3992,9 @@ void GXCopyTex(void* dest, GXBool clear)
                     }
                 }
                 forget_texture(e->tex);
+                use_unit(0);
                 glBindTexture(GL_TEXTURE_2D, e->tex);
-                unit_tex[active_unit] = e->tex;
+                unit_tex[0] = e->tex;
                 glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rw, rh, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf);
             }
@@ -3360,6 +4027,7 @@ void GXEnableTexOffsets(GXTexCoordID coord, u8 line_enable, u8 point_enable) { (
 
 void pc_gx_render_init(void)
 {
+    gpu_path = getenv("MELEE_GX_CPU") != NULL ? 0 : -1; /* decided on first use */
     int i;
     memset(&gx, 0, sizeof(gx));
     for (i = 0; i < MTX_ROWS; i++) {

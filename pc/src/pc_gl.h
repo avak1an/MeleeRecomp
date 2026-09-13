@@ -28,6 +28,15 @@
 
 typedef char GLchar;
 typedef ptrdiff_t GLsizeiptr;
+typedef ptrdiff_t GLintptr;
+typedef struct __GLsync* GLsync;
+typedef unsigned long long GLuint64;
+#define GL_ARRAY_BUFFER 0x8892
+#define GL_MAP_WRITE_BIT 0x0002
+#define GL_MAP_PERSISTENT_BIT 0x0040
+#define GL_MAP_COHERENT_BIT 0x0080
+#define GL_SYNC_GPU_COMMANDS_COMPLETE 0x9117
+#define GL_SYNC_FLUSH_COMMANDS_BIT 0x00000001
 
 typedef GLuint(APIENTRY* PFN_glCreateShader)(GLenum);
 typedef void(APIENTRY* PFN_glShaderSource)(GLuint, GLsizei, const GLchar* const*, const GLint*);
@@ -59,6 +68,15 @@ typedef void(APIENTRY* PFN_glGenFramebuffers)(GLsizei, GLuint*);
 typedef void(APIENTRY* PFN_glBindFramebuffer)(GLenum, GLuint);
 typedef void(APIENTRY* PFN_glFramebufferTexture2D)(GLenum, GLenum, GLenum, GLuint, GLint);
 typedef void(APIENTRY* PFN_glBlitFramebuffer)(GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum);
+typedef void(APIENTRY* PFN_glDrawRangeElements)(GLenum, GLuint, GLuint, GLsizei, GLenum, const void*);
+typedef void(APIENTRY* PFN_glGenBuffers)(GLsizei, GLuint*);
+typedef void(APIENTRY* PFN_glBindBuffer)(GLenum, GLuint);
+typedef void(APIENTRY* PFN_glBufferStorage)(GLenum, GLsizeiptr, const void*, GLbitfield);
+typedef void*(APIENTRY* PFN_glMapBufferRange)(GLenum, GLintptr, GLsizeiptr, GLbitfield);
+typedef GLsync(APIENTRY* PFN_glFenceSync)(GLenum, GLbitfield);
+typedef GLenum(APIENTRY* PFN_glClientWaitSync)(GLsync, GLbitfield, GLuint64);
+typedef void(APIENTRY* PFN_glDeleteSync)(GLsync);
+typedef void(APIENTRY* PFN_glDrawElementsBaseVertex)(GLenum, GLsizei, GLenum, const void*, GLint);
 typedef GLenum(APIENTRY* PFN_glCheckFramebufferStatus)(GLenum);
 #define GL_FRAMEBUFFER 0x8D40
 #define GL_READ_FRAMEBUFFER 0x8CA8
@@ -97,6 +115,15 @@ extern PFN_glGenFramebuffers pc_glGenFramebuffers;
 extern PFN_glBindFramebuffer pc_glBindFramebuffer;
 extern PFN_glFramebufferTexture2D pc_glFramebufferTexture2D;
 extern PFN_glBlitFramebuffer pc_glBlitFramebuffer;
+extern PFN_glDrawRangeElements pc_glDrawRangeElements;
+extern PFN_glGenBuffers pc_glGenBuffers;
+extern PFN_glBindBuffer pc_glBindBuffer;
+extern PFN_glBufferStorage pc_glBufferStorage;
+extern PFN_glMapBufferRange pc_glMapBufferRange;
+extern PFN_glFenceSync pc_glFenceSync;
+extern PFN_glClientWaitSync pc_glClientWaitSync;
+extern PFN_glDeleteSync pc_glDeleteSync;
+extern PFN_glDrawElementsBaseVertex pc_glDrawElementsBaseVertex;
 extern PFN_glCheckFramebufferStatus pc_glCheckFramebufferStatus;
 
 /// Create the window and GL context. Returns false (after printing why)
