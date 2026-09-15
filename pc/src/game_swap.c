@@ -330,19 +330,49 @@ static void swap_ft_dynamics(struct ftDynamics* dyn)
 
 /* The five slots after the parts descriptor mean different things per hat
  * (masks, joints, lookups, colours); only the ones the code reads as bone
- * dynamics are swapped: Kirby's own hat's slot 1 and Pichu's slot 4. */
+ * dynamics are swapped, the slot each hat's setup in ftdynamics.c reads
+ * (ftCo_8009D074 and the following functions). */
 void pc_swap_kirby_hat(struct KirbyHatStruct* hat, int kind)
 {
+    static const struct {
+        int kind, slot;
+    } dyn_slots[] = {
+        { FTKIND_KOOPA, 2 }, { FTKIND_ZELDA, 2 }, { FTKIND_NANA, 2 },  { FTKIND_FALCO, 2 },
+        { FTKIND_KIRBY, 1 }, { FTKIND_MARS, 0 },  { FTKIND_LINK, 2 },  { FTKIND_YOSHI, 3 },
+        { FTKIND_LUIGI, 1 }, { FTKIND_GANON, 1 }, { FTKIND_PURIN, 4 }, { FTKIND_PICHU, 4 },
+    };
+    size_t i;
     if (hat == NULL || !pc_swap_ptr_ok(hat) || !pc_swap_once(hat)) {
         return;
     }
     /* the parts descriptor is swapped by pc_swap_parts_desc_lazy when
      * ftParts_8007487C reads it: the hat structs differ per kind and some
      * of them start with the descriptor itself */
-    if (kind == FTKIND_KIRBY) {
-        swap_ft_dynamics(hat->hat_dynamics[1]);
-    } else if (kind == FTKIND_PICHU) {
-        swap_ft_dynamics(hat->hat_dynamics[4]);
+    for (i = 0; i < sizeof(dyn_slots) / sizeof(dyn_slots[0]); i++) {
+        if (dyn_slots[i].kind == kind) {
+            swap_ft_dynamics(hat->hat_dynamics[dyn_slots[i].slot]);
+        }
+    }
+    /* The hats loaded by ftkirby.c's LOAD_HAT (Captain Falcon, Yoshi,
+     * Jigglypuff, Dr. Mario, Pichu) are laid out like a fighter's ftData
+     * x8 block: the parts descriptor, then the costume texture-object
+     * count and the per-costume index tables, which ftAnim_80070200 reads
+     * ("fighter tobj num over!" with the count byte-reversed). */
+    if (kind == FTKIND_CAPTAIN || kind == FTKIND_YOSHI || kind == FTKIND_PURIN || kind == FTKIND_DRMARIO ||
+        kind == FTKIND_PICHU)
+    {
+        u32* count = (u32*) ((u8*) hat + 8);
+        u16** tables = *(u16***) ((u8*) hat + 0xC);
+        if (*count > 64) {
+            pc_swap32(count);
+        }
+        if (*count <= 64 && tables != NULL && pc_swap_ptr_ok(tables) && pc_swap_once(tables)) {
+            /* one costume per hat: the game falls back to table 0 */
+            u16* idx = tables[0];
+            if (idx != NULL && pc_swap_ptr_ok(idx) && pc_swap_once(idx)) {
+                pc_swap16_range(idx, (size_t) *count * sizeof(u16));
+            }
+        }
     }
 }
 
