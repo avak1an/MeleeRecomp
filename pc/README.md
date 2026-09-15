@@ -695,11 +695,17 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   `hsd_804D2348` is addressed as `hsd_804D1138 + 0x1210`, so it is part of
   the same block. The four places that copy a save entry into a sector
   or a sector into a save entry call `pc_card_swap_payload`, so the card
-  holds the console's byte order (a sector copy takes a whole sector's
-  worth from the entry, so the entry is recognised by its buffer address
-  and converted at its own size). `lbcardgame.c` keeps the banner/icon
-  descriptor words in console order, because the library reads them as
-  bytes.
+  holds the console's byte order (a whole-file write copies a sector's
+  worth from the entry's registered buffer, a single-entry update such as
+  the results screen's save passes the entry itself at its own size; both
+  are recognised and converted at the entry's size). `lbcardgame.c` keeps
+  the banner/icon descriptor words in console order, because the library
+  reads them as bytes.
+- `hsd_3A64.c`: the text encoder converts UTF-8 input to Shift-JIS first
+  (`pc/src/sjis.c`). The sources keep full-width text such as the
+  character names as UTF-8 and the GameCube build converts every literal
+  with sjiswrap; this build compiles them as they are, and without the
+  conversion the name box on the character select stayed empty.
 - Bit-field packing: Metrowerks places plain bytes that follow a group of
   `u32` bit-fields inside the bit-fields' 32-bit unit, MSVC starts a new
   unit. `mn/types.h` (`StartMeleeRules`, 48 bits then bytes) and

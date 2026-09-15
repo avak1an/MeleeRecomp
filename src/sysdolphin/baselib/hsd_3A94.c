@@ -720,10 +720,18 @@ s32 fn_803AA790(void)
 static void pc_swap_entry_out(CardState* state, s32 idx, const void* src,
                               void* dst, s32 size)
 {
-    if (state != NULL && idx >= 0 && idx < 9 && src == state->x70[idx].ptr &&
+    /* a whole-file write copies from the entry's registered buffer; a
+     * single-entry update (the results screen's save) registers no buffer
+     * and passes the entry itself, at its own size */
+    if (state != NULL && idx >= 0 && idx < 9 &&
+        (src == state->x70[idx].ptr || state->x70[idx].ptr == NULL) &&
         state->x4C[idx] > 0 && state->x4C[idx] <= size)
     {
         pc_card_swap_payload(dst, state->x4C[idx], 1);
+    } else if (getenv("MELEE_TRACE_CARD") != NULL) {
+        fprintf(stderr, "[pc] card: sector copy not converted: entry %d src %p (entry %p, %d bytes) chunk %d\n", idx, src,
+                state != NULL && idx >= 0 && idx < 9 ? state->x70[idx].ptr : NULL,
+                state != NULL && idx >= 0 && idx < 9 ? state->x4C[idx] : 0, size);
     }
 }
 #endif

@@ -11,6 +11,9 @@
 #include <dolphin/gx.h>
 #include <dolphin/mtx.h>
 #include <dolphin/types.h>
+#ifdef TARGET_PC
+#include <pc_text.h>
+#endif
 
 u8* HSD_SisLib_803A6478(u8* dst, u8* src)
 {
@@ -146,6 +149,11 @@ s32 HSD_SisLib_803A67EC(u8* data, u8* string)
     u8 sjis_lo;
 
     has_kerning[0] = 0;
+#ifdef TARGET_PC
+    /* source literals come in as UTF-8 (the GameCube build converts them
+     * with sjiswrap); the callers pass a 128-byte buffer */
+    pc_utf8_to_sjis(string, 0x80);
+#endif
     str_cursor = string;
     out_idx = 0;
     for (in_idx = 0; in_idx < 0x80; in_idx++, str_cursor++) {

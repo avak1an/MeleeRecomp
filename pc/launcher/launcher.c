@@ -1851,7 +1851,10 @@ static void build_ui(void)
 
 static void place(int id, int x, int y, int w, int h)
 {
-    SetWindowPos(ctl(id), NULL, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    /* NOCOPYBITS: a scroll moves every control; without it Windows copies
+     * each control's old image to its new place and the page shows the
+     * controls twice until the content repaints */
+    SetWindowPos(ctl(id), NULL, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW | SWP_NOCOPYBITS);
 }
 
 /* an edit box (or the mod list) inside a painted frame */
@@ -2031,7 +2034,10 @@ static void layout_content(void)
     si.nPos = scroll_y;
     SetScrollInfo(content_wnd, SB_VERT, &si, TRUE);
     in_layout = 0;
-    InvalidateRect(content_wnd, NULL, FALSE);
+    /* repaint the content and every control now, not when the message
+     * queue drains: while the wheel keeps scrolling the old images would
+     * stay on screen until then */
+    RedrawWindow(content_wnd, NULL, NULL, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
 }
 
 static void layout_main(void)

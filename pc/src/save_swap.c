@@ -150,6 +150,11 @@ void pc_card_swap_payload(void* payload, int size, int to_console)
             fprintf(stderr, "[pc] card: main save block %s console order" "%c", to_console ? "to" : "from", 10);
         }
         swap_main((struct gmm_x1868*) payload, to_console);
+        if (trace && !to_console) {
+            const struct gmm_x1868* m = (const struct gmm_x1868*) payload;
+            fprintf(stderr, "[pc] card: loaded save: characters %#x stages %#x trophies %d vs matches %u" "%c",
+                    m->unlocked_characers_bitmask, m->x186A, m->trophy_count, m->time_matches, 10);
+        }
     } else if (size == PC_SAVE_TAGS_SIZE) {
         int i;
         struct NameTagDataBank* bank = (struct NameTagDataBank*) payload;
