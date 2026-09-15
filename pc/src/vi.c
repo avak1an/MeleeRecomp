@@ -186,6 +186,7 @@ void VIWaitForRetrace(void)
 {
     pc_frame_count++;
     retrace_count++;
+    pc_state_frame();
     if (!pc_window_pump()) {
         fprintf(stderr, "[pc] window closed\n");
         pc_exit(0);

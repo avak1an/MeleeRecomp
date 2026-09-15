@@ -571,11 +571,18 @@ static OSTime host_ticks(void)
 {
     LARGE_INTEGER now;
     static OSTime virtual_calls;
-    if (!pc_config.realtime) {
-        /* Unpaced runs (headless tests, scripted routes) use a clock locked
-         * to the frame counter so alarms and timeouts fire on the same frame
-         * every run regardless of host speed. Each query also advances it a
-         * little so loops that spin on the tick counter still terminate. */
+    static int host_clock = -1;
+    if (host_clock < 0) {
+        host_clock = getenv("MELEE_HOST_CLOCK") != NULL;
+    }
+    if (!host_clock) {
+        /* The game's clock is locked to the frame counter, paced or not, so
+         * alarms, timeouts and the movie player advance on the same frame
+         * every run regardless of host speed: what the game computes never
+         * depends on how fast the host ran it (netplay needs exactly that).
+         * Each query also advances it a little so loops that spin on the
+         * tick counter still terminate. MELEE_HOST_CLOCK=1 restores the
+         * host's counter. */
         virtual_calls += 40;
         return (OSTime) pc_frame_count * (OSTime) (__OSBusClock / 4 / 60) + virtual_calls;
     }
@@ -593,19 +600,31 @@ OSTick OSGetTick(void)
 /// The game seeds its RNG from the tick counter at boot; --seed overrides.
 unsigned pc_game_seed(void)
 {
-    return pc_config.seed != 0 ? pc_config.seed : (unsigned) host_ticks();
+    LARGE_INTEGER now;
+    if (pc_config.seed != 0) {
+        return pc_config.seed;
+    }
+    /* the host's counter, not the game's frame-locked clock, which would
+     * give every unseeded boot the same seed */
+    QueryPerformanceCounter(&now);
+    return (unsigned) now.LowPart ^ (unsigned) time(NULL);
 }
 
 /* The console's time base counts from 2000-01-01 (the real-time clock);
  * the calendar offset at start-up is added so save comments and the
  * clock-dependent screens show today's date. */
+static OSTime time_epoch; /* file scope: the determinism check leaves it out by name */
+
 OSTime OSGetTime(void)
 {
-    static OSTime epoch;
-    if (epoch == 0) {
-        epoch = (OSTime) (time(NULL) - 946684800) * (OSTime) (__OSBusClock / 4);
+    if (time_epoch == 0) {
+        /* A seeded run gets a fixed calendar too: the title screen advances
+         * the random generator by the clock's current second, which is
+         * how the console varies its attract demo. */
+        time_t start = pc_config.seed != 0 ? (time_t) 946684800 + 24 * 3600 * 366 : time(NULL);
+        time_epoch = (OSTime) (start - 946684800) * (OSTime) (__OSBusClock / 4);
     }
-    return host_ticks() + epoch;
+    return host_ticks() + time_epoch;
 }
 
 void OSTicksToCalendarTime(OSTime ticks, OSCalendarTime* td)

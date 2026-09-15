@@ -94,12 +94,25 @@ card. The memory card is a raw image in Dolphin's format with the game's
 data in the console's byte order, so saves move between the port,
 Dolphin and a console without conversion, and `.gci` files import.
 
+**Milestone 10 (netplay) - in progress.** Step 1, determinism, is done:
+the game's clock is locked to the frame counter in every run (paced or
+not), a seeded run gets a fixed calendar (the title screen advances the
+random generator by the clock's second, which is how the console varies
+its attract demo), and the memory card stamps its times from the game's
+clock. `--state-hash` proves it: headless, windowed, paced, with
+anti-aliasing or screenshots, the game's memory hashes identically frame
+for frame through a whole match. The runtime's own globals now live in
+sections of their own so the check covers the game's state only. Next:
+saving and restoring the state for rollback, then input-delay lockstep
+over UDP, then rollback.
+
 Planned:
 
 - Adventure mode beyond its first stage, All-Star and the ending sequence
   (no routes yet); the open renderer questions under "Known gaps".
-- Native peer-to-peer netplay between copies of the port (the game already
-  replays deterministically from a seed).
+- Native peer-to-peer netplay between copies of the port (milestone 10;
+  not Slippi: that needs bit-identical emulation of the original
+  executable).
 
 ## Building (Windows)
 
@@ -246,6 +259,16 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
 - `MELEE_TRACE_POS=1`: every fighter's position, own velocity and motion
   state every frame (for movement that has no visible cause, such as the
   body push between fighters standing next to each other).
+  `MELEE_TRACE_RAND=1`: every draw of the game's random generator with its
+  caller, to compare two runs.
+- `--state-hash FILE`: write a hash of the game's state every frame (main
+  memory and the game's globals, without the runtime's own variables). Two
+  runs with the same inputs must produce identical files; the check behind
+  netplay. `--state-dump N:FILE` writes the state at frame N and
+  `--state-diff N:FILE` compares frame N of another run against it and
+  prints every differing place with its symbol, so the first frame whose
+  hash differs can be explained. `MELEE_STATE_ALL=1` includes the runtime's
+  own variables, `MELEE_STATE_IGNORE=sym,sym+OFF:LEN,...` leaves more out.
 - `MELEE_GX_PROFILE=1` (or `--profile`): every 300 frames, where the
   frame's wall time went (vertex processing, shader and texture lookups,
   EFB copies, the present, and the rest, which is the game logic and any
@@ -979,8 +1002,16 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   loops now pump completions), `item.c` (state tables with non-pointer
   words in the material/shape slots).
 - `pad.c`: scripted and headless runs ignore the host keyboard and
-  controllers; `runtime.c`: a frame-locked clock and calendar in unpaced
-  runs, so the same `--seed` replays the same match.
+  controllers; `runtime.c`: the game's clock (`OSGetTick`, `OSGetTime`,
+  alarms) is locked to the frame counter in every run, paced or not, so
+  nothing the game computes depends on how fast the host ran it
+  (`MELEE_HOST_CLOCK=1` restores the host counter); a seeded run also gets
+  a fixed calendar, and `card.c` stamps save times from that clock. With
+  that, the same `--seed` and inputs replay the same match in any
+  configuration, which is what netplay builds on (`--state-hash` checks
+  it). The runtime's globals are placed in their own sections
+  (`pc/include/pc_sections.h`, forced into every `pc/src` file) so the
+  check can tell the game's state from the host's.
 
 ## Known gaps (deliberate, for later milestones)
 

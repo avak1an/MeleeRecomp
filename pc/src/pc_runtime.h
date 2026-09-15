@@ -42,7 +42,16 @@ typedef struct PCConfig {
     const char* keymap;  ///< keyboard layout file (see pad.c)
     int volume;          ///< audio output volume in percent (default 100)
     bool no_audio;       ///< do not open the audio device
+    const char* state_hash; ///< --state-hash: per-frame hash file (determinism.c)
+    const char* state_dump; ///< --state-dump N:FILE
+    int state_dump_frame;
+    const char* state_diff; ///< --state-diff N:FILE
+    int state_diff_frame;
 } PCConfig;
+
+/// Per-frame state hash / dump / diff (determinism.c), from VIWaitForRetrace.
+void pc_state_frame(void);
+void pc_state_close(void);
 
 extern PCConfig pc_config;
 

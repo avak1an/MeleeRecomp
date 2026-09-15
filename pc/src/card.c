@@ -295,8 +295,10 @@ static void commit_system(void)
 
 static u32 now_seconds(void)
 {
-    /* seconds since 2000-01-01 00:00 UTC, as the console counts */
-    return (u32) (time(NULL) - 946684800);
+    /* seconds since 2000-01-01 00:00 UTC, as the console counts: from the
+     * game's clock (OSGetTime), so a seeded run stamps the same times every
+     * time and the game's state stays deterministic */
+    return (u32) OSTicksToSeconds(OSGetTime());
 }
 
 static void format_image(void)

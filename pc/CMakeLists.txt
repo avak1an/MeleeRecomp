@@ -52,7 +52,11 @@ set(SDK_SOURCES
 # PC runtime: hand-written replacements for the SDK plus generated stubs.
 file(GLOB PC_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c)
 set_source_files_properties(${MELEE_SOURCES} ${HSD_SOURCES} ${SDK_SOURCES} PROPERTIES COMPILE_OPTIONS "/Od;/Ob0")
-set_source_files_properties(${PC_SOURCES} PROPERTIES COMPILE_OPTIONS "/O2")
+# The runtime's own globals go to sections of their own (.pcdata/.pcbss, see
+# include/pc_sections.h), so the determinism check can hash the game's state
+# without the host-side state (renderer caches, audio device, timers).
+set_source_files_properties(${PC_SOURCES} PROPERTIES COMPILE_OPTIONS
+    "/O2;/FI${CMAKE_CURRENT_SOURCE_DIR}/include/pc_sections.h")
 set(PC_GENERATED ${CMAKE_CURRENT_SOURCE_DIR}/generated/stubs.c
                  ${CMAKE_CURRENT_SOURCE_DIR}/generated/yakumono_swap.c)
 

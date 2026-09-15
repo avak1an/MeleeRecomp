@@ -41,6 +41,9 @@ static void usage(void)
             "                  <first frame> <last frame> <buttons|-> [stickX stickY]\n"
             "                  buttons: A B X Y Z L R START UP DOWN LEFT RIGHT joined by +\n"
             "  --seed N        fixed RNG seed (default: the clock), for repeatable runs\n"
+            "  --state-hash FILE   write a hash of the game's memory every frame (determinism check)\n"
+            "  --state-dump N:FILE write the game's memory at frame N\n"
+            "  --state-diff N:FILE at frame N, list where memory differs from that dump\n"
             "  --quiet-stubs   do not log the first call of each SDK stub\n"
             "  --headless      no window; run the game logic only\n"
             "  --screenshots DIR  save a BMP of every 60th frame into DIR\n"
@@ -218,6 +221,25 @@ int main(int argc, char** argv)
             pc_config.screenshot_from = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--saves") == 0 && i + 1 < argc) {
             pc_config.save_dir = argv[++i];
+        } else if (strcmp(argv[i], "--state-hash") == 0 && i + 1 < argc) {
+            pc_config.state_hash = argv[++i];
+        } else if ((strcmp(argv[i], "--state-dump") == 0 || strcmp(argv[i], "--state-diff") == 0) && i + 1 < argc) {
+            /* N:FILE */
+            const char* opt = argv[i];
+            char* spec = argv[++i];
+            char* colon = strchr(spec, ':');
+            if (colon == NULL || colon == spec) {
+                fprintf(stderr, "[pc] %s needs FRAME:FILE\n", opt);
+                return 2;
+            }
+            *colon = 0;
+            if (strcmp(opt, "--state-dump") == 0) {
+                pc_config.state_dump_frame = atoi(spec);
+                pc_config.state_dump = colon + 1;
+            } else {
+                pc_config.state_diff_frame = atoi(spec);
+                pc_config.state_diff = colon + 1;
+            }
         } else if (strcmp(argv[i], "--mod") == 0 && i + 1 < argc) {
             pc_dvd_add_mod(argv[++i]);
             mods_given = true;
