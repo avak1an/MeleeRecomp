@@ -1,4 +1,7 @@
 #include "axdriver.h"
+#ifdef TARGET_PC
+#include <pc_endian.h>
+#endif
 
 #include <math.h>
 #include <string.h>
@@ -834,6 +837,27 @@ void AXDriver_8038DA70(const char* path, void (*callback)(void))
     }
 
     DVDClose(&fileInfo);
+
+#ifdef TARGET_PC
+    /* .sem file: four big-endian tables, each a 32-bit count followed by
+     * that many 32-bit words, then the command streams, which the driver
+     * reads as 32-bit words (AXDriver_8038C6C0). */
+    {
+        u32* w = (u32*) AXDriver_804D7798;
+        u8* end = (u8*) AXDriver_804D7798 + (AXDriver_804D779C & ~3u);
+        int t;
+        for (t = 0; t < 4; t++) {
+            u32 n;
+            pc_swap32(w);
+            n = *w++;
+            pc_swap32_range(w, n * 4);
+            w += n;
+        }
+        if ((u8*) w < end) {
+            pc_swap32_range(w, end - (u8*) w);
+        }
+    }
+#endif
 
     AXDriver_804D77A0 = ((s32*) AXDriver_804D7798)[0];
     count = AXDriver_804D77A0;

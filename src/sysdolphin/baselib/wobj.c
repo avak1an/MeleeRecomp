@@ -1,4 +1,7 @@
 #include "wobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include "aobj.h"
 #include "class.h"
@@ -95,6 +98,9 @@ void HSD_WObjInterpretAnim(HSD_WObj* wobj)
 
 static int WObjLoad(HSD_WObj* wobj, HSD_WObjDesc* desc)
 {
+#ifdef TARGET_PC
+    pc_swap_wobjdesc(desc);
+#endif
     HSD_WObjSetPosition(wobj, &desc->pos);
     if (wobj->robj != NULL) {
         HSD_RObjRemoveAll(wobj->robj);
@@ -109,6 +115,9 @@ void HSD_WObjInit(HSD_WObj* wobj, HSD_WObjDesc* desc)
     if (wobj == NULL || desc == NULL) {
         return;
     }
+#ifdef TARGET_PC
+    pc_swap_wobjdesc(desc);
+#endif
 
     HSD_WObjSetPosition(wobj, &desc->pos);
     if (wobj->robj != NULL) {

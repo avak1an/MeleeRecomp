@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grizumi.h"
 
 #include "granime.h"
@@ -185,6 +188,9 @@ void grIzumi_801CBB88(void)
     HSD_GObj* r3;
 
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grizumi(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     grIzumi_801CBCE8(0);

@@ -23,8 +23,7 @@
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/random.h>
 
-static MotionFlags const ftKb_MF_GwSpecialN_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit;
+STATIC_CONST(MotionFlags, ftKb_MF_GwSpecialN_Coll, ftCommon_GroundAirColl_MF | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit);
 
 /* 10CE5C */ static void fn_8010CE5C(Fighter_GObj* gobj);
 /* 10CFB0 */ static void fn_8010CFB0(Fighter_GObj* gobj);

@@ -4,69 +4,53 @@
 #include <melee/ft/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 
-static MotionFlags const ftGw_MF_Base = Ft_MF_SkipItemVis | Ft_MF_FreezeState;
+STATIC_CONST(MotionFlags, ftGw_MF_Base, Ft_MF_SkipItemVis | Ft_MF_FreezeState);
 
-static MotionFlags const ftGw_MF_Landing = Ft_MF_KeepColAnimHitStatus |
+STATIC_CONST(MotionFlags, ftGw_MF_Landing, Ft_MF_KeepColAnimHitStatus |
                                            Ft_MF_SkipHit | Ft_MF_KeepSfx |
-                                           Ft_MF_SkipParasol;
+                                           Ft_MF_SkipParasol);
 
-static MotionFlags const ftGw_MF_LandingAirB = ftGw_MF_Landing | Ft_MF_KeepGfx;
+STATIC_CONST(MotionFlags, ftGw_MF_LandingAirB, ftGw_MF_Landing | Ft_MF_KeepGfx);
 
-static MotionFlags const ftGw_MF_LandingAirHi =
-    ftGw_MF_LandingAirB | Ft_MF_KeepFastFall;
+STATIC_CONST(MotionFlags, ftGw_MF_LandingAirHi, ftGw_MF_LandingAirB | Ft_MF_KeepFastFall);
 
-static MotionFlags const ftGw_MF_Attack = ftGw_MF_Base | Ft_MF_KeepSfx;
+STATIC_CONST(MotionFlags, ftGw_MF_Attack, ftGw_MF_Base | Ft_MF_KeepSfx);
 
-static MotionFlags const ftGw_MF_AttackLw3 = ftGw_MF_Attack | Ft_MF_SkipHit;
+STATIC_CONST(MotionFlags, ftGw_MF_AttackLw3, ftGw_MF_Attack | Ft_MF_SkipHit);
 
-static MotionFlags const ftGw_MF_AttackAirN = ftGw_MF_Attack | ftGw_MF_Landing;
+STATIC_CONST(MotionFlags, ftGw_MF_AttackAirN, ftGw_MF_Attack | ftGw_MF_Landing);
 
-static MotionFlags const ftGw_MF_AttackAirB =
-    ftGw_MF_AttackAirN | Ft_MF_KeepGfx;
+STATIC_CONST(MotionFlags, ftGw_MF_AttackAirB, ftGw_MF_AttackAirN | Ft_MF_KeepGfx);
 
-static MotionFlags const ftGw_MF_AttackAirHi =
-    ftGw_MF_AttackAirB | Ft_MF_KeepFastFall;
+STATIC_CONST(MotionFlags, ftGw_MF_AttackAirHi, ftGw_MF_AttackAirB | Ft_MF_KeepFastFall);
 
-static MotionFlags const ftGw_MF_AttackS4 =
-    ftGw_MF_AttackLw3 | Ft_MF_KeepFastFall | Ft_MF_SkipRumble;
+STATIC_CONST(MotionFlags, ftGw_MF_AttackS4, ftGw_MF_AttackLw3 | Ft_MF_KeepFastFall | Ft_MF_SkipRumble);
 
-static MotionFlags const ftGw_MF_Attack11 =
-    ftGw_MF_Attack | Ft_MF_KeepFastFall | Ft_MF_Unk19;
+STATIC_CONST(MotionFlags, ftGw_MF_Attack11, ftGw_MF_Attack | Ft_MF_KeepFastFall | Ft_MF_Unk19);
 
-static MotionFlags const ftGw_MF_Attack100 =
-    ftGw_MF_Attack | Ft_MF_KeepColAnimHitStatus | Ft_MF_Unk19;
+STATIC_CONST(MotionFlags, ftGw_MF_Attack100, ftGw_MF_Attack | Ft_MF_KeepColAnimHitStatus | Ft_MF_Unk19);
 
-static MotionFlags const ftGw_MF_Special =
-    ftGw_MF_Base | Ft_MF_SkipModel | Ft_MF_UnkUpdatePhys;
+STATIC_CONST(MotionFlags, ftGw_MF_Special, ftGw_MF_Base | Ft_MF_SkipModel | Ft_MF_UnkUpdatePhys);
 
-static MotionFlags const ftGw_MF_SpecialS = ftGw_MF_Special | Ft_MF_KeepGfx;
+STATIC_CONST(MotionFlags, ftGw_MF_SpecialS, ftGw_MF_Special | Ft_MF_KeepGfx);
 
-static MotionFlags const ftGw_MF_SpecialHi =
-    ftGw_MF_Special | Ft_MF_KeepFastFall | Ft_MF_KeepGfx;
+STATIC_CONST(MotionFlags, ftGw_MF_SpecialHi, ftGw_MF_Special | Ft_MF_KeepFastFall | Ft_MF_KeepGfx);
 
-static MotionFlags const ftGw_MF_SpecialLwCatch =
-    ftGw_MF_Special | Ft_MF_KeepColAnimHitStatus;
+STATIC_CONST(MotionFlags, ftGw_MF_SpecialLwCatch, ftGw_MF_Special | Ft_MF_KeepColAnimHitStatus);
 
-static MotionFlags const ftGw_MF_SpecialN =
-    ftGw_MF_Special | Ft_MF_KeepFastFall | Ft_MF_SkipThrowException;
+STATIC_CONST(MotionFlags, ftGw_MF_SpecialN, ftGw_MF_Special | Ft_MF_KeepFastFall | Ft_MF_SkipThrowException);
 
-static MotionFlags const ftGw_MF_SpecialAirS =
-    ftGw_MF_SpecialS | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftGw_MF_SpecialAirS, ftGw_MF_SpecialS | Ft_MF_SkipParasol);
 
-static MotionFlags const ftGw_MF_SpecialAirHi =
-    ftGw_MF_SpecialHi | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftGw_MF_SpecialAirHi, ftGw_MF_SpecialHi | Ft_MF_SkipParasol);
 
-static MotionFlags const ftGw_MF_SpecialAirLwCatch =
-    ftGw_MF_SpecialLwCatch | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftGw_MF_SpecialAirLwCatch, ftGw_MF_SpecialLwCatch | Ft_MF_SkipParasol);
 
-static MotionFlags const ftGw_MF_SpecialAirN =
-    ftGw_MF_SpecialN | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftGw_MF_SpecialAirN, ftGw_MF_SpecialN | Ft_MF_SkipParasol);
 
-static MotionFlags const ftGw_MF_SpecialLw =
-    ftGw_MF_SpecialLwCatch | Ft_MF_Unk19;
+STATIC_CONST(MotionFlags, ftGw_MF_SpecialLw, ftGw_MF_SpecialLwCatch | Ft_MF_Unk19);
 
-static MotionFlags const ftGw_MF_SpecialAirLw =
-    ftGw_MF_SpecialLw | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftGw_MF_SpecialAirLw, ftGw_MF_SpecialLw | Ft_MF_SkipParasol);
 
 /// Mr. Game & Watch Motion State IDs
 typedef enum ftGameWatch_MotionState {

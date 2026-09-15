@@ -20,10 +20,8 @@
 #include <melee/ft/types.h>
 #include <melee/it/kinds/itfoxillusion.h>
 
-static MotionFlags const ftFx_MF_SpecialS_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_SkipRumble;
-static MotionFlags const ftFx_MF_SpecialSDash_Coll =
-    ftFx_MF_SpecialS_Coll | Ft_MF_KeepColAnimHitStatus;
+STATIC_CONST(MotionFlags, ftFx_MF_SpecialS_Coll, ftCommon_GroundAirColl_MF | Ft_MF_SkipRumble);
+STATIC_CONST(MotionFlags, ftFx_MF_SpecialSDash_Coll, ftFx_MF_SpecialS_Coll | Ft_MF_KeepColAnimHitStatus);
 
 /// 0x800E9DF8
 /// https://decomp.me/scratch/5Qwzg // Create Fox Illusion / Falco Phantasm GFX

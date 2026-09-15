@@ -1,4 +1,7 @@
 #include "fog.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include "aobj.h"
 #include "class.h"
@@ -92,6 +95,9 @@ HSD_Fog* HSD_FogAlloc(void)
 
 HSD_Fog* HSD_FogLoadDesc(HSD_FogDesc* desc)
 {
+#ifdef TARGET_PC
+    pc_swap_fogdesc(desc);
+#endif
     HSD_Fog* fog = HSD_FogAlloc();
     HSD_ASSERT(0x99, fog);
     HSD_FogInit(fog, desc);
@@ -103,6 +109,9 @@ HSD_Fog* HSD_FogLoadDesc(HSD_FogDesc* desc)
 
 void HSD_FogInit(HSD_Fog* fog, HSD_FogDesc* desc)
 {
+#ifdef TARGET_PC
+    pc_swap_fogdesc(desc);
+#endif
     if (fog != NULL) {
         if (desc != NULL) {
             fog->type = desc->type;
@@ -132,6 +141,9 @@ HSD_FogAdj* HSD_FogAdjAlloc(void)
 
 HSD_FogAdj* HSD_FogAdjLoadDesc(HSD_FogAdjDesc* desc)
 {
+#ifdef TARGET_PC
+    pc_swap_fogadjdesc(desc);
+#endif
     HSD_FogAdj* adj = HSD_FogAdjAlloc();
     HSD_ASSERT(0xE6, adj);
     HSD_FogAdjInit(adj, desc);
@@ -140,6 +152,9 @@ HSD_FogAdj* HSD_FogAdjLoadDesc(HSD_FogAdjDesc* desc)
 
 void HSD_FogAdjInit(HSD_FogAdj* adj, HSD_FogAdjDesc* desc)
 {
+#ifdef TARGET_PC
+    pc_swap_fogadjdesc(desc);
+#endif
     if (adj != NULL) {
         if (desc != NULL) {
             adj->width = desc->width;

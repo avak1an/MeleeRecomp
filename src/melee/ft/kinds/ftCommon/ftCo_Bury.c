@@ -1,4 +1,7 @@
 #include "ftCo_Bury.h"
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 
 #include <Runtime/platform.h>
 
@@ -189,6 +192,11 @@ void ftCo_800C0B20(Fighter_GObj* gobj)
             HitCapsule hit;
             float f;
             fp = GET_FIGHTER(gobj);
+#ifdef TARGET_PC
+            /* the floor's hazard description, straight from the stage
+             * file (Mute City's road) */
+            pc_swap_hazard_hit(unk_anim);
+#endif
             f = ftColl_800765F0(fp, NULL, unk_anim->count);
             hurt_idx = 0;
             fp->bury_timer_1 = p_ftCommonData->bury_timer_unk1;

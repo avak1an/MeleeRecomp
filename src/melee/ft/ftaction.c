@@ -1,3 +1,8 @@
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#include "pc_runtime.h"
+#include <stdlib.h>
+#endif
 #include "ftaction.h"
 
 #include <Runtime/platform.h>
@@ -1221,7 +1226,7 @@ void ftAction_80072E4C(Fighter_GObj* gobj, CommandInfo* cmd)
     }
 
     if (gfx_id == -1) {
-        gfx_id = ((u16*) cmd->u)[1];
+        gfx_id = ((u16*) cmd->u)[CMD_HALF(1)];
     }
     offset.z = 0.0f;
     range.z = 0.0f;
@@ -1337,10 +1342,29 @@ void ftAction_80073240(Fighter_GObj* fighter_gobj)
             } else if (ftCommand->timer > 0.0f) {
                 break;
             }
+#ifdef TARGET_PC
+            if (!pc_swap_ptr_ok(ftCommand->u)) {
+                OSReport("[pc] fighter script: pointer %p is outside memory (loop depth %d, "
+                         "returns %p %p %p %p)\n",
+                         (void*) ftCommand->u, ftCommand->loop_count, ftCommand->event_return[0],
+                         ftCommand->event_return[1], ftCommand->event_return[2],
+                         ftCommand->event_return[3]);
+                pc_print_backtrace();
+                ftCommand->u = NULL;
+                break;
+            }
+#endif
             eventCode =
                 gmScriptEventCast(ftCommand->u, gmScriptEventDefault)->opcode;
             if (Command_Execute(ftCommand, eventCode) == false) {
                 eventCode -= 0xA;
+                #ifdef TARGET_PC
+                if (eventCode >= ARRAY_SIZE(ftAction_803C06E8) || ftAction_803C06E8[eventCode] == NULL) {
+                    u32* w = (u32*) ftCommand->u;
+                    OSReport("[pc] fighter script: bad event %u at %p: %08x %08x %08x %08x (before: %08x %08x)\n",
+                             eventCode + 10, (void*) w, w[0], w[1], w[2], w[3], w[-2], w[-1]);
+                }
+#endif
                 ftAction_803C06E8[eventCode](fighter_gobj, ftCommand);
             }
         } while (F32_MAX != ftCommand->timer);
@@ -1377,6 +1401,13 @@ void ftAction_80073354(Fighter_GObj* gobj)
                     gmScriptEventCast(cmd->u, gmScriptEventDefault)->opcode;
                 if (Command_Execute(cmd, eventCode) == false) {
                     eventCode -= 0xA;
+                    #ifdef TARGET_PC
+                    if (eventCode >= ARRAY_SIZE(ftAction_803C07AC) || ftAction_803C07AC[eventCode] == NULL) {
+                        u32* w = (u32*) cmd->u;
+                        OSReport("[pc] fighter script: bad event %u at %p: %08x %08x %08x %08x (before: %08x %08x)\n",
+                                 eventCode + 10, (void*) w, w[0], w[1], w[2], w[3], w[-2], w[-1]);
+                    }
+#endif
                     ftAction_803C07AC[eventCode](gobj, cmd);
                 }
                 if (cmd->timer != timer && cmd->timer <= 0.0f) {

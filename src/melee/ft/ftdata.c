@@ -1,4 +1,10 @@
 #include "ftdata.h"
+#ifdef TARGET_PC
+#include <stdlib.h>
+#endif
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 
 #include <Runtime/platform.h>
 
@@ -1568,6 +1574,11 @@ void ftData_8008572C(FighterKind kind)
     if (gFtDataList[kind] == NULL) {
         lbArchive_80017040(NULL, ftData_803C1F40[kind].a, &gFtDataList[kind],
                            ftData_803C1F40[kind].b, 0);
+#ifdef TARGET_PC
+        pc_swap_ftdata(gFtDataList[kind], ftData_Table_Unk0[kind].count,
+                       ftData_UnkIntPairs[kind].count,
+                       CostumeListsForeachCharacter[kind].numCostumes);
+#endif
     }
 }
 
@@ -1736,6 +1747,9 @@ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
     struct Fighter_WaitAnimData* temp_r3;
     u32 temp_r3_2;
     u32 temp_r4_2;
+#ifdef TARGET_PC
+    bool copied = false;
+#endif
 
     if (msid < arg1->x58C) {
         temp_r3 = (struct Fighter_WaitAnimData*) ftData_80085FD4(arg1, msid);
@@ -1746,6 +1760,9 @@ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
                 if ((temp_r3_3 != NULL) &&
                     (temp_r3->x14 == (u32) temp_r3_3->x5A4))
                 {
+#ifdef TARGET_PC
+                    copied = true;
+#endif
                     memcpy(fp->x59C, temp_r3_3->x59C, temp_r3->x8);
                     temp_r4 = fp->x59C;
                     temp_ret = lbArchiveRelocate(
@@ -1771,6 +1788,18 @@ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
                     }
                 }
                 fp->x590 = HSD_ArchiveGetPublicAddress(&sp14, temp_r3->x0);
+#ifdef TARGET_PC
+                /* a copy taken from another fighter (the first branch) is
+                 * already in host order: swapping it again would break
+                 * the animation (a fan swing that never ended) */
+                if (!copied) {
+                    pc_swap_figatree(fp->x590);
+                }
+                if (getenv("MELEE_TRACE_MOTION") != NULL) {
+                    OSReport("[pc] fighter %d anim %d: figatree %p%s\n", fp->player_id, msid, (void*) fp->x590,
+                             copied ? " (copied from another fighter)" : "");
+                }
+#endif
             } else {
                 fp->x590 = NULL;
             }
@@ -1790,6 +1819,9 @@ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
     u32 temp_r3_2;
     u32 temp_r4_2;
 
+#ifdef TARGET_PC
+    bool copied = false;
+#endif
     if (msid < arg0->x58C) {
         temp_r3 = ftData_80085FD4(arg0, msid);
         temp_r3_2 = temp_r3->x14;
@@ -1799,6 +1831,9 @@ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
                 if ((temp_r3_3 != NULL) &&
                     (temp_r3->x14 == (u32) temp_r3_3->x5A4))
                 {
+#ifdef TARGET_PC
+                    copied = true;
+#endif
                     memcpy(arg0->x59C, temp_r3_3->x59C, temp_r3->x8);
                     temp_r4 = arg0->x59C;
                     temp_ret = lbArchiveRelocate(
@@ -1824,6 +1859,16 @@ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
                     }
                 }
                 arg0->x598 = HSD_ArchiveGetPublicAddress(&sp10, temp_r3->x0);
+#ifdef TARGET_PC
+                /* this loader reads a figatree only for its frame count
+                 * (the landing and jump animation lengths); unswapped the
+                 * lengths were denormals and LandingFallSpecial ran at a
+                 * speed of nearly zero: a fighter stood still for good
+                 * after landing from an up special. */
+                if (!copied) {
+                    pc_swap_figatree(arg0->x598);
+                }
+#endif
             } else {
                 arg0->x598 = 0;
             }

@@ -1,4 +1,9 @@
 #include "hsd_3A94.h"
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#include <pc_game_swap.h>
+#include <stdlib.h>
+#endif
 
 #include "hsd_3B2B.h"
 #include "hsd_3B2E.h"
@@ -102,8 +107,16 @@ typedef struct CardQueueEntry {
 
 /* 3A949C */ static void hsd_803A949C(s32 chan, s32 arg1);
 /* 3ACB74 */ static s32 fn_803ACB74(s32 seq_a, s32 seq_b);
+#ifdef TARGET_PC
+#define hsd_804D1148 (*(u32(*)[0x80][0x9]) (hsd_card_area + 0x10))
+#else
 /* 4D1148 */ extern u32 hsd_804D1148[0x80][0x9];
+#endif
+#ifdef TARGET_PC
+#define hsd_804D2348 (*(__baselib_UnkType003*) (hsd_card_area + 0x1210))
+#else
 /* 4D2348 */ extern __baselib_UnkType003 hsd_804D2348;
+#endif
 /* 4D7980 */ extern volatile s32 hsd_804D7980;
 /* 4D7984 */ extern volatile s32 hsd_804D7984;
 /* 4D7988 */ extern s32 hsd_804D7988;
@@ -187,6 +200,9 @@ void hsd_803A949C(s32 chan, s32 arg1)
                 if (CMD_PTR(0x28) != NULL) {
                     u8* src = (u8*) (offset + (u32) state->x0);
                     memcpy(CMD_PTR(0x28), src + 0x20, CMD_S32(0x30));
+#ifdef TARGET_PC
+                    pc_card_swap_payload(CMD_PTR(0x28), CMD_S32(0x30), 0);
+#endif
                 }
             }
             result = hsd_803A949C_Close(state);
@@ -198,6 +214,9 @@ void hsd_803A949C(s32 chan, s32 arg1)
             }
             if (CMD_S32(0x30) > 0 && CMD_PTR(0x28) != NULL) {
                 memcpy((void*) CMD_S32(0x28), state->x0 + 0x20, CMD_S32(0x30));
+#ifdef TARGET_PC
+                pc_card_swap_payload(CMD_PTR(0x28), CMD_S32(0x30), 0);
+#endif
             }
             result = hsd_803A949C_Close(state);
         }
@@ -693,6 +712,30 @@ s32 fn_803AA790(void)
 #define CMD_X1C cmd[7]
 #define CMD_X20 cmd[8]
 
+#ifdef TARGET_PC
+/* A sector carries a whole sector's worth of an entry (the copy over-reads
+ * past a short entry, as on the console); the entry itself starts where
+ * the copy starts from the entry's buffer, and that is what is converted
+ * to console byte order. */
+static void pc_swap_entry_out(CardState* state, s32 idx, const void* src,
+                              void* dst, s32 size)
+{
+    /* a whole-file write copies from the entry's registered buffer; a
+     * single-entry update (the results screen's save) registers no buffer
+     * and passes the entry itself, at its own size */
+    if (state != NULL && idx >= 0 && idx < 9 &&
+        (src == state->x70[idx].ptr || state->x70[idx].ptr == NULL) &&
+        state->x4C[idx] > 0 && state->x4C[idx] <= size)
+    {
+        pc_card_swap_payload(dst, state->x4C[idx], 1);
+    } else if (getenv("MELEE_TRACE_CARD") != NULL) {
+        fprintf(stderr, "[pc] card: sector copy not converted: entry %d src %p (entry %p, %d bytes) chunk %d\n", idx, src,
+                state != NULL && idx >= 0 && idx < 9 ? state->x70[idx].ptr : NULL,
+                state != NULL && idx >= 0 && idx < 9 ? state->x4C[idx] : 0, size);
+    }
+}
+#endif
+
 static inline s32 retryCardFastOpen(s32 chan, s32 file_no,
                                     CARDFileInfo* file_info)
 {
@@ -897,6 +940,15 @@ void hsd_803AAA48(void)
 {
     s32 r;
     s32 chan;
+#ifdef TARGET_PC
+    static int trace = -1;
+    /* the game spins on this function while card requests are in flight;
+     * their completions are delivered from the pump */
+    pc_pump();
+    if (trace < 0) {
+        trace = getenv("MELEE_TRACE_CARD") != NULL;
+    }
+#endif
     while (1) {
         CardContext* ctx = (CardContext*) hsd_804D1138;
         CardState** state = &ctx->x4;
@@ -924,6 +976,13 @@ void hsd_803AAA48(void)
 
         cmd = (s32*) &((CardBufEntry*) ctx)[hsd_804D7980];
         type = *(cmd += 4);
+#ifdef TARGET_PC
+        if (trace) {
+            OSReport("[card] run idx=%d type=%d state=%p x8=%d res=%d entry=%u cmd=%u\n",
+                     hsd_804D7980, type, (void*) cmd[1], cmd[2], hsd_804D7988,
+                     (unsigned) sizeof(CardBufEntry), (unsigned) sizeof(CardCmd));
+        }
+#endif
 
         switch ((u32) type) {
         case 0:
@@ -1144,6 +1203,10 @@ void hsd_803AAA48(void)
                 size = CMD_X20;
                 if (size > 0 && CMD_X18 != NULL) {
                     memcpy(&CMD_STATE->x0[hdr_offset + 0x20], CMD_X18, size);
+#ifdef TARGET_PC
+                    pc_swap_entry_out(CMD_STATE, CMD_X8, CMD_X18,
+                                      &CMD_STATE->x0[hdr_offset + 0x20], size);
+#endif
                 }
                 rem = (CMD_STATE->x8 - hdr_offset) - size - 0x20;
                 if (rem != 0) {
@@ -1454,6 +1517,12 @@ s32 fn_803AC168(s32* cmd_buf)
         s32 idx = hsd_804D7984;
         hsd_804D7984 = (hsd_804D7984 + 1) % 128;
         memcpy((u8*) hsd_804D1148[idx], cmd_buf, sizeof(CardCmd));
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_CARD") != NULL) {
+            OSReport("[card] queue idx=%d type=%d state=%p x8=%d xC=%d x10=%d\n", idx,
+                     cmd_buf[0], (void*) cmd_buf[1], cmd_buf[2], cmd_buf[3], cmd_buf[4]);
+        }
+#endif
     }
 
     if (mode == 2) {
@@ -2084,6 +2153,11 @@ s32 fn_803ACFC0(CardState* state, s32 block_idx, s32 file_id, s32 seq_num,
     if (payload_size > 0) {
         memcpy(&fn_803ACFC0_header(state, hdr_offset)[0x20], payload,
                payload_size);
+#ifdef TARGET_PC
+        pc_swap_entry_out(state, version, payload,
+                          &fn_803ACFC0_header(state, hdr_offset)[0x20],
+                          payload_size);
+#endif
     }
 
     {
@@ -2753,6 +2827,9 @@ static inline s32 readCardDataBlockFirst(CardState* state, u32 sector_size,
     }
     if (length != 0 && dst != NULL) {
         memcpy(dst, state->x0 + (read_ofs + 0x20), length);
+#ifdef TARGET_PC
+        pc_card_swap_payload(dst, length, 0);
+#endif
     }
     return 0;
 }
@@ -2794,6 +2871,9 @@ static inline s32 readCardDataBlockFinal(CardState* state, u32 sector_size,
     }
     if (length != 0 && dst != NULL) {
         memcpy(dst, state->x0 + (read_ofs + 0x20), length);
+#ifdef TARGET_PC
+        pc_card_swap_payload(dst, length, 0);
+#endif
     }
     return 0;
 }

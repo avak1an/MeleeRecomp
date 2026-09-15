@@ -1,4 +1,9 @@
 #include "particle.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#include "pc_runtime.h"
+extern int pc_debug_gx;
+#endif
 
 #include "generator.h"
 
@@ -48,6 +53,9 @@ typedef struct {
 /* 4D78EC */ u32 hsd_804D78EC = 0;
 /* 4D78F0 */ HSD_CObj* psCamera = NULL;
 /* 4D78F4 */ u32 hsd_804D78F4 = 0;
+#ifdef TARGET_PC
+struct pc_particle_block pc_particle_block; /* see particle.h */
+#else
 static HSD_JObj* hsd_804D08E8[8];
 /* 4D0908 */ HSD_Particle* hsd_804D0908[16];
 /* 4D0948 */ u32* hsd_804D0948[65];
@@ -57,6 +65,7 @@ static HSD_JObj* hsd_804D08E8[8];
 /* 4D0D58 */ int psCmdListArray[65];
 /* 4D0E5C */ HSD_PSCmdList** ptclref_804D0E5C[65];
 /* 4D0F60 */ struct hsd_804D0F60_t hsd_804D0F60;
+#endif
 
 typedef struct PSNode {
     /* 0x00 */ struct PSNode* child;
@@ -152,6 +161,10 @@ void psInitDataBankLoad(int bank, const int* cmdBank, const int* texBank,
         break;
     }
     default:
+#ifdef TARGET_PC
+        OSReport("[pc] particle bank %d at %p: version 0x%04x, words %08x %08x %08x\n", bank,
+                 cmdBank, version, ((u32*) cmdBank)[0], ((u32*) cmdBank)[1], ((u32*) cmdBank)[2]);
+#endif
         OSPanic(__FILE__, 207, "psInitDataBanks: unknown version\n");
     }
 }
@@ -159,6 +172,9 @@ void psInitDataBankLoad(int bank, const int* cmdBank, const int* texBank,
 void psInitDataBankLocate(HSD_Archive* cmdBank, HSD_Archive* texBank,
                           int* formBank)
 {
+#ifdef TARGET_PC
+    pc_swap_ps_banks(cmdBank, texBank, formBank);
+#endif
     s32 num;
     s32* ptr;
     s32* group;
@@ -206,6 +222,11 @@ version40:
     }
 
 done_cmd:
+#ifdef TARGET_PC
+    if (pc_debug_gx) {
+        OSReport("[gx]   after reloc: %08x num %d num2 %d\n", *(u32*) cmdBank, num, num2);
+    }
+#endif
     /* Phase 2: Fix cmdList kind bits */
     ptr = base + num;
     for (i = num; i < num2; i++) {
@@ -218,6 +239,11 @@ done_cmd:
         ptr++;
     }
 
+#ifdef TARGET_PC
+    if (pc_debug_gx) {
+        OSReport("[gx]   after kind fix: %08x\n", *(u32*) cmdBank);
+    }
+#endif
     /* Phase 3: texBank relocation */
     {
         s32 num_groups = ((s32*) texBank)[0];
@@ -631,10 +657,21 @@ s32 hsd_803991D8(HSD_Generator* gen, HSD_JObj* jobj, f32 force, f32 range)
 static inline void psReadFloat(u8** stream)
 {
     u8* p = *stream;
+#ifdef TARGET_PC
+    /* the bytecode's float operands are big-endian bytes; assembled in
+     * stream order on a little-endian host they came out reversed (a size
+     * of 6.0 read as a denormal, 5.2 as 2.7e23: the giant flat triangles
+     * over the screen during Fire Fox were particle quads that big) */
+    ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[3] = *p++;
+    ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[2] = *p++;
+    ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[1] = *p++;
+    ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[0] = *p++;
+#else
     ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[0] = *p++;
     ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[1] = *p++;
     ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[2] = *p++;
     ((ParticleFloatBytes*) &hsd_804D78D0)->bytes[3] = *p++;
+#endif
     *stream = p;
 }
 
@@ -3051,10 +3088,31 @@ void hsd_8039D0A0(HSD_Generator* gen)
 
     prev = NULL;
     idnum = gen->idnum;
+#ifdef TARGET_PC
+    if (gen->linkNo >= 146) {
+        OSReport("[pc] particle generator %p: link %d bank %d kind %d texGroup %d id %d\n", (void*) gen,
+                 gen->linkNo, gen->bank, gen->kind, gen->texGroup, idnum);
+    }
+#endif
     head = &data->particle[gen->linkNo];
     prt = *head;
 
     while (prt != NULL) {
+#ifdef TARGET_PC
+        if (!pc_swap_ptr_ok(prt)) {
+            /* corrupted list link: still under investigation (seen after
+             * item effects); drop the rest of the list instead of crashing */
+            OSReport("[pc] particle list %d of generator %p (bank %d kind %d id %d) is corrupt at %p (slot %p, frame %u)\n",
+                     gen->linkNo, (void*) gen, gen->bank, gen->kind, idnum, (void*) prt,
+                     prev == NULL ? (void*) head : (void*) &prev->next, pc_frame_count);
+            if (prev == NULL) {
+                *head = NULL;
+            } else {
+                prev->next = NULL;
+            }
+            break;
+        }
+#endif
         next = prt->next;
         if (prt->idnum == idnum && prt->gen != NULL && prt->gen == gen) {
             if (prt->gen != NULL && prt->gen->userfunc != NULL &&

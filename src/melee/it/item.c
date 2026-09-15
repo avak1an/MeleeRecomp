@@ -1,3 +1,7 @@
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#include <pc_hsd_swap.h>
+#endif
 #include "item.h"
 
 #include <melee/lb/forward.h>
@@ -42,6 +46,10 @@
 #include <sysdolphin/baselib/gobjproc.h>
 #include <sysdolphin/baselib/gobjuserdata.h>
 #include <sysdolphin/baselib/jobj.h>
+#ifdef TARGET_PC
+#include <stdint.h>
+#include <stdlib.h>
+#endif
 
 /* 267130 */ static void Item_80267130(HSD_GObj* gobj, SpawnItem* spawnItem);
 /* 2674AC */ static void Item_802674AC(SpawnItem* spawnItem);
@@ -921,6 +929,19 @@ static HSD_GObj* Item_8026862C(SpawnItem* spawnItem)
     if (gobj == NULL) {
         return NULL;
     }
+#ifdef TARGET_PC
+    if (getenv("MELEE_POKEMON") != NULL && spawnItem->kind >= It_PKind_Start &&
+        spawnItem->kind < It_PKind_Terminate)
+    {
+        /* debugging aid: every Poke Ball releases this Pokemon (item kind) */
+        spawnItem->kind = (ItemKind) atoi(getenv("MELEE_POKEMON"));
+    }
+    if (getenv("MELEE_TRACE_MOTION") != NULL) {
+        extern uint32_t pc_frame_count;
+        OSReport("[pc] frame %u: item spawn kind %d hold %d at (%.1f %.1f)\n", pc_frame_count, spawnItem->kind,
+                 spawnItem->hold_kind, spawnItem->pos.x, spawnItem->pos.y);
+    }
+#endif
     if (spawnItem->kind < It_Kind_Kuriboh) {
         // Common items
         GObj_SetupGXLink(gobj, it_803F1418[spawnItem->kind].x0_renderFunc, 6,
@@ -1038,6 +1059,28 @@ static void Item_80268BE0(HSD_JObj* item_jobj, HSD_AnimJoint* anim_joint,
                 }
             }
         }
+#ifdef TARGET_PC
+        /* Some state tables (Corneria's laser) carry non-pointer words in
+         * the material/shape animation slots; the console never reaches
+         * them because their model has no such animations. */
+        if (!pc_swap_ptr_ok(matanim_joint)) {
+            matanim_joint = NULL;
+        }
+        if (!pc_swap_ptr_ok(shapeanim_joint)) {
+            shapeanim_joint = NULL;
+        }
+        if (!pc_swap_ptr_ok(anim_joint)) {
+            u32* w = (u32*) item_data->xC4_article_data->xC_itemStates;
+            int k;
+            OSReport("[pc] item %d anim: bad joints anim=%p mat=%p shape=%p (states %p, state %d):",
+                     item_data->kind, (void*) anim_joint, (void*) matanim_joint,
+                     (void*) shapeanim_joint, (void*) w, item_data->msid);
+            for (k = 0; k < 28; k++) {
+                OSReport("%s%08x", (k % 4) == 0 ? " | " : " ", w[k]);
+            }
+            OSReport("\n");
+        }
+#endif
         HSD_JObjAddAnim(item_jobj, anim_joint, matanim_joint, shapeanim_joint);
         if (item_jobj->child != NULL) {
             functionArg1 = NULL;
@@ -1111,6 +1154,9 @@ void Item_80268DD4(HSD_GObj* gobj, f32 frame)
 /// Copy item script
 void Item_80268E40(Item* item_data, struct ItemStateDesc* itemStateDesc)
 {
+#ifdef TARGET_PC
+    pc_swap_script(itemStateDesc->xC_script, PC_SCRIPT_ITEM);
+#endif
     item_data->x524_cmd.u = itemStateDesc->xC_script;
     item_data->x524_cmd.loop_count = 0;
     item_data->x524_cmd.timer = 0.0f;
@@ -1209,10 +1255,16 @@ void Item_80268E5C(HSD_GObj* gobj, enum_t msid, Item_StateChangeFlags flags)
                 HSD_JObjSetScaleItem(gobj->user_data, gobj->hsd_obj, &scl);
             }
 
+#ifdef TARGET_PC
+            pc_swap_script(temp_r29->xC_script, PC_SCRIPT_ITEM);
+#endif
             item_data->x524_cmd.u = temp_r29->xC_script;
             item_data->x524_cmd.loop_count = 0;
             item_data->x524_cmd.timer = 0.0F;
         } else if (temp_r23 != NULL && (flags & ITEM_CMD_UPDATE)) {
+#ifdef TARGET_PC
+            pc_swap_script(temp_r29->xC_script, PC_SCRIPT_ITEM);
+#endif
             item_data->x524_cmd.u = temp_r29->xC_script;
             item_data->x524_cmd.loop_count = 0;
             item_data->x524_cmd.timer = 0.0f;

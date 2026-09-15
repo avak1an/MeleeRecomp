@@ -209,10 +209,9 @@ void ftPk_SpecialAirSHold_Coll(HSD_GObj* gobj)
     }
 }
 
-static u32 const transition_flags1 =
-    Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipMatAnim |
+STATIC_CONST(u32, transition_flags1, Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipMatAnim |
     Ft_MF_KeepSfx | Ft_MF_SkipColAnim | Ft_MF_UpdateCmd | Ft_MF_SkipItemVis |
-    Ft_MF_Unk19 | Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_Unk19 | Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 void ftPk_SpecialS_ChangeMotion_Unk02(HSD_GObj* gobj)
 {
@@ -313,10 +312,9 @@ void ftPk_SpecialAirS0_Coll(HSD_GObj* gobj)
     }
 }
 
-static u32 const transition_flags2 =
-    Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipMatAnim |
+STATIC_CONST(u32, transition_flags2, Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipMatAnim |
     Ft_MF_SkipColAnim | Ft_MF_UpdateCmd | Ft_MF_SkipItemVis | Ft_MF_Unk19 |
-    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 void ftPk_SpecialS_ChangeMotion_Unk06(HSD_GObj* gobj)
 {
@@ -409,7 +407,7 @@ void ftPk_SpecialAirS1_Coll(HSD_GObj* gobj)
     }
 }
 
-static u32 const transition_flags3 = Ft_MF_KeepGfx | Ft_MF_SkipHit;
+STATIC_CONST(u32, transition_flags3, Ft_MF_KeepGfx | Ft_MF_SkipHit);
 
 void ftPk_SpecialS_ChangeMotion_Unk10(HSD_GObj* gobj)
 {

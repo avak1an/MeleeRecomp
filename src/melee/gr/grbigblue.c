@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grbigblue.h"
 
 #include <Runtime/platform.h>
@@ -223,6 +226,9 @@ void grBigBlue_801E57C0(void)
     PAD_STACK(12);
 
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grbigblue(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     grBigBlue_801E59F8(0x1F);

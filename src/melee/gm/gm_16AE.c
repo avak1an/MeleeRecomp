@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#endif
 #include "gm_16AE.h"
 
 #include <string.h>
@@ -1668,6 +1671,11 @@ void fn_8016DCC0(StartMeleeData* arg0)
     lbl_8046B6A0.unk_0 = 0;
 
     lbl_8046B6A0.x24C8 = arg0->rules;
+#ifdef TARGET_PC
+    if (pc_config.stage > 0) {
+        lbl_8046B6A0.x24C8.stkind = (u16) pc_config.stage; /* --stage: every match */
+    }
+#endif
 
     lbl_8046B6A0.x24C.x5 = arg0->rules.match_kind;
     lbl_8046B6A0.x24C.is_teams = arg0->rules.is_teams;

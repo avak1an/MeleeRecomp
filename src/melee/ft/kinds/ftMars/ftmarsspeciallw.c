@@ -25,10 +25,8 @@
 #include <melee/lb/lb_00B0.h>
 #include <melee/lb/lb_00F9.h>
 
-static MotionFlags const ftMs_MF_SpecialLw_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit;
-static MotionFlags const ftMs_MF_SpecialLwHit_Coll =
-    ftMs_MF_SpecialLw_Coll | Ft_MF_KeepGfx;
+STATIC_CONST(MotionFlags, ftMs_MF_SpecialLw_Coll, ftCommon_GroundAirColl_MF | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit);
+STATIC_CONST(MotionFlags, ftMs_MF_SpecialLwHit_Coll, ftMs_MF_SpecialLw_Coll | Ft_MF_KeepGfx);
 
 void ftMs_SpecialLw_Enter(HSD_GObj* gobj)
 {

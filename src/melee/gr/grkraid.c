@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grkraid.h"
 
 #include "forward.h"
@@ -66,6 +69,9 @@ void grKraid_OnInit(void)
     HSD_GObj* gobj;
 
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grkraid(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
     grKraid_801FE0C4(0);

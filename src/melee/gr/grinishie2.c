@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grinishie2.h"
 
 #include <Runtime/platform.h>
@@ -185,6 +188,9 @@ void grInishie2_801FCBC0(bool arg) {}
 void grInishie2_801FCBC4(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grinishie2(yakumono_param);
+#endif
 
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;

@@ -9,7 +9,11 @@
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/jobj.h>
 
+#ifdef TARGET_PC
+#define EFALT_VA_ARG(t) va_arg(*(va_list*) &vlist_arg, t)
+#else
 #define EFALT_VA_ARG(t) (*((t*) __va_arg(vlist_arg, _var_arg_typeof(t))))
+#endif
 
 extern volatile u32 efLib_LoadKind;
 extern volatile s32 efLib_AnimCount;

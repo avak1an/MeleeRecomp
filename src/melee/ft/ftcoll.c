@@ -1,3 +1,11 @@
+#ifdef TARGET_PC
+#include <stdlib.h>
+#include <stddef.h>
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#endif
+#include <pc_game_swap.h>
+#endif
 #include "ftcoll.h"
 
 #include <Runtime/platform.h>
@@ -1292,6 +1300,13 @@ bool ftColl_80077C60(Item* item, HitCapsule* hit, Fighter* fp,
                 }
 
                 if (!fp->x221C_b4) {
+#ifdef TARGET_PC
+                    if (scaled_dmg > 500.0f) {
+                        OSReport("[pc] item %d hitbox damage %g (item mul %g at %p, mul2 %g) hit fighter %d\n",
+                                 item->kind, hit->damage, item->xC40, (void*) &item->xC40, item->xC44,
+                                 fp->kind);
+                    }
+#endif
                     if (scaled_dmg > 500.0f) {
                         HSD_ASSERTREPORT(0xB7, 0,
                                          "attack power over 500!! %f\n",
@@ -1423,6 +1438,16 @@ void ftColl_8007861C(Fighter_GObj* arg0, Fighter_GObj* gobj, int arg2,
     victim = GET_FIGHTER(gobj);
     grounded = 0;
     prev_source_ply = victim->dmg.x18c4_source_ply;
+#ifdef TARGET_PC
+    {
+        static int shown;
+        if (getenv("MELEE_TRACE_MOTION") != NULL && (attacker == NULL || victim->motion_id == 88) && shown++ < 4) {
+            OSReport("[pc] hit applied to P%d (attacker %s, motion %d); from:\n", victim->player_id + 1,
+                     attacker != NULL ? "fighter" : "none", victim->motion_id);
+            pc_print_backtrace();
+        }
+    }
+#endif
 
     if (attacker != NULL) {
         victim->dmg.x18C0 = attacker == victim ? 0 : attacker->x8_spawnNum;
@@ -2708,6 +2733,13 @@ void ftColl_8007A06C(Fighter_GObj* gobj, void* dmg_ptr, void* log, size_t idx,
             }
 
             kb = result;
+#ifdef TARGET_PC
+            if (getenv("MELEE_TRACE_MOTION") != NULL) {
+                OSReport("[pc] item hit kb %g (cap %g defense %g attack %g stage %g w %g xF4 %g xF8 %g x110 %g x114 %g x118 %g x11C %g x120 %g)\n",
+                         kb, cap, defense, attack, stage, w, ftd->xF4, ftd->xF8, ftd->x110, ftd->x114, ftd->x118,
+                         ftd->x11C, ftd->x120);
+            }
+#endif
 
             if (arg4 != 0) {
                 u32 u_dmg = (u32) entry->x20;
@@ -2914,6 +2946,21 @@ void ftColl_8007A06C(Fighter_GObj* gobj, void* dmg_ptr, void* log, size_t idx,
     out->damage = best_entry->x20;
     out->sfx_severity = sfx_severity;
 
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_MOTION") != NULL) {
+        HitCapsule* h = best_entry->hit0;
+        OSReport("[pc] frame %u: P%d takes a hit of type %d kind %d: damage %g angle %d kb %u/%u/%u element %u state %d\n",
+                 pc_frame_count, ((Fighter*) gobj->user_data)->player_id + 1, best_entry->x0, best_entry->kind,
+                 h != NULL ? h->damage : -1.0f, h != NULL ? h->kb_angle : -1, h != NULL ? h->x24 : 0,
+                 h != NULL ? h->x28 : 0, h != NULL ? h->x2C : 0, h != NULL ? h->element : 0, h != NULL ? (int) h->state : -1);
+        if (best_entry->x0 == 1 && h != NULL) {
+            Fighter* afp = (Fighter*) best_entry->gobj->user_data;
+            OSReport("[pc]   attacker P%d motion %d, capsule at fp+0x%x (x914 at 0x%x, x1064 at 0x%x), x4 %u unk_count %u\n",
+                     afp->player_id + 1, afp->motion_id, (unsigned) ((u8*) h - (u8*) afp), (unsigned) offsetof(Fighter, x914),
+                     (unsigned) offsetof(Fighter, x1064_thrownHitbox), h->x4, h->unk_count);
+        }
+    }
+#endif
     switch (best_entry->x0) {
     case 1: {
         Fighter* attacker_fp = (Fighter*) best_entry->gobj->user_data;
@@ -2986,6 +3033,16 @@ void ftColl_8007AB80(Fighter_GObj* gobj)
 
 void ftColl_8007ABD0(HitCapsule* arg0, u32 arg1, Fighter_GObj* arg2)
 {
+#ifdef TARGET_PC
+    {
+        static int shown;
+        Fighter* pfp = GET_FIGHTER(arg2);
+        if (getenv("MELEE_TRACE_MOTION") != NULL && (pfp->motion_id == 88 || pfp->motion_id == 91) && shown++ < 2) {
+            OSReport("[pc] hitbox created for P%d in motion %d (damage %u); from:\n", pfp->player_id + 1, pfp->motion_id, arg1);
+            pc_print_backtrace();
+        }
+    }
+#endif
     Fighter* fp;
     float dmg;
     float scaled_dmg;
@@ -3361,6 +3418,13 @@ void ftColl_8007B7A4(Fighter_GObj* gobj, int arg1)
 
 void ftColl_8007B7FC(Fighter* fp, int arg1)
 {
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_MOTION") != NULL) {
+        extern uint32_t pc_frame_count;
+        OSReport("[pc] frame %u: P%d timed status 107 for %d frames (threshold %d)\n", pc_frame_count,
+                 fp->player_id + 1, arg1, it_8026B588());
+    }
+#endif
     fp->x221D_b6 = true;
     fp->x2004 = arg1;
     ftCo_800BFFD0(fp, 107, 0);
@@ -3491,6 +3555,15 @@ void ftColl_8007BAC0(Fighter_GObj* gobj)
                 if (ftCo_800C0A28(gobj, ground, type)) {
                     if (ft_80459A8C[i].active_cb(ground, gobj, (Vec3*) &desc))
                     {
+#ifdef TARGET_PC
+                        /* the hit description, straight from the stage file */
+                        pc_swap_hazard_hit(desc);
+                        if (getenv("MELEE_TRACE_SWAP") != NULL) {
+                            const u32* w = (const u32*) desc;
+                            OSReport("[pc] hazard hit %p: %08x %08x %08x %08x %08x %08x %08x %08x %08x\n", (void*) desc, w[0],
+                                     w[1], w[2], w[3], w[4], w[5], w[6], w[7], w[8]);
+                        }
+#endif
                         if (max == 0) {
                             ftCo_800C08A0(gobj, (Fighter_GObj*) ground, desc,
                                           type);

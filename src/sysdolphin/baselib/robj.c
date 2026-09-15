@@ -1,4 +1,7 @@
 #include "robj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <math.h>
 #include <string.h>
@@ -597,6 +600,9 @@ static void expLoadDesc(HSD_Exp* exp, HSD_ExpDesc* desc);
 
 HSD_RObj* HSD_RObjLoadDesc(HSD_RObjDesc* robjdesc)
 {
+#ifdef TARGET_PC
+    pc_swap_robjdesc(robjdesc);
+#endif
     HSD_RObj* robj;
 
     if (robjdesc != NULL) {

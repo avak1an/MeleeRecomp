@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 #include "ftwaitanim.h"
 
 #include "ftanim.h"
@@ -25,6 +28,9 @@ void ftCo_8008A6D8(Fighter_GObj* gobj, s32 anim_id)
         ftData_80085CD8(fp, fp, anim_id);
         fp->anim_id = anim_id;
         ftCo_8009E7B4(fp, blend_data);
+#ifdef TARGET_PC
+        pc_swap_script(anim->xC, PC_SCRIPT_FIGHTER);
+#endif
         fp->x3E4_fighterCmdScript.u = anim->xC;
         fp->x3E4_fighterCmdScript.loop_count = 0;
         if (fp->x590 != NULL) {
@@ -85,12 +91,21 @@ void ftCo_8008A7A8(Fighter_GObj* gobj, WaitStruct* arg1)
                 struct Fighter_WaitAnimData* anim;
                 Fighter* fp = GET_FIGHTER(gobj);
                 if (temp != -1) {
+#ifdef TARGET_PC
+                    if ((u32) temp >= (u32) fp->x58C) {
+                        OSReport("[pc] wait anim: id %d out of range (%d entries) for kind %d\n", temp,
+                                 fp->x58C, fp->kind);
+                    }
+#endif
                     anim = &fp->x24[temp];
                     blend_data = &fp->x28[temp];
                     ftData_80085CD8(fp, fp, anim_id);
                     fp->anim_id = anim_id;
                     ftCo_8009E7B4(fp, blend_data);
-                    fp->x3E4_fighterCmdScript.u = anim->xC;
+            #ifdef TARGET_PC
+        pc_swap_script(anim->xC, PC_SCRIPT_FIGHTER);
+#endif
+        fp->x3E4_fighterCmdScript.u = anim->xC;
                     fp->x3E4_fighterCmdScript.loop_count = 0;
                     if (fp->x590 != NULL) {
                         fp->x594_s32 = anim->x10_animCurrFlags;

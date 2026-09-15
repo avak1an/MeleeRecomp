@@ -1,4 +1,7 @@
 #include "grlib.h"
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 
 #include <sysdolphin/baselib/forward.h>
 
@@ -190,6 +193,9 @@ void grLib_801C9A70(enum_t arg0, Vec3* v)
 
 void grLib_801C9B20(HSD_JObj* arg0, DynamicsDesc* arg1, DynamicsDesc* arg2)
 {
+#ifdef TARGET_PC
+    pc_swap_dynamics_desc(arg1);
+#endif
     lb_8000FD48(arg0, arg2, arg1->count);
     lb_80011710(arg1, arg2);
 }

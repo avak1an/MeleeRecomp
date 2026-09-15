@@ -18,11 +18,27 @@
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/lobj.h>
 
+/* PC: the character's special attributes come from disc big-endian and are
+ * swapped (once) as 32-bit words right before the first copy. */
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+struct ftLk_DatAttrs;
+struct _MarsAttributes;
+/* the sword characters' attributes end in a SwordAttrs block (the sword
+ * trail: two floats, then bytes for alpha and colour) whose bytes the word
+ * swap must leave alone; its offset is passed along */
+#define PC_SWORD_ATTRS_OFFSET(p)                                                  _Generic((p), struct ftLk_DatAttrs*: 0x64, struct _MarsAttributes*: 0x78, default: -1)
+#define PC_SWAP_EXT_ATTRS(p, n) pc_swap_ext_attrs((p), (n), PC_SWORD_ATTRS_OFFSET(p))
+#else
+#define PC_SWAP_EXT_ATTRS(p, n) ((void) 0)
+#endif
+
 #define PUSH_ATTRS(fp, attributeName)                                         \
     do {                                                                      \
         void* backup = (fp)->dat_attrs_backup;                                \
         attributeName* src = (attributeName*) (fp)->ft_data->ext_attr;        \
         void** da = &(fp)->dat_attrs;                                         \
+        PC_SWAP_EXT_ATTRS(src, sizeof(attributeName));                        \
         *(attributeName*) (fp)->dat_attrs_backup = *src;                      \
         *da = backup;                                                         \
     } while (0)

@@ -1,4 +1,10 @@
+#include <stdlib.h>
 #include "archive.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#include "pc_runtime.h"
+#include <stdio.h>
+#endif
 
 #include <string.h>
 
@@ -15,6 +21,67 @@ static inline void Locate(HSD_Archive* archive)
     }
 }
 
+#ifdef TARGET_PC
+/* Archives are big-endian on disc. On a little-endian host the parts the
+ * parser itself reads are swapped in place before parsing: the header, the
+ * relocation/public/extern tables, and every pointer slot named by the
+ * relocation table. Other fields are swapped by the code that consumes
+ * them (see pc/README.md, "Endianness"). */
+static u32 pc_bswap32(u32 v)
+{
+    return (v >> 24) | ((v >> 8) & 0xFF00) | ((v << 8) & 0xFF0000) | (v << 24);
+}
+
+static void pc_archive_swap(u8* src, size_t file_size)
+{
+    u32* header = (u32*) src;
+    u32 i, offset, nb_reloc, nb_public, nb_extern, data_size;
+    u32* table;
+
+    /* Already host order (e.g. parsed twice)? Then leave it alone. */
+    if (header[0] == file_size) {
+        return;
+    }
+    /* A freshly loaded file: any "already swapped" records inside its
+     * memory belong to a previous file at the same address. */
+    pc_swap_forget_range(src, file_size);
+    pc_swap_note_archive(src, file_size);
+    for (i = 0; i < 6; i++) {
+        header[i] = pc_bswap32(header[i]);
+    }
+    data_size = header[1];
+    nb_reloc = header[2];
+    nb_public = header[3];
+    nb_extern = header[4];
+    if (pc_debug_gx) {
+        fprintf(stderr, "[gx] archive %p size %u (header says %u): data %u, %u reloc, %u public, %u extern\n",
+                (void*) src, (unsigned) file_size, header[0], data_size, nb_reloc, nb_public, nb_extern);
+    }
+    if (header[0] != file_size || sizeof(HSD_ArchiveHeader) + data_size +
+                                          (nb_reloc + 2 * nb_public + 2 * nb_extern) * 4 > file_size) {
+        fprintf(stderr, "[pc] archive at %p: header (size %u, data %u, %u relocs) does not fit the %u "
+                        "byte buffer, not swapped\n",
+                (void*) src, header[0], data_size, nb_reloc, (unsigned) file_size);
+        pc_print_backtrace();
+        for (i = 0; i < 6; i++) {
+            header[i] = pc_bswap32(header[i]); /* leave the buffer as found */
+        }
+        return;
+    }
+    offset = sizeof(HSD_ArchiveHeader) + data_size;
+    table = (u32*) (src + offset);
+    for (i = 0; i < nb_reloc + 2 * nb_public + 2 * nb_extern; i++) {
+        table[i] = pc_bswap32(table[i]);
+    }
+    for (i = 0; i < nb_reloc; i++) {
+        u32* slot = (u32*) (src + sizeof(HSD_ArchiveHeader) + table[i]);
+        *slot = pc_bswap32(*slot);
+        pc_swap_note_reloc_slot(slot);
+        pc_swap_note_reloc_target(slot, src + sizeof(HSD_ArchiveHeader) + *slot);
+    }
+}
+#endif
+
 s32 HSD_ArchiveParse(HSD_Archive* archive, u8* src, size_t file_size)
 {
     u32 offset;
@@ -23,6 +90,9 @@ s32 HSD_ArchiveParse(HSD_Archive* archive, u8* src, size_t file_size)
         return -1;
     }
 
+#ifdef TARGET_PC
+    pc_archive_swap(src, file_size);
+#endif
     memset(archive, 0, sizeof(HSD_Archive));
     archive->flags |= 1;
     memcpy(archive, src, sizeof(HSD_ArchiveHeader));
@@ -80,6 +150,15 @@ void* HSD_ArchiveGetPublicAddress(HSD_Archive* archive, const char* symbols)
             return archive->data + archive->public_info[i].offset;
         }
     }
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_ARCHIVE") != NULL) {
+        OSReport("[pc] archive %p has no symbol %s; it has:", (void*) archive, symbols);
+        for (i = 0; i < archive->header.nb_public; i++) {
+            OSReport(" %s", archive->symbols + archive->public_info[i].symbol);
+        }
+        OSReport("\n");
+    }
+#endif
 
     return NULL;
 }

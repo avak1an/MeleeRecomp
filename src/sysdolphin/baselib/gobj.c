@@ -1,3 +1,7 @@
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#include <stdio.h>
+#endif
 #include "gobj.h"
 
 #include "class.h"
@@ -111,7 +115,21 @@ void HSD_GObj_80390CFC(void)
                 {
                     HSD_GObj_804D781C = gobj;
                     HSD_GObj_804D7838 = proc;
+#ifdef TARGET_PC
+                    if (pc_debug_watch != NULL) {
+                        char tag[128];
+                        snprintf(tag, sizeof(tag), "before proc %s", pc_symbol_name((void*) proc->on_invoke));
+                        pc_debug_watch_check(tag);
+                    }
+#endif
                     proc->on_invoke(proc->gobj);
+#ifdef TARGET_PC
+                    if (pc_debug_watch != NULL) {
+                        char tag[128];
+                        snprintf(tag, sizeof(tag), "after proc %s", pc_symbol_name((void*) proc->on_invoke));
+                        pc_debug_watch_check(tag);
+                    }
+#endif
                     HSD_GObj_804D7830 = proc->next;
                     if (HSD_GObj_804CE3E4.flags != 0) {
                         HSD_GObj_804CE3E4.b0 = 1;
@@ -150,7 +168,21 @@ static inline void render_gobj(HSD_GObj* cur, int i)
 {
     HSD_GObj* saved = HSD_GObj_804D7814;
     HSD_GObj_804D7814 = cur;
+#ifdef TARGET_PC
+    if (pc_debug_watch != NULL) {
+        char tag[128];
+        snprintf(tag, sizeof(tag), "before render %s", pc_symbol_name((void*) cur->render_cb));
+        pc_debug_watch_check(tag);
+    }
+#endif
     cur->render_cb(cur, i);
+#ifdef TARGET_PC
+    if (pc_debug_watch != NULL) {
+        char tag[128];
+        snprintf(tag, sizeof(tag), "after render %s", pc_symbol_name((void*) cur->render_cb));
+        pc_debug_watch_check(tag);
+    }
+#endif
     HSD_GObj_804D7814 = saved;
 }
 
@@ -158,6 +190,25 @@ static inline void render_gobj(HSD_GObj* cur, int i)
 void HSD_GObj_80390ED0(HSD_GObj* gobj, u32 mask)
 {
     s32 i = 0;
+#ifdef TARGET_PC
+    {
+        extern int pc_debug_gx;
+        extern unsigned int pc_frame_count;
+        if (pc_debug_gx && pc_frame_count % 60 == 0) {
+            int j, n;
+            HSD_GObj* c;
+            OSReport("[gx] render mask %x prios %08x%08x from %s, links:", mask, (u32) (gobj->gxlink_prios >> 32),
+                     (u32) gobj->gxlink_prios, pc_symbol_name(__builtin_return_address(0)));
+            for (j = 0; j <= HSD_GObjLibInitData.gx_link_max + 1; j++) {
+                for (n = 0, c = HSD_GObjGXLinkHead[j]; c != NULL; c = c->next_gx) {
+                    n++;
+                }
+                OSReport(" %d", n);
+            }
+            OSReport("\n");
+        }
+    }
+#endif
     while (mask) {
         if (mask & 1) {
             u64 prios = gobj->gxlink_prios;

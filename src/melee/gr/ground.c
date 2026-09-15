@@ -1,5 +1,10 @@
 #include "ground.h"
 
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#include <stdlib.h>
+#endif
+
 #include <Runtime/platform.h>
 
 #include <math.h>
@@ -1176,10 +1181,18 @@ f32 Ground_801C20D0(void)
 
 typedef struct LightOverrideEntry {
     /* 0x0 */ HSD_LightDesc* desc;
+#ifdef TARGET_PC
+    /* disc data: the console compiler packs bit-fields MSB first */
+    /* 0x4 */ u8 _ : 5;
+    /* 0x4 */ u8 c : 1;
+    /* 0x4 */ u8 b : 1;
+    /* 0x4 */ u8 a : 1;
+#else
     /* 0x4 */ u8 a : 1;
     /* 0x4 */ u8 b : 1;
     /* 0x4 */ u8 c : 1;
     /* 0x4 */ u8 _ : 5;
+#endif
     /* 0x5 */ u8 _pad[3];
 } LightOverrideEntry;
 
@@ -1261,6 +1274,22 @@ LightList** Ground_801C20E0(UnkArchiveStruct* archive, LightList** lightset)
         HSD_LightDesc* desc = *(HSD_LightDesc**) *out;
         UnkStageDat* dat;
         u16* flags;
+#ifdef TARGET_PC
+        /* the flags are read and rewritten here before HSD_LObjLoadDesc
+         * swaps the descriptor; swap it now (once) so the type test and the
+         * diffuse/specular overrides land on the right bits */
+        pc_swap_lightdesc(desc);
+        if (getenv("MELEE_TRACE_LIGHT") != NULL) {
+            bool f6 = 0, f7 = 0, f5 = 0;
+            OSReport("[pc] light desc %p: attnflags %04x words %08x %08x %08x %08x %08x %08x\n", (void*) desc,
+                     desc->attnflags, ((u32*) desc)[0], ((u32*) desc)[1], ((u32*) desc)[2], ((u32*) desc)[3],
+                     ((u32*) desc)[4], ((u32*) desc)[5]);
+            bool found = find_light_override_in_dat(archive->unk4, archive->unk4, desc, &f6, &f7, &f5);
+            OSReport("[pc] light desc %p: file flags %04x color (%u %u %u) override %s diffuse %d specular %d shadow %d\n",
+                     (void*) desc, desc->flags, desc->color.r, desc->color.g, desc->color.b, found ? "found" : "none", f6,
+                     f7, f5);
+        }
+#endif
         if (*(flags = &desc->flags) & 3) {
             dat = archive->unk4;
             if (find_light_override_in_dat(dat, archive->unk4, desc, &b6, &b7,
@@ -1471,6 +1500,17 @@ static bool Ground_801C24F8(StKind stkind, u32 arg1, s32* arg2)
             break;
         }
     }
+#ifdef TARGET_PC
+    if (bgm == BGM_Undefined) {
+        OSReport("[pc] Ground_801C24F8: no BGM for stage kind %d (flags %x) among %d stage params:",
+                 stkind, arg1, stage_info.param->stage_param_count);
+        for (i = 0; i < stage_info.param->stage_param_count; i++) {
+            OSReport(" %d", phi_r30_0[i].stkind);
+        }
+        OSReport("; bgm fields x4 %d x8 %d xC %d x10 %d x14 %d\n", phi_r30->x4, phi_r30->x8, phi_r30->xC,
+                 phi_r30->x10, phi_r30->x14);
+    }
+#endif
     HSD_ASSERT(2242, bgm!=BGM_Undefined);
     if (bgm == -2) {
         *arg2 = lbAudioAx_8002305C(Player_GetPlayerCharacter(0), HSD_Randi(2));
@@ -1651,6 +1691,15 @@ bool Ground_801C2ED0(HSD_JObj* jobj, s32 arg1)
         cur = temp_r3->unk4->unk8[arg1].unk20;
         max = temp_r3->unk4->unk8[arg1].unk24;
         for (i = 0; i < max; i++, cur++) {
+#ifdef TARGET_PC
+            {
+                extern int pc_debug_gx;
+                if (pc_debug_gx) {
+                    OSReport("[gx] coll joint: model %d entry %d/%d at %p: x=%d y=%d z=%d\n",
+                             arg1, i, max, cur, cur->x, cur->y, cur->z);
+                }
+            }
+#endif
             mpLib_800552B0(cur->x, jobj, cur->z);
             mpLib_80055E9C(cur->x);
             mpLib_80057424(cur->x);
@@ -2523,6 +2572,16 @@ bool Ground_801C43C4(void* arg0)
                 }
             }
         }
+#ifdef TARGET_PC
+        {
+            int k;
+            OSReport("[pc] shadow entry lookup failed: arg0=%p max=%d entries:", arg0, max);
+            for (k = 0; k < max && k < 16; k++) {
+                OSReport(" %p/%02x", tmp->unk20[k].unk0, ((u8*) &tmp->unk20[k])[4]);
+            }
+            OSReport("\n");
+        }
+#endif
         HSD_ASSERT(3652, 0);
     }
     return false;
@@ -3278,7 +3337,11 @@ int Ground_801C5940(void)
     }* phi_r8;
     int i, j, out_idx;
     UnkArchiveStruct* archive;
+#ifdef TARGET_PC
+    enum { vals_count = 32 };
+#else
     const size_t vals_count = 32;
+#endif
     u8 _[4];
     int vals[vals_count];
     archive = grDatFiles_GetArchive();

@@ -217,6 +217,10 @@ void it_8026EECC(HSD_GObj* gobj, int arg1)
 {
     Item* ip = GET_ITEM(gobj);
     Vec3 pos;
+#ifdef TARGET_PC
+    extern int pc_debug_in_item;
+    pc_debug_in_item = 1 + ip->kind;
+#endif
 
     if (ip->xDAA_flag.b7) {
         pos.x = pos.y = pos.z = 0.0F;
@@ -236,4 +240,7 @@ void it_8026EECC(HSD_GObj* gobj, int arg1)
         HSD_StateInitTev();
         HSD_ClearVtxDesc();
     }
+#ifdef TARGET_PC
+    pc_debug_in_item = 0;
+#endif
 }

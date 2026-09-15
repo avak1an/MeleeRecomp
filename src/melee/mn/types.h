@@ -157,60 +157,69 @@ typedef struct lbl_8046B378_t {
 } lbl_8046B378_t; /* size = 0x110 */
 ASSERT_SIZE(lbl_8046B378_t, 0x110);
 
+/* The 48 bit-fields below are followed by plain bytes. Metrowerks packs
+ * those bytes into the bit-fields' 32-bit unit (x6 at offset 6); MSVC would
+ * start them on a new unit. Byte-sized bit-fields give the console layout
+ * on PC; on the console this is the original u32. */
+#ifdef TARGET_PC
+#define RULES_BITS u8
+#else
+#define RULES_BITS u32
+#endif
 struct StartMeleeRules {
-    u32 match_kind : 3; ///< ::MatchKind
-    u32 x0_3 : 3;       ///< unknown enum
-    u32 timer_enabled : 1;
-    u32 timer_counts_up : 1; ///< ::bool
+    RULES_BITS match_kind : 3; ///< ::MatchKind
+    RULES_BITS x0_3 : 3;       ///< unknown enum
+    RULES_BITS timer_enabled : 1;
+    RULES_BITS timer_counts_up : 1; ///< ::bool
 
-    u32 x1_0 : 1;
-    u32 x1_1 : 1;
-    u32 x1_2 : 1;
-    u32 x1_3 : 1;
-    u32 x1_4 : 1;
-    u32 x1_5 : 1;
-    u32 timer_shows_hours : 1; // false=65:00.00, true=1:05:00.00
+    RULES_BITS x1_0 : 1;
+    RULES_BITS x1_1 : 1;
+    RULES_BITS x1_2 : 1;
+    RULES_BITS x1_3 : 1;
+    RULES_BITS x1_4 : 1;
+    RULES_BITS x1_5 : 1;
+    RULES_BITS timer_shows_hours : 1; // false=65:00.00, true=1:05:00.00
 
-    u32 friendly_fire : 1; ///< friendly fire on
+    RULES_BITS friendly_fire : 1; ///< friendly fire on
 
-    u32 is_stock : 1;
-    u32 x2_1 : 1;
-    u32 x2_2 : 1;
-    u32 single_button : 1;   ///< single-button mode enabled
-    u32 disable_pausing : 1; ///< When set, pausing is disabled for both active
+    RULES_BITS is_stock : 1;
+    RULES_BITS x2_1 : 1;
+    RULES_BITS x2_2 : 1;
+    RULES_BITS single_button : 1;   ///< single-button mode enabled
+    RULES_BITS disable_pausing : 1; ///< When set, pausing is disabled for both active
                              ///< gameplay and pause menus. Sourced from the
                              ///< rules pause option and from several game-mode
                              ///< setups.
-    u32 x2_5 : 1;
-    u32 x2_6 : 1;
-    u32 x2_7 : 1;
+    RULES_BITS x2_5 : 1;
+    RULES_BITS x2_6 : 1;
+    RULES_BITS x2_7 : 1;
 
-    u32 x3_0 : 1;
-    u32 x3_1 : 1;
-    u32 x3_2 : 1;
-    u32 x3_3 : 1;
-    u32 x3_4 : 1;
-    u32 x3_5 : 1;
-    u32 x3_6 : 1;
-    u32 x3_7 : 1;
+    RULES_BITS x3_0 : 1;
+    RULES_BITS x3_1 : 1;
+    RULES_BITS x3_2 : 1;
+    RULES_BITS x3_3 : 1;
+    RULES_BITS x3_4 : 1;
+    RULES_BITS x3_5 : 1;
+    RULES_BITS x3_6 : 1;
+    RULES_BITS x3_7 : 1;
 
-    u32 x4_0 : 1;  ///< pause camera enabled?
-    u32 is_vs : 1; ///< Set only by ::gmVsMelee_EnterVs
-    u32 x4_2 : 1;
-    u32 x4_3 : 1;
-    u32 x4_4 : 1;
-    u32 x4_5 : 1;
-    u32 x4_6 : 1;
-    u32 x4_7 : 1;
+    RULES_BITS x4_0 : 1;  ///< pause camera enabled?
+    RULES_BITS is_vs : 1; ///< Set only by ::gmVsMelee_EnterVs
+    RULES_BITS x4_2 : 1;
+    RULES_BITS x4_3 : 1;
+    RULES_BITS x4_4 : 1;
+    RULES_BITS x4_5 : 1;
+    RULES_BITS x4_6 : 1;
+    RULES_BITS x4_7 : 1;
 
-    u32 x5_0 : 1;
-    u32 x5_1 : 1;
-    u32 x5_2 : 1;
-    u32 x5_3 : 1;
-    u32 x5_4 : 1;
-    u32 x5_5 : 1;
-    u32 x5_6 : 1;
-    u32 x5_7 : 1;
+    RULES_BITS x5_0 : 1;
+    RULES_BITS x5_1 : 1;
+    RULES_BITS x5_2 : 1;
+    RULES_BITS x5_3 : 1;
+    RULES_BITS x5_4 : 1;
+    RULES_BITS x5_5 : 1;
+    RULES_BITS x5_6 : 1;
+    RULES_BITS x5_7 : 1;
 
     u8 x6;
     u8 x7; // end graphic / SFX type

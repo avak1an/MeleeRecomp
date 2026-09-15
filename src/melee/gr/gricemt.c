@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "gricemt.h"
 
 #include <Runtime/platform.h>
@@ -424,6 +427,9 @@ void grIceMt_801F686C(void)
     PAD_STACK(0x10);
 
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_gricemt(yakumono_param);
+#endif
     stage_info.unk8C.b4 = true;
     stage_info.unk8C.b5 = false;
     setupStageCallbacks(0);

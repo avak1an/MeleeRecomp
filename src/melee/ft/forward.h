@@ -165,86 +165,86 @@ typedef enum CharacterKind {
     /* 21 */ CHKIND_MAX = CHKIND_NONE
 } CharacterKind;
 
-static MotionFlags const Ft_MF_None = 0;
+STATIC_CONST(MotionFlags, Ft_MF_None, 0);
 
-static MotionFlags const Ft_MF_KeepFastFall = 1 << 0;
+STATIC_CONST(MotionFlags, Ft_MF_KeepFastFall, 1 << 0);
 
-static MotionFlags const Ft_MF_KeepGfx = 1 << 1;
+STATIC_CONST(MotionFlags, Ft_MF_KeepGfx, 1 << 1);
 
 /// Preserve full body collision state
-static MotionFlags const Ft_MF_KeepColAnimHitStatus = 1 << 2;
+STATIC_CONST(MotionFlags, Ft_MF_KeepColAnimHitStatus, 1 << 2);
 
 /// Keep hitboxes
-static MotionFlags const Ft_MF_SkipHit = 1 << 3;
+STATIC_CONST(MotionFlags, Ft_MF_SkipHit, 1 << 3);
 
 /// Ignore model state change ?
-static MotionFlags const Ft_MF_SkipModel = 1 << 4;
+STATIC_CONST(MotionFlags, Ft_MF_SkipModel, 1 << 4);
 
-static MotionFlags const Ft_MF_SkipAnimVel = 1 << 5;
+STATIC_CONST(MotionFlags, Ft_MF_SkipAnimVel, 1 << 5);
 
-static MotionFlags const Ft_MF_Unk06 = 1 << 6;
+STATIC_CONST(MotionFlags, Ft_MF_Unk06, 1 << 6);
 
 /// Ignore switching to character's "hurt" textures ?
-static MotionFlags const Ft_MF_SkipMatAnim = 1 << 7;
+STATIC_CONST(MotionFlags, Ft_MF_SkipMatAnim, 1 << 7);
 
 /// Resets thrower GObj pointer to NULL if false?
-static MotionFlags const Ft_MF_SkipThrowException = 1 << 8;
+STATIC_CONST(MotionFlags, Ft_MF_SkipThrowException, 1 << 8);
 
-static MotionFlags const Ft_MF_KeepSfx = 1 << 9;
+STATIC_CONST(MotionFlags, Ft_MF_KeepSfx, 1 << 9);
 
 /// Ignore Parasol state change
-static MotionFlags const Ft_MF_SkipParasol = 1 << 10;
+STATIC_CONST(MotionFlags, Ft_MF_SkipParasol, 1 << 10);
 
 /// Ignore rumble update?
-static MotionFlags const Ft_MF_SkipRumble = 1 << 11;
+STATIC_CONST(MotionFlags, Ft_MF_SkipRumble, 1 << 11);
 
-static MotionFlags const Ft_MF_SkipColAnim = 1 << 12;
+STATIC_CONST(MotionFlags, Ft_MF_SkipColAnim, 1 << 12);
 
 /// Keep respawn platform?
-static MotionFlags const Ft_MF_KeepAccessory = 1 << 13;
+STATIC_CONST(MotionFlags, Ft_MF_KeepAccessory, 1 << 13);
 
 /// Run all Subaction Events up to the current animation frame
-static MotionFlags const Ft_MF_UpdateCmd = 1 << 14;
+STATIC_CONST(MotionFlags, Ft_MF_UpdateCmd, 1 << 14);
 
-static MotionFlags const Ft_MF_SkipNametagVis = 1 << 15;
+STATIC_CONST(MotionFlags, Ft_MF_SkipNametagVis, 1 << 15);
 
 /// Assume this is for individual bones?
-static MotionFlags const Ft_MF_KeepColAnimPartHitStatus = 1 << 16;
+STATIC_CONST(MotionFlags, Ft_MF_KeepColAnimPartHitStatus, 1 << 16);
 
-static MotionFlags const Ft_MF_KeepSwordTrail = 1 << 17;
+STATIC_CONST(MotionFlags, Ft_MF_KeepSwordTrail, 1 << 17);
 
 /// Used by Ness during Up/Down Smash
-static MotionFlags const Ft_MF_SkipItemVis = 1 << 18;
+STATIC_CONST(MotionFlags, Ft_MF_SkipItemVis, 1 << 18);
 
 /// Skips updating bit 5 of #Fighter::x2222_flag?
-static MotionFlags const Ft_MF_Unk19 = 1 << 19;
+STATIC_CONST(MotionFlags, Ft_MF_Unk19, 1 << 19);
 
-static MotionFlags const Ft_MF_UnkUpdatePhys = 1 << 20;
+STATIC_CONST(MotionFlags, Ft_MF_UnkUpdatePhys, 1 << 20);
 
 /// Sets anim rate to 0 and some other stuff
-static MotionFlags const Ft_MF_FreezeState = 1 << 21;
+STATIC_CONST(MotionFlags, Ft_MF_FreezeState, 1 << 21);
 
-static MotionFlags const Ft_MF_SkipModelPartVis = 1 << 22;
+STATIC_CONST(MotionFlags, Ft_MF_SkipModelPartVis, 1 << 22);
 
-static MotionFlags const Ft_MF_SkipMetalB = 1 << 23;
+STATIC_CONST(MotionFlags, Ft_MF_SkipMetalB, 1 << 23);
 
-static MotionFlags const Ft_MF_Unk24 = 1 << 24;
+STATIC_CONST(MotionFlags, Ft_MF_Unk24, 1 << 24);
 
-static MotionFlags const Ft_MF_SkipAttackCount = 1 << 25;
+STATIC_CONST(MotionFlags, Ft_MF_SkipAttackCount, 1 << 25);
 
-static MotionFlags const Ft_MF_SkipModelFlags = 1 << 26;
+STATIC_CONST(MotionFlags, Ft_MF_SkipModelFlags, 1 << 26);
 
-static MotionFlags const Ft_MF_Unk27 = 1 << 27;
+STATIC_CONST(MotionFlags, Ft_MF_Unk27, 1 << 27);
 
-static MotionFlags const Ft_MF_SkipHitStun = 1 << 28;
+STATIC_CONST(MotionFlags, Ft_MF_SkipHitStun, 1 << 28);
 
 /// Keeps current fighter animation?
-static MotionFlags const Ft_MF_SkipAnim = 1 << 29;
+STATIC_CONST(MotionFlags, Ft_MF_SkipAnim, 1 << 29);
 
-static MotionFlags const Ft_MF_Unk30 = 1 << 30;
+STATIC_CONST(MotionFlags, Ft_MF_Unk30, 1 << 30);
 
 /// Unused?
-static MotionFlags const Ft_MF_Unk31 = 1 << 31;
+STATIC_CONST(MotionFlags, Ft_MF_Unk31, 1 << 31);
 
 /// Ledge Grab Macros
 

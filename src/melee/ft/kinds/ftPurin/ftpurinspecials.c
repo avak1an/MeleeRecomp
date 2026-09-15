@@ -20,8 +20,7 @@
 #include <sysdolphin/baselib/archive.h>
 #include <sysdolphin/baselib/gobj.h>
 
-static MotionFlags const ftPr_MF_SpecialS_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_SkipHit;
+STATIC_CONST(MotionFlags, ftPr_MF_SpecialS_Coll, ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_SkipHit);
 
 #ifdef MUST_MATCH
 static float order_sdata2(void)

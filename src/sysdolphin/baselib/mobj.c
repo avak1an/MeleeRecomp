@@ -1,4 +1,7 @@
 #include "mobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <string.h>
 
@@ -151,6 +154,26 @@ void HSD_MObjAnim(HSD_MObj* mobj)
 
 static int MObjLoad(HSD_MObj* mobj, HSD_MObjDesc* desc)
 {
+#ifdef TARGET_PC
+    pc_swap_mobjdesc(desc);
+    if (pc_swap_ptr_ok(desc) && (!pc_swap_ptr_ok(desc->texdesc) || !pc_swap_ptr_ok(desc->mat) ||
+        !pc_swap_ptr_ok(desc->pedesc) || !pc_swap_ptr_ok(desc->class_name)))
+    {
+        OSReport("[pc] bad HSD_MObjDesc at %p: class=%p rendermode=%08x texdesc=%p "
+                 "mat=%p pedesc=%p\n",
+                 desc, desc->class_name, desc->rendermode, desc->texdesc, desc->mat,
+                 desc->pedesc);
+    }
+#endif
+#ifdef TARGET_PC
+    if (desc->texdesc != NULL && pc_swap_ptr_ok(desc->texdesc) &&
+        (!pc_swap_ptr_ok(desc->texdesc->class_name) || !pc_swap_ptr_ok(desc->texdesc->next)))
+    {
+        OSReport("[pc] bad HSD_TObjDesc at %p (mobjdesc %p): class=%p next=%p id=%08x src=%08x\n",
+                 desc->texdesc, desc, desc->texdesc->class_name, desc->texdesc->next,
+                 desc->texdesc->id, desc->texdesc->src);
+    }
+#endif
     mobj->rendermode = desc->rendermode;
     mobj->tobj = HSD_TObjLoadDesc(desc->texdesc);
     mobj->mat = HSD_MaterialAlloc();
@@ -393,6 +416,16 @@ void HSD_MObjSetup(HSD_MObj* mobj, u32 rendermode)
 
     HSD_StateInitTev();
     rendermode = mobj->rendermode;
+#ifdef TARGET_PC
+    {
+        extern unsigned int pc_debug_rendermode;
+        extern unsigned char pc_debug_mat_colors[16];
+        pc_debug_rendermode = rendermode;
+        memcpy(pc_debug_mat_colors, &mobj->mat->ambient, 4);
+        memcpy(pc_debug_mat_colors + 4, &mobj->mat->diffuse, 4);
+        memcpy(pc_debug_mat_colors + 8, &mobj->mat->specular, 4);
+    }
+#endif
     HSD_SetMaterialColor(mobj->mat->ambient, mobj->mat->diffuse,
                          mobj->mat->specular, mobj->mat->alpha);
     if (rendermode & RENDER_SPECULAR) {

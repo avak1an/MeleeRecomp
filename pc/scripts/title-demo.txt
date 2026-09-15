@@ -1,0 +1,5 @@
+# Boot to the title screen with a save present, open the main menu and let
+# the attract demo start on its own (the game creates its save on the first
+# run; run the route once before using it as a regression check).
+# <first frame> <last frame> <buttons or -> [stickX stickY]
+150 151 START

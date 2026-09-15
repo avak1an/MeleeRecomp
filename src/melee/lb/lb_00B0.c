@@ -1,4 +1,7 @@
 #include "lb_00B0.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <dolphin/mtx.h>
 #include <melee/sc/types.h> // IWYU pragma: keep
@@ -144,6 +147,9 @@ void lb_8000B4FC(HSD_JObj* jobj, HSD_Joint* joint)
     if (jobj == NULL || joint == NULL) {
         return;
     }
+#ifdef TARGET_PC
+    pc_swap_joint(joint); /* pose descriptors read straight from fighter data */
+#endif
     jobj->rotate.x = joint->rotation.x;
     jobj->rotate.y = joint->rotation.y;
     jobj->rotate.z = joint->rotation.z;
@@ -160,6 +166,9 @@ void lb_8000B5DC(HSD_JObj* jobj, HSD_Joint* joint)
     if (jobj == NULL || joint == NULL) {
         return;
     }
+#ifdef TARGET_PC
+    pc_swap_joint(joint); /* pose descriptors read straight from fighter data */
+#endif
     jobj->rotate.x = joint->rotation.x;
     jobj->rotate.y = joint->rotation.y;
     jobj->rotate.z = joint->rotation.z;
@@ -175,6 +184,9 @@ void lb_8000B6A4(HSD_JObj* jobj, HSD_Joint* joint)
     if (jobj == NULL || joint == NULL) {
         return;
     }
+#ifdef TARGET_PC
+    pc_swap_joint(joint); /* pose descriptors read straight from fighter data */
+#endif
     jobj->scale = joint->scale;
     jobj->translate = joint->position;
     if (!(jobj->flags & JOBJ_MTX_INDEP_SRT)) {
@@ -187,6 +199,9 @@ void lb_8000B760(HSD_JObj* jobj, HSD_Joint* joint)
     if (jobj == NULL || joint == NULL) {
         return;
     }
+#ifdef TARGET_PC
+    pc_swap_joint(joint); /* pose descriptors read straight from fighter data */
+#endif
     jobj->translate = joint->position;
     if (!(jobj->flags & JOBJ_MTX_INDEP_SRT)) {
         HSD_JObjSetMtxDirty(jobj);
@@ -568,6 +583,9 @@ void lbCopyJObjSRT(HSD_JObj* src, HSD_JObj* dst)
 void lb_8000C868(HSD_Joint* arg0, HSD_JObj* arg1, HSD_JObj* arg2, float arg8,
                  float arg9)
 {
+#ifdef TARGET_PC
+    pc_swap_joint(arg0);
+#endif
     Vec3 spC0;
     Vec3 spB4;
     Quaternion spA4;

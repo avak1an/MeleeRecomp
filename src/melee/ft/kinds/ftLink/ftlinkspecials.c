@@ -375,10 +375,10 @@ void ftLk_SpecialAirS1Empty_Phys(HSD_GObj* gobj)
     ft_80084EEC(gobj);
 }
 
-static FtMotionId const coll_mf = Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim |
+STATIC_CONST(FtMotionId, coll_mf, Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim |
                                   Ft_MF_UpdateCmd | Ft_MF_SkipItemVis |
                                   Ft_MF_Unk19 | Ft_MF_SkipModelPartVis |
-                                  Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+                                  Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 void ftLk_SpecialS1_Coll(HSD_GObj* gobj)
 {

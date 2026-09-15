@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <string.h>
 #include "player.h"
 
 #include <melee/ft/forward.h>
@@ -9,6 +11,9 @@
 #include "types.h"
 #include <dolphin/mtx.h>
 #include <melee/ft/fighter.h>
+#ifdef TARGET_PC
+#include <melee/it/itspawn.h>
+#endif
 #include <melee/ft/ft_0877.h>
 #include <melee/ft/ft_0D4D.h>
 #include <melee/ft/ftdata.h>
@@ -39,6 +44,15 @@ struct Unk_Struct_w_Array {
 //// .data
 char str_PdPmdat_start_of_data[] = "PdPm.dat";
 char str_plLoadCommonData[] = "plLoadCommonData";
+
+#ifdef TARGET_PC
+/* The code below views the two strings and ftMapping_list as one struct
+ * (an original-link-order dependency). On PC the view is a copy. */
+static struct Unk_Struct_w_Array* pc_pdpm_view(void);
+#define PDPM_VIEW() pc_pdpm_view()
+#else
+#define PDPM_VIEW() (PDPM_VIEW())
+#endif
 
 ftMapping ftMapping_list[CHKIND_MAX] = { //////ftMapping_list
     /* CKIND_CAPTAIN   */ { FTKIND_CAPTAIN, 0xFF },
@@ -75,6 +89,23 @@ ftMapping ftMapping_list[CHKIND_MAX] = { //////ftMapping_list
     /* CHKIND_SANDBAG  */ { FTKIND_SANDBAG, 0xFF },
     /* CHKIND_POPO     */ { FTKIND_POPO, 0xFF }
 };
+
+#ifdef TARGET_PC
+static struct Unk_Struct_w_Array* pc_pdpm_view(void)
+{
+    static struct Unk_Struct_w_Array view;
+    static int ready;
+    if (!ready) {
+        size_t n = sizeof(view.vec_arr) < sizeof(ftMapping_list) ? sizeof(view.vec_arr) : sizeof(ftMapping_list);
+        memcpy(view.some_str, str_PdPmdat_start_of_data, sizeof(str_PdPmdat_start_of_data));
+        memcpy(view.another_str, str_plLoadCommonData, sizeof(str_plLoadCommonData));
+        memcpy(view.vec_arr, ftMapping_list, n);
+        ready = 1;
+    }
+    return &view;
+}
+#endif
+
 
 ////.bss
 StaticPlayer player_slots[Gm_Player_NumMax];
@@ -236,11 +267,23 @@ void Player_80031AD0(int slot)
     first_struct.has_transformation = false;
     first_struct.x5 = -1;
 
+#ifdef TARGET_PC
+    if (slot != 0 && getenv("MELEE_CPU_LEVEL") != NULL) {
+        /* debugging aid: every CPU (ports 2-4) plays at this level */
+        player->cpu_level = (u8) atoi(getenv("MELEE_CPU_LEVEL"));
+    }
+#endif
     player->player_entity[0] = Fighter_Create(&first_struct);
     player->player_state = 2;
 
     internal_id = byte_check =
         offset_arr[player->player_character * sizeof(ftMapping)];
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_MOTION") != NULL) {
+        OSReport("[pc] Player_80031AD0: slot %d character %d internal %d extra %d (sizeof ftMapping %u)\n", slot,
+                 player->player_character, internal_id, (int) byte_check, (unsigned) sizeof(ftMapping));
+    }
+#endif
 
     if (byte_check != -1) {
         has_transformation =
@@ -356,7 +399,7 @@ void Player_80032070(int slot, bool bool_arg)
 {
     StaticPlayer* player;
     struct Unk_Struct_w_Array* unkStruct =
-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
+        PDPM_VIEW();
     Player_CheckSlot(slot);
     player = &player_slots[slot];
 
@@ -445,7 +488,7 @@ Gm_PKind Player_8003248C(s32 slot, bool arg1)
 {
     Gm_PKind slot_type;
     struct Unk_Struct_w_Array* unk_struct =
-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
+        PDPM_VIEW();
     StaticPlayer* player;
 
     Player_CheckSlot(slot);
@@ -489,7 +532,7 @@ s8 Player_80032610(s32 slot, bool arg1)
 { //// decomp.me/scratch/pHTx2
 
     struct Unk_Struct_w_Array* some_struct =
-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
+        PDPM_VIEW();
     StaticPlayer* player;
     s32 error_value = -1;
 
@@ -1044,6 +1087,46 @@ void Player_SetUnk9C(s32 slot, s32 unk9C)
     player->unk9C = unk9C;
 }
 
+#ifdef TARGET_PC
+/// Debugging aid (--kill): drops a slot's fighter far below the stage so
+/// the game counts a KO, for driving matches to their end.
+void pc_debug_kill_fighter(int slot)
+{
+    HSD_GObj* gobj;
+    Fighter* fp;
+    if (slot < 0 || slot >= 6) {
+        return;
+    }
+    gobj = player_slots[slot].player_entity[player_slots[slot].transformed[0]];
+    if (gobj == NULL) {
+        return;
+    }
+    fp = GET_FIGHTER(gobj);
+    if (fp != NULL) {
+        fp->cur_pos.y = -10000.0f;
+    }
+}
+
+/// Debugging aid (--item): spawns an item next to a slot's fighter.
+void pc_debug_spawn_item(int kind, int slot)
+{
+    HSD_GObj* gobj;
+    Fighter* fp;
+    Vec3 pos;
+    if (slot < 0 || slot >= 6) {
+        return;
+    }
+    gobj = player_slots[slot].player_entity[player_slots[slot].transformed[0]];
+    if (gobj == NULL || (fp = GET_FIGHTER(gobj)) == NULL) {
+        return;
+    }
+    pos = fp->cur_pos;
+    pos.y += 8.0f;
+    pos.x += 4.0f * fp->facing_dir;
+    it_8026D258(&pos, (ItemKind) kind);
+}
+#endif
+
 HSD_GObj* Player_GetEntity(s32 slot)
 {
     StaticPlayer* player;
@@ -1295,7 +1378,7 @@ s32 Player_GetFalls(s32 slot)
 { /// decomp.me/scratch/8ijor
     StaticPlayer* player;
     struct Unk_Struct_w_Array* unkStruct =
-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
+        PDPM_VIEW();
     Player_CheckSlot(slot);
     player = &player_slots[slot];
 
@@ -2052,7 +2135,7 @@ void Player_80036DD8(void)
 void Player_80036E20(CharacterKind ckind, HSD_Archive* archive, s32 arg2)
 {
     struct Unk_Struct_w_Array* unkStruct =
-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
+        PDPM_VIEW();
     ftDemo_SetArchiveData(unkStruct->vec_arr[ckind].x, archive, arg2);
     if ((unkStruct->vec_arr[ckind].y != -1) &&
         (unkStruct->vec_arr[ckind].z == 0))

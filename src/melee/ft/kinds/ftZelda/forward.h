@@ -4,41 +4,30 @@
 #include <melee/ft/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 
-static MotionFlags const ftZd_MF_Special =
-    Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
-    Ft_MF_FreezeState;
+STATIC_CONST(MotionFlags, ftZd_MF_Special, Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
+    Ft_MF_FreezeState);
 
-static MotionFlags const ftZd_MF_SpecialN =
-    ftZd_MF_Special | Ft_MF_KeepFastFall | Ft_MF_SkipColAnim;
+STATIC_CONST(MotionFlags, ftZd_MF_SpecialN, ftZd_MF_Special | Ft_MF_KeepFastFall | Ft_MF_SkipColAnim);
 
-static MotionFlags const ftZd_MF_SpecialHi =
-    ftZd_MF_Special | Ft_MF_KeepFastFall | Ft_MF_KeepGfx;
+STATIC_CONST(MotionFlags, ftZd_MF_SpecialHi, ftZd_MF_Special | Ft_MF_KeepFastFall | Ft_MF_KeepGfx);
 
-static MotionFlags const ftZd_MF_SpecialLw =
-    ftZd_MF_Special | Ft_MF_KeepColAnimHitStatus;
+STATIC_CONST(MotionFlags, ftZd_MF_SpecialLw, ftZd_MF_Special | Ft_MF_KeepColAnimHitStatus);
 
-static MotionFlags const ftZd_MF_SpecialS =
-    ftZd_MF_Special | Ft_MF_KeepGfx | Ft_MF_SkipThrowException;
+STATIC_CONST(MotionFlags, ftZd_MF_SpecialS, ftZd_MF_Special | Ft_MF_KeepGfx | Ft_MF_SkipThrowException);
 
-static MotionFlags const ftZd_MF_SpecialAirN =
-    ftZd_MF_SpecialN | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftZd_MF_SpecialAirN, ftZd_MF_SpecialN | Ft_MF_SkipParasol);
 
-static MotionFlags const ftZd_MF_SpecialAirHi =
-    ftZd_MF_SpecialHi | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftZd_MF_SpecialAirHi, ftZd_MF_SpecialHi | Ft_MF_SkipParasol);
 
-static MotionFlags const ftZd_MF_SpecialAirLw =
-    ftZd_MF_SpecialLw | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftZd_MF_SpecialAirLw, ftZd_MF_SpecialLw | Ft_MF_SkipParasol);
 
-static MotionFlags const ftZd_MF_SpecialAirS =
-    ftZd_MF_SpecialS | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftZd_MF_SpecialAirS, ftZd_MF_SpecialS | Ft_MF_SkipParasol);
 
-static MotionFlags const ftZd_MF_SpecialN_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus |
-    Ft_MF_SkipHit;
+STATIC_CONST(MotionFlags, ftZd_MF_SpecialN_Coll, ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus |
+    Ft_MF_SkipHit);
 
-static MotionFlags const ftZd_MF_SpecialLw_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus |
-    Ft_MF_SkipHit;
+STATIC_CONST(MotionFlags, ftZd_MF_SpecialLw_Coll, ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_KeepColAnimHitStatus |
+    Ft_MF_SkipHit);
 
 typedef enum ftZd_MotionState {
     ftZd_MS_SpecialN = ftCo_MS_Count,

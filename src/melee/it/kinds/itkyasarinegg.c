@@ -132,6 +132,9 @@ void it_802EFD84(Item_GObj* gobj)
 
 bool itKyasarinegg_UnkMotion4_Anim(Item_GObj* gobj)
 {
+#ifdef TARGET_PC
+    return /* r3 of the last call on the console */
+#endif
     it_802751D8(gobj);
 }
 

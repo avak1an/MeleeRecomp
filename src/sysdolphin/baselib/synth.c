@@ -1,4 +1,11 @@
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#endif
 #include "synth.h"
+#ifdef TARGET_PC
+#include <pc_endian.h>
+#include <pc_hsd_swap.h>
+#endif
 
 #include <math.h> // IWYU pragma: keep
 #include <placeholder.h>
@@ -58,6 +65,11 @@ static void HSD_SynthSFXSampleLoadCallback(int result, int length, void* addr,
         u32 data_bytes = header_size - 0x10;
         size_t alloc_size;
         u32 total;
+#ifdef TARGET_PC
+        /* The sample table (a count followed by 0x40-byte entries) is
+         * big-endian on disc; the fields touched here are 32-bit. */
+        pc_swap32_range(HSD_Synth_804D7730, data_bytes);
+#endif
         u32 dnw;
         int bankID;
         AXVPB** pp;
@@ -107,6 +119,13 @@ static void HSD_SynthSFXSampleLoadCallback(int result, int length, void* addr,
             memcpy((u8*) HSD_Synth_804D7730 + 8, HSD_Synth_804D7734, nbytes);
             for (k = 0; k < n; k++) {
                 u8* e = (u8*) HSD_Synth_804D7730 + k * 0x40;
+#ifdef TARGET_PC
+                /* The AX blocks of a voice (AXPBADDR at +0x10, AXPBADPCM at
+                 * +0x20, AXPBADPCMLOOP at +0x48) hold 16-bit fields; only
+                 * the three sample addresses stay 32-bit. */
+                pc_rotate32_range(e + 0x10, 4);
+                pc_rotate32_range(e + 0x20, 0x30);
+#endif
                 if (e + 0x10 != NULL) {
                     *(u32*) (e + 0x14) += hsd_SynthSFXBank[bankID] * 2;
                 } else {
@@ -154,6 +173,10 @@ static void HSD_SynthSFXHeaderLoadCallback(int result, int length, void* addr,
     s32 header_size;
     size_t alloc_size;
 
+#ifdef TARGET_PC
+    /* .ssm header: eight big-endian 32-bit words. */
+    pc_swap32_range(hsd_SynthSFXLoadBuf, 0x20);
+#endif
     if (HSD_Synth_804D7738 == 0) {
         int bankID = HSD_Synth_804C2A60[0].bankID;
 
@@ -418,12 +441,23 @@ void HSD_SynthSFXBankDeflag(int bank_id)
         offset += vpb->userContext;
         vpb = vpb->next;
     }
+#ifdef TARGET_PC
+    /* the console store runs past HSD_Synth_804C2AE0 into the array that
+     * follows it in memory, which is hsd_SynthSFXBank */
+    hsd_SynthSFXBank[bank_id] = offset;
+#else
     HSD_Synth_804C2AE0[bank_id + 0x80 / 4] = (void*) offset;
+#endif
 }
 
 void HSD_SynthSFXBankDeflagSync(void)
 {
     while (sfxGroupDataReaddressCounter) {
+#ifdef TARGET_PC
+        /* the counter drops from transfer callbacks, which complete from
+         * the pump here instead of an interrupt */
+        pc_pump();
+#endif
         continue;
     }
 }
@@ -549,6 +583,20 @@ int HSD_Synth_80389334(int sfx_id, u8 vol, u8 vol2, u8 pan, int priority,
     sfx_entry = HSD_Synth_804C29E0[sfx_id & 0x1F];
 
     while (sfx_entry != NULL) {
+#ifdef TARGET_PC
+        if (!pc_ptr_readable(sfx_entry, sizeof(*sfx_entry))) {
+            struct foo* e = HSD_Synth_804C29E0[sfx_id & 0x1F];
+            fprintf(stderr, "[pc] sfx bucket %d (at %p) is corrupt looking up %d:", sfx_id & 0x1F,
+                    (void*) &HSD_Synth_804C29E0[sfx_id & 0x1F], sfx_id);
+            while (e != NULL && pc_ptr_readable(e, sizeof(*e))) {
+                fprintf(stderr, " %p(id %d n %d)", (void*) e, e->unk4, e->unk8);
+                e = (struct foo*) e->next;
+            }
+            fprintf(stderr, " -> %p\n", (void*) e);
+            OSRestoreInterrupts(saved_interrupts);
+            return -1;
+        }
+#endif
         if (sfx_entry->unk4 == sfx_id) {
             voice_idx = 0;
             while (voice_idx < sfx_entry->unk8) {
@@ -1188,8 +1236,33 @@ void HSD_SynthResetStreamCounters(int result, int length, void* buf, bool b)
     HSD_Synth_804D7778 = 0;
 }
 
+#ifdef TARGET_PC
+/* A stream (HPS) header just read from disc: words 0..3 are counts, then
+ * per voice an AXPBADDR (u16, u16, three u32) and an AXPBADPCM (u16s). */
+static void pc_swap_pstream_header(u32* entry)
+{
+    int i;
+    pc_swap32_range(entry, 0x80);
+    for (i = 0; i < 2; i++) {
+        pc_rotate32_range(&entry[i * 14 + 4], 4);
+        pc_rotate32_range(&entry[i * 14 + 8], 0x28);
+    }
+}
+
+/* A hako (stream block) header: three u32 sizes followed by the ADPCM loop
+ * state of each voice as 16-bit values. */
+static void pc_swap_hako_header(void* header)
+{
+    pc_swap32_range(header, 0x20);
+    pc_rotate32_range((u8*) header + 0xC, 0x14);
+}
+#endif
+
 void HSD_Synth_8038AD74(u32 offset, uintptr_t src)
 {
+#ifdef TARGET_PC
+    pc_swap_hako_header(&lbl_804C4540[HSD_Synth_804D7768]);
+#endif
     HSD_DevComRequest(HSD_Synth_804D7764, src,
                       HSD_Synth_804D7780 + (HSD_Synth_804D7768 << 16),
                       lbl_804C4540[HSD_Synth_804D7768].x0, 0x23, 0,
@@ -1340,6 +1413,9 @@ void HSD_Synth_8038B120(void)
 
 void HSD_SynthPStreamFirstHakoHeaderCallback(void)
 {
+#ifdef TARGET_PC
+    pc_swap_hako_header(&lbl_804C4540[HSD_Synth_804D7768]);
+#endif
     HSD_DevComRequest(HSD_Synth_804D7764, 0xA0,
                       HSD_Synth_804D7780 + (HSD_Synth_804D7768 << 16),
                       lbl_804C4540[HSD_Synth_804D7768].x0, 0x23, 0,
@@ -1353,6 +1429,9 @@ void HSD_SynthPStreamHeaderCallback(int arg0, int arg1, void* arg2,
     struct HSD_SynthSFXNode* node;
     int i;
 
+#ifdef TARGET_PC
+    pc_swap_pstream_header(entry);
+#endif
     node = getNode(HSD_Synth_804D7760);
     if (node != NULL) {
         node->voice_count = entry[3];

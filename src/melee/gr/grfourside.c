@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grfourside.h"
 
 #include <Runtime/platform.h>
@@ -134,6 +137,9 @@ void grFourside_801F2D0C(bool arg) {}
 void grFourside_801F2D10(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grfourside(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
     grFourside_801F2DD0(0);

@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grgreens.h"
 
 #include <Runtime/platform.h>
@@ -199,6 +202,9 @@ void grGreens_Init(void)
 {
     PAD_STACK(8);
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grgreens(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     grGreens_80213524(0);

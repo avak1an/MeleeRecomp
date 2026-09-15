@@ -21,8 +21,7 @@
 #include <melee/lb/lb_00B0.h>
 #include <sysdolphin/baselib/random.h>
 
-static MotionFlags const ftKp_MF_SpecialN_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_SkipRumble;
+STATIC_CONST(MotionFlags, ftKp_MF_SpecialN_Coll, ftCommon_GroundAirColl_MF | Ft_MF_SkipRumble);
 
 enum_t ftKp_Init_803CF2A0[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1,

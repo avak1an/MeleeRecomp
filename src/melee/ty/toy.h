@@ -65,7 +65,22 @@
 /* 31263C */ void Toy_8031263C(void);
 /* 3127D4 */ void Toy_803127D4(void);
 /* 3FE5E8 */ extern char Toy_str_ScMenFigure_cam_int1_camera[];
+#ifdef TARGET_PC
+/* The trophy code views _Toy_804A26B8, two text buffers and Toy_804A284C
+ * as one 0x3F0-byte object (Toy26B8, `toy + 0x194`, ...); on PC they are
+ * one object. */
+struct pc_toy_block_t {
+    /* 0x000 */ struct _Toy_804A26B8_t base;
+    /* 0x00C */ char devtext1[0x8C];
+    /* 0x098 */ char devtext2[0xFC];
+    /* 0x194 */ u16 flags[302];
+};
+ASSERT_SIZE(struct pc_toy_block_t, 0x3F0);
+extern struct pc_toy_block_t pc_toy_block;
+#define Toy_804A284C (pc_toy_block.flags)
+#else
 /* 4A284C */ extern u16 Toy_804A284C[302];
+#endif
 /* 4A2AA8 */ extern ToyAnimState Toy_804A2AA8;
 /* 4D6EAC */ extern TyDspEntry* Toy_sbss_804D6EAC;
 /* 4D6EB0 */ extern TyDspEntry* Toy_sbss_804D6EB0;

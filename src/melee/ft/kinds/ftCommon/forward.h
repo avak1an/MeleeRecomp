@@ -6,10 +6,9 @@
 typedef struct ftHurtboxInit ftHurtboxInit;
 typedef struct ftCollisionBox ftCollisionBox;
 
-static MotionFlags const ftCommon_GroundAirColl_MF =
-    Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim | Ft_MF_UpdateCmd |
+STATIC_CONST(MotionFlags, ftCommon_GroundAirColl_MF, Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim | Ft_MF_UpdateCmd |
     Ft_MF_SkipItemVis | Ft_MF_Unk19 | Ft_MF_SkipModelPartVis |
-    Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 typedef enum ftCo_JumpInput {
     JumpInput_None,
@@ -18,271 +17,162 @@ typedef enum ftCo_JumpInput {
     JumpInput_XY,
 } ftCo_JumpInput;
 
-static MotionFlags const ftCo_MF_5_6 = Ft_MF_SkipAnimVel | Ft_MF_Unk06;
-static MotionFlags const ftCo_MF_2_5_6 =
-    ftCo_MF_5_6 | Ft_MF_KeepColAnimHitStatus;
-static MotionFlags const ftCo_MF_Squat = ftCo_MF_2_5_6 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_Dash = ftCo_MF_Squat | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_Run = ftCo_MF_5_6 | Ft_MF_SkipHit;
-static MotionFlags const ftCo_MF_Appeal =
-    ftCo_MF_5_6 | Ft_MF_KeepFastFall | Ft_MF_SkipModel;
-static MotionFlags const ftCo_MF_9_10 = Ft_MF_KeepSfx | Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_LandingAirN =
-    ftCo_MF_9_10 | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit;
-static MotionFlags const ftCo_MF_LandingAirF =
-    ftCo_MF_LandingAirN | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_LandingAirB =
-    ftCo_MF_LandingAirN | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_LandingAirHi =
-    ftCo_MF_LandingAirB | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_LandingAirLw = ftCo_MF_9_10 | Ft_MF_SkipModel;
-static MotionFlags const ftCo_MF_Turn = ftCo_MF_2_5_6 | Ft_MF_KeepAccessory;
-static MotionFlags const ftCo_MF_Walk =
-    ftCo_MF_2_5_6 | Ft_MF_KeepGfx | Ft_MF_UpdateCmd;
-static MotionFlags const ftCo_MF_3_5_6 = ftCo_MF_5_6 | Ft_MF_SkipHit;
-static MotionFlags const ftCo_MF_Jump =
-    ftCo_MF_3_5_6 | Ft_MF_KeepFastFall | Ft_MF_SkipNametagVis;
-static MotionFlags const ftCo_MF_JumpAir =
-    ftCo_MF_3_5_6 | Ft_MF_KeepGfx | Ft_MF_KeepColAnimPartHitStatus;
-static MotionFlags const ftCo_MF_GuardReflect =
-    ftCo_MF_5_6 | Ft_MF_KeepFastFall | Ft_MF_KeepGfx | Ft_MF_SkipModel |
-    Ft_MF_SkipColAnim | Ft_MF_UnkUpdatePhys;
-static MotionFlags const ftCo_MF_Guard = Ft_MF_Unk19 | Ft_MF_UnkUpdatePhys;
-static MotionFlags const ftCo_MF_AttackBase =
-    Ft_MF_KeepSfx | Ft_MF_SkipItemVis;
-static MotionFlags const ftCo_MF_Attack =
-    ftCo_MF_AttackBase | Ft_MF_FreezeState;
-static MotionFlags const ftCo_MF_Attack_2 =
-    ftCo_MF_Attack | Ft_MF_KeepColAnimHitStatus;
-static MotionFlags const ftCo_MF_AttackDash =
-    ftCo_MF_Attack_2 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_AttackS3 = ftCo_MF_Attack_2 | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_AttackHi3 =
-    ftCo_MF_AttackS3 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_AttackLw3 = ftCo_MF_Attack | Ft_MF_SkipHit;
-static MotionFlags const ftCo_MF_CliffAttackQuick =
-    ftCo_MF_AttackLw3 | Ft_MF_KeepFastFall | Ft_MF_KeepGfx |
-    Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipModel | Ft_MF_SkipAnimVel;
-static MotionFlags const ftCo_MF_AttackAir =
-    ftCo_MF_Attack | Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_AttackAirN =
-    ftCo_MF_AttackAir | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit |
-    Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_AttackAirF =
-    ftCo_MF_AttackAirN | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_AttackAirB =
-    ftCo_MF_AttackAirN | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_AttackAirHi =
-    ftCo_MF_AttackAirF | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_AttackAirLw =
-    ftCo_MF_AttackAir | Ft_MF_SkipModel;
-static MotionFlags const ftCo_MF_Attack4 =
-    ftCo_MF_AttackLw3 | Ft_MF_SkipRumble;
-static MotionFlags const ftCo_MF_AttackS4 =
-    ftCo_MF_Attack4 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_AttackHi4 = ftCo_MF_Attack4 | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_AttackLw4 =
-    ftCo_MF_Attack4 | Ft_MF_KeepFastFall | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_Attack1 = ftCo_MF_Attack | Ft_MF_Unk19;
-static MotionFlags const ftCo_MF_Attack11 =
-    ftCo_MF_Attack1 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_Attack12 = ftCo_MF_Attack1 | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_Attack13 =
-    ftCo_MF_Attack12 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_Attack100 =
-    ftCo_MF_Attack1 | Ft_MF_KeepColAnimHitStatus;
-static MotionFlags const ftCo_MF_ItemScope =
-    Ft_MF_SkipItemVis | Ft_MF_SkipModelPartVis;
-static MotionFlags const ftCo_MF_SwordSwing1 = ftCo_MF_ItemScope | Ft_MF_Unk06;
-static MotionFlags const ftCo_MF_SwordSwing3 =
-    ftCo_MF_SwordSwing1 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_SwordSwingDash =
-    ftCo_MF_SwordSwing3 | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_BatSwing1 =
-    ftCo_MF_SwordSwing1 | Ft_MF_KeepColAnimHitStatus;
-static MotionFlags const ftCo_MF_BatSwing3 =
-    ftCo_MF_BatSwing1 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_BatSwingDash =
-    ftCo_MF_BatSwing3 | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_ParasolSwing1 =
-    ftCo_MF_SwordSwing1 | Ft_MF_SkipHit;
-static MotionFlags const ftCo_MF_ParasolSwing3 =
-    ftCo_MF_ParasolSwing1 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_ParasolSwingDash =
-    ftCo_MF_ParasolSwing3 | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_HarisenSwing1 =
-    ftCo_MF_BatSwing1 | Ft_MF_SkipHit;
-static MotionFlags const ftCo_MF_HarisenSwing3 =
-    ftCo_MF_HarisenSwing1 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_HarisenSwingDash =
-    ftCo_MF_HarisenSwing3 | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_StarRodSwing1 =
-    ftCo_MF_SwordSwing1 | Ft_MF_SkipModel;
-static MotionFlags const ftCo_MF_StarRodSwing3 =
-    ftCo_MF_StarRodSwing1 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_StarRodSwingDash =
-    ftCo_MF_StarRodSwing3 | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_LipstickSwing1 =
-    ftCo_MF_StarRodSwing1 | Ft_MF_KeepColAnimHitStatus;
-static MotionFlags const ftCo_MF_LipstickSwing3 =
-    ftCo_MF_LipstickSwing1 | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_LipstickSwingDash =
-    ftCo_MF_LipstickSwing3 | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_ParasolOpen =
-    ftCo_MF_ParasolSwing1 | Ft_MF_SkipModel;
-static MotionFlags const ftCo_MF_HammerBase =
-    ftCo_MF_LipstickSwing1 | Ft_MF_SkipHit;
-static MotionFlags const ftCo_MF_Hammer = ftCo_MF_HammerBase | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_WarpStarFall =
-    ftCo_MF_Hammer | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_ItemScope_5_6 =
-    ftCo_MF_5_6 | ftCo_MF_ItemScope;
-static MotionFlags const ftCo_MF_ItemThrow =
-    ftCo_MF_ItemScope_5_6 | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_LGunShoot =
-    ftCo_MF_ItemScope | Ft_MF_KeepFastFall | Ft_MF_SkipHit | Ft_MF_SkipModel |
-    Ft_MF_Unk06 | Ft_MF_SkipThrowException;
-static MotionFlags const ftCo_MF_ItemScopeFire =
-    ftCo_MF_LGunShoot | Ft_MF_KeepColAnimHitStatus;
-static MotionFlags const ftCo_MF_HammerFall =
-    ftCo_MF_Hammer | Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_ItemThrowAir =
-    ftCo_MF_ItemThrow | Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_LGunShootAir =
-    ftCo_MF_LGunShoot | Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_ItemScopeAir =
-    ftCo_MF_HammerBase | Ft_MF_KeepFastFall | Ft_MF_SkipThrowException |
-    Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_Swing4 = Ft_MF_KeepGfx | Ft_MF_SkipRumble;
-static MotionFlags const ftCo_MF_SwordSwing4 =
-    ftCo_MF_SwordSwing1 | ftCo_MF_Swing4;
-static MotionFlags const ftCo_MF_BatSwing4 =
-    ftCo_MF_BatSwing1 | ftCo_MF_Swing4;
-static MotionFlags const ftCo_MF_ParasolSwing4 =
-    ftCo_MF_ParasolSwing1 | ftCo_MF_Swing4;
-static MotionFlags const ftCo_MF_HarisenSwing4 =
-    ftCo_MF_HarisenSwing1 | ftCo_MF_Swing4;
-static MotionFlags const ftCo_MF_StarRodSwing4 =
-    ftCo_MF_StarRodSwing1 | ftCo_MF_Swing4;
-static MotionFlags const ftCo_MF_LipstickSwing4 =
-    ftCo_MF_LipstickSwing1 | ftCo_MF_Swing4;
-static MotionFlags const ftCo_MF_ItemThrow4 =
-    ftCo_MF_ItemScope_5_6 | ftCo_MF_Swing4;
-static MotionFlags const ftCo_MF_ItemThrowAir4 =
-    ftCo_MF_ItemThrow4 | Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_HammerMove =
-    ftCo_MF_HammerBase | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_HammerTurn =
-    ftCo_MF_HammerMove | Ft_MF_KeepAccessory;
-static MotionFlags const ftCo_MF_HammerWalk =
-    ftCo_MF_HammerMove | Ft_MF_UpdateCmd;
-static MotionFlags const ftCo_MF_ItemFall =
-    Ft_MF_SkipHit | Ft_MF_SkipModel | Ft_MF_Unk06 | Ft_MF_SkipModelPartVis;
-static MotionFlags const ftCo_MF_ItemScrewBase =
-    ftCo_MF_AttackBase | ftCo_MF_ItemFall | Ft_MF_KeepFastFall | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_ItemScrew =
-    ftCo_MF_ItemScrewBase | Ft_MF_SkipNametagVis;
-static MotionFlags const ftCo_MF_HammerJump =
-    ftCo_MF_HammerMove | Ft_MF_SkipParasol | Ft_MF_SkipNametagVis;
-static MotionFlags const ftCo_MF_ItemScrewAir =
-    ftCo_MF_ItemScrewBase | Ft_MF_SkipParasol | Ft_MF_KeepColAnimPartHitStatus;
-static MotionFlags const ftCo_MF_LiftWait =
-    Ft_MF_Unk19 | Ft_MF_SkipModelPartVis;
-static MotionFlags const ftCo_MF_LiftMove = ftCo_MF_LiftWait |
+STATIC_CONST(MotionFlags, ftCo_MF_5_6, Ft_MF_SkipAnimVel | Ft_MF_Unk06);
+STATIC_CONST(MotionFlags, ftCo_MF_2_5_6, ftCo_MF_5_6 | Ft_MF_KeepColAnimHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_Squat, ftCo_MF_2_5_6 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_Dash, ftCo_MF_Squat | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_Run, ftCo_MF_5_6 | Ft_MF_SkipHit);
+STATIC_CONST(MotionFlags, ftCo_MF_Appeal, ftCo_MF_5_6 | Ft_MF_KeepFastFall | Ft_MF_SkipModel);
+STATIC_CONST(MotionFlags, ftCo_MF_9_10, Ft_MF_KeepSfx | Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_LandingAirN, ftCo_MF_9_10 | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit);
+STATIC_CONST(MotionFlags, ftCo_MF_LandingAirF, ftCo_MF_LandingAirN | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_LandingAirB, ftCo_MF_LandingAirN | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_LandingAirHi, ftCo_MF_LandingAirB | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_LandingAirLw, ftCo_MF_9_10 | Ft_MF_SkipModel);
+STATIC_CONST(MotionFlags, ftCo_MF_Turn, ftCo_MF_2_5_6 | Ft_MF_KeepAccessory);
+STATIC_CONST(MotionFlags, ftCo_MF_Walk, ftCo_MF_2_5_6 | Ft_MF_KeepGfx | Ft_MF_UpdateCmd);
+STATIC_CONST(MotionFlags, ftCo_MF_3_5_6, ftCo_MF_5_6 | Ft_MF_SkipHit);
+STATIC_CONST(MotionFlags, ftCo_MF_Jump, ftCo_MF_3_5_6 | Ft_MF_KeepFastFall | Ft_MF_SkipNametagVis);
+STATIC_CONST(MotionFlags, ftCo_MF_JumpAir, ftCo_MF_3_5_6 | Ft_MF_KeepGfx | Ft_MF_KeepColAnimPartHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_GuardReflect, ftCo_MF_5_6 | Ft_MF_KeepFastFall | Ft_MF_KeepGfx | Ft_MF_SkipModel |
+    Ft_MF_SkipColAnim | Ft_MF_UnkUpdatePhys);
+STATIC_CONST(MotionFlags, ftCo_MF_Guard, Ft_MF_Unk19 | Ft_MF_UnkUpdatePhys);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackBase, Ft_MF_KeepSfx | Ft_MF_SkipItemVis);
+STATIC_CONST(MotionFlags, ftCo_MF_Attack, ftCo_MF_AttackBase | Ft_MF_FreezeState);
+STATIC_CONST(MotionFlags, ftCo_MF_Attack_2, ftCo_MF_Attack | Ft_MF_KeepColAnimHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackDash, ftCo_MF_Attack_2 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackS3, ftCo_MF_Attack_2 | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackHi3, ftCo_MF_AttackS3 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackLw3, ftCo_MF_Attack | Ft_MF_SkipHit);
+STATIC_CONST(MotionFlags, ftCo_MF_CliffAttackQuick, ftCo_MF_AttackLw3 | Ft_MF_KeepFastFall | Ft_MF_KeepGfx |
+    Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipModel | Ft_MF_SkipAnimVel);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackAir, ftCo_MF_Attack | Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackAirN, ftCo_MF_AttackAir | Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit |
+    Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackAirF, ftCo_MF_AttackAirN | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackAirB, ftCo_MF_AttackAirN | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackAirHi, ftCo_MF_AttackAirF | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackAirLw, ftCo_MF_AttackAir | Ft_MF_SkipModel);
+STATIC_CONST(MotionFlags, ftCo_MF_Attack4, ftCo_MF_AttackLw3 | Ft_MF_SkipRumble);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackS4, ftCo_MF_Attack4 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackHi4, ftCo_MF_Attack4 | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_AttackLw4, ftCo_MF_Attack4 | Ft_MF_KeepFastFall | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_Attack1, ftCo_MF_Attack | Ft_MF_Unk19);
+STATIC_CONST(MotionFlags, ftCo_MF_Attack11, ftCo_MF_Attack1 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_Attack12, ftCo_MF_Attack1 | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_Attack13, ftCo_MF_Attack12 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_Attack100, ftCo_MF_Attack1 | Ft_MF_KeepColAnimHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemScope, Ft_MF_SkipItemVis | Ft_MF_SkipModelPartVis);
+STATIC_CONST(MotionFlags, ftCo_MF_SwordSwing1, ftCo_MF_ItemScope | Ft_MF_Unk06);
+STATIC_CONST(MotionFlags, ftCo_MF_SwordSwing3, ftCo_MF_SwordSwing1 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_SwordSwingDash, ftCo_MF_SwordSwing3 | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_BatSwing1, ftCo_MF_SwordSwing1 | Ft_MF_KeepColAnimHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_BatSwing3, ftCo_MF_BatSwing1 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_BatSwingDash, ftCo_MF_BatSwing3 | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_ParasolSwing1, ftCo_MF_SwordSwing1 | Ft_MF_SkipHit);
+STATIC_CONST(MotionFlags, ftCo_MF_ParasolSwing3, ftCo_MF_ParasolSwing1 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_ParasolSwingDash, ftCo_MF_ParasolSwing3 | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_HarisenSwing1, ftCo_MF_BatSwing1 | Ft_MF_SkipHit);
+STATIC_CONST(MotionFlags, ftCo_MF_HarisenSwing3, ftCo_MF_HarisenSwing1 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_HarisenSwingDash, ftCo_MF_HarisenSwing3 | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_StarRodSwing1, ftCo_MF_SwordSwing1 | Ft_MF_SkipModel);
+STATIC_CONST(MotionFlags, ftCo_MF_StarRodSwing3, ftCo_MF_StarRodSwing1 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_StarRodSwingDash, ftCo_MF_StarRodSwing3 | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_LipstickSwing1, ftCo_MF_StarRodSwing1 | Ft_MF_KeepColAnimHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_LipstickSwing3, ftCo_MF_LipstickSwing1 | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_LipstickSwingDash, ftCo_MF_LipstickSwing3 | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_ParasolOpen, ftCo_MF_ParasolSwing1 | Ft_MF_SkipModel);
+STATIC_CONST(MotionFlags, ftCo_MF_HammerBase, ftCo_MF_LipstickSwing1 | Ft_MF_SkipHit);
+STATIC_CONST(MotionFlags, ftCo_MF_Hammer, ftCo_MF_HammerBase | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_WarpStarFall, ftCo_MF_Hammer | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemScope_5_6, ftCo_MF_5_6 | ftCo_MF_ItemScope);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemThrow, ftCo_MF_ItemScope_5_6 | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_LGunShoot, ftCo_MF_ItemScope | Ft_MF_KeepFastFall | Ft_MF_SkipHit | Ft_MF_SkipModel |
+    Ft_MF_Unk06 | Ft_MF_SkipThrowException);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemScopeFire, ftCo_MF_LGunShoot | Ft_MF_KeepColAnimHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_HammerFall, ftCo_MF_Hammer | Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemThrowAir, ftCo_MF_ItemThrow | Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_LGunShootAir, ftCo_MF_LGunShoot | Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemScopeAir, ftCo_MF_HammerBase | Ft_MF_KeepFastFall | Ft_MF_SkipThrowException |
+    Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_Swing4, Ft_MF_KeepGfx | Ft_MF_SkipRumble);
+STATIC_CONST(MotionFlags, ftCo_MF_SwordSwing4, ftCo_MF_SwordSwing1 | ftCo_MF_Swing4);
+STATIC_CONST(MotionFlags, ftCo_MF_BatSwing4, ftCo_MF_BatSwing1 | ftCo_MF_Swing4);
+STATIC_CONST(MotionFlags, ftCo_MF_ParasolSwing4, ftCo_MF_ParasolSwing1 | ftCo_MF_Swing4);
+STATIC_CONST(MotionFlags, ftCo_MF_HarisenSwing4, ftCo_MF_HarisenSwing1 | ftCo_MF_Swing4);
+STATIC_CONST(MotionFlags, ftCo_MF_StarRodSwing4, ftCo_MF_StarRodSwing1 | ftCo_MF_Swing4);
+STATIC_CONST(MotionFlags, ftCo_MF_LipstickSwing4, ftCo_MF_LipstickSwing1 | ftCo_MF_Swing4);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemThrow4, ftCo_MF_ItemScope_5_6 | ftCo_MF_Swing4);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemThrowAir4, ftCo_MF_ItemThrow4 | Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_HammerMove, ftCo_MF_HammerBase | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_HammerTurn, ftCo_MF_HammerMove | Ft_MF_KeepAccessory);
+STATIC_CONST(MotionFlags, ftCo_MF_HammerWalk, ftCo_MF_HammerMove | Ft_MF_UpdateCmd);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemFall, Ft_MF_SkipHit | Ft_MF_SkipModel | Ft_MF_Unk06 | Ft_MF_SkipModelPartVis);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemScrewBase, ftCo_MF_AttackBase | ftCo_MF_ItemFall | Ft_MF_KeepFastFall | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemScrew, ftCo_MF_ItemScrewBase | Ft_MF_SkipNametagVis);
+STATIC_CONST(MotionFlags, ftCo_MF_HammerJump, ftCo_MF_HammerMove | Ft_MF_SkipParasol | Ft_MF_SkipNametagVis);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemScrewAir, ftCo_MF_ItemScrewBase | Ft_MF_SkipParasol | Ft_MF_KeepColAnimPartHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_LiftWait, Ft_MF_Unk19 | Ft_MF_SkipModelPartVis);
+STATIC_CONST(MotionFlags, ftCo_MF_LiftMove, ftCo_MF_LiftWait |
                                             Ft_MF_KeepColAnimHitStatus |
-                                            Ft_MF_SkipAnimVel | Ft_MF_Unk06;
-static MotionFlags const ftCo_MF_LiftTurn =
-    ftCo_MF_LiftMove | Ft_MF_KeepAccessory;
-static MotionFlags const ftCo_MF_LiftWalk =
-    ftCo_MF_LiftMove | Ft_MF_KeepGfx | Ft_MF_UpdateCmd;
-static MotionFlags const ftCo_MF_ParasolFall =
-    ftCo_MF_ItemFall | Ft_MF_SkipItemVis | Ft_MF_Unk19;
-static MotionFlags const ftCo_MF_FireFlowerShoot =
-    ftCo_MF_ParasolFall | Ft_MF_KeepGfx | Ft_MF_SkipThrowException;
-static MotionFlags const ftCo_MF_ItemScopeRapid =
-    ftCo_MF_ParasolFall | Ft_MF_KeepColAnimHitStatus |
-    Ft_MF_SkipThrowException | Ft_MF_Unk19;
-static MotionFlags const ftCo_MF_FireFlowerShootAir =
-    ftCo_MF_FireFlowerShoot | Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_ItemScopeAirRapid =
-    ftCo_MF_ItemScopeRapid | Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_Dazed =
-    Ft_MF_UnkUpdatePhys | Ft_MF_SkipModelPartVis;
-static MotionFlags const ftCo_MF_Damage = ftCo_MF_Dazed | Ft_MF_KeepSwordTrail;
-static MotionFlags const ftCo_MF_DamageScrew =
-    ftCo_MF_Damage | Ft_MF_SkipNametagVis;
-static MotionFlags const ftCo_MF_DamageScrewAir =
-    ftCo_MF_Damage | Ft_MF_KeepColAnimPartHitStatus;
-static MotionFlags const ftCo_MF_Down = Ft_MF_SkipHit | Ft_MF_SkipAnimVel |
+                                            Ft_MF_SkipAnimVel | Ft_MF_Unk06);
+STATIC_CONST(MotionFlags, ftCo_MF_LiftTurn, ftCo_MF_LiftMove | Ft_MF_KeepAccessory);
+STATIC_CONST(MotionFlags, ftCo_MF_LiftWalk, ftCo_MF_LiftMove | Ft_MF_KeepGfx | Ft_MF_UpdateCmd);
+STATIC_CONST(MotionFlags, ftCo_MF_ParasolFall, ftCo_MF_ItemFall | Ft_MF_SkipItemVis | Ft_MF_Unk19);
+STATIC_CONST(MotionFlags, ftCo_MF_FireFlowerShoot, ftCo_MF_ParasolFall | Ft_MF_KeepGfx | Ft_MF_SkipThrowException);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemScopeRapid, ftCo_MF_ParasolFall | Ft_MF_KeepColAnimHitStatus |
+    Ft_MF_SkipThrowException | Ft_MF_Unk19);
+STATIC_CONST(MotionFlags, ftCo_MF_FireFlowerShootAir, ftCo_MF_FireFlowerShoot | Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_ItemScopeAirRapid, ftCo_MF_ItemScopeRapid | Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_Dazed, Ft_MF_UnkUpdatePhys | Ft_MF_SkipModelPartVis);
+STATIC_CONST(MotionFlags, ftCo_MF_Damage, ftCo_MF_Dazed | Ft_MF_KeepSwordTrail);
+STATIC_CONST(MotionFlags, ftCo_MF_DamageScrew, ftCo_MF_Damage | Ft_MF_SkipNametagVis);
+STATIC_CONST(MotionFlags, ftCo_MF_DamageScrewAir, ftCo_MF_Damage | Ft_MF_KeepColAnimPartHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_Down, Ft_MF_SkipHit | Ft_MF_SkipAnimVel |
                                         Ft_MF_Unk06 | Ft_MF_FreezeState |
-                                        Ft_MF_SkipModelPartVis;
-static MotionFlags const ftCo_MF_DownU =
-    ftCo_MF_Down | Ft_MF_KeepColAnimHitStatus;
-static MotionFlags const ftCo_MF_DownD = ftCo_MF_DownU | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_DownDamageU =
-    ftCo_MF_DownU | Ft_MF_KeepSwordTrail;
-static MotionFlags const ftCo_MF_DownDamageD =
-    ftCo_MF_DownD | Ft_MF_KeepSwordTrail;
-static MotionFlags const ftCo_MF_DownAttack =
-    ftCo_MF_Attack | Ft_MF_SkipModel | Ft_MF_SkipAnimVel |
-    Ft_MF_SkipModelPartVis;
-static MotionFlags const ftCo_MF_DownAttackU =
-    ftCo_MF_DownAttack | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_DownAttackD =
-    ftCo_MF_DownAttack | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_PassiveWall =
-    ftCo_MF_Dazed | Ft_MF_FreezeState;
-static MotionFlags const ftCo_MF_Passive = ftCo_MF_Down | Ft_MF_KeepGfx |
+                                        Ft_MF_SkipModelPartVis);
+STATIC_CONST(MotionFlags, ftCo_MF_DownU, ftCo_MF_Down | Ft_MF_KeepColAnimHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_DownD, ftCo_MF_DownU | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_DownDamageU, ftCo_MF_DownU | Ft_MF_KeepSwordTrail);
+STATIC_CONST(MotionFlags, ftCo_MF_DownDamageD, ftCo_MF_DownD | Ft_MF_KeepSwordTrail);
+STATIC_CONST(MotionFlags, ftCo_MF_DownAttack, ftCo_MF_Attack | Ft_MF_SkipModel | Ft_MF_SkipAnimVel |
+    Ft_MF_SkipModelPartVis);
+STATIC_CONST(MotionFlags, ftCo_MF_DownAttackU, ftCo_MF_DownAttack | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_DownAttackD, ftCo_MF_DownAttack | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_PassiveWall, ftCo_MF_Dazed | Ft_MF_FreezeState);
+STATIC_CONST(MotionFlags, ftCo_MF_Passive, ftCo_MF_Down | Ft_MF_KeepGfx |
                                            Ft_MF_KeepColAnimHitStatus |
-                                           Ft_MF_UnkUpdatePhys;
-static MotionFlags const ftCo_MF_StopWall =
-    Ft_MF_KeepFastFall | Ft_MF_KeepGfx | Ft_MF_SkipHit | Ft_MF_SkipAnimVel |
-    Ft_MF_Unk06 | Ft_MF_SkipMetalB;
-static MotionFlags const ftCo_MF_Pass =
-    ftCo_MF_StopWall | Ft_MF_KeepColAnimHitStatus;
-static MotionFlags const ftCo_MF_OttottoWait = Ft_MF_Unk19 | Ft_MF_SkipMetalB;
-static MotionFlags const ftCo_MF_CliffAction =
-    Ft_MF_UnkUpdatePhys | Ft_MF_SkipMetalB;
-static MotionFlags const ftCo_MF_CliffAction_4_5 =
-    ftCo_MF_CliffAction | Ft_MF_SkipModel | Ft_MF_SkipAnimVel;
-static MotionFlags const ftCo_MF_CliffCatch =
-    ftCo_MF_CliffAction_4_5 | Ft_MF_Unk06;
-static MotionFlags const ftCo_MF_CliffAttackSlow =
-    ftCo_MF_AttackBase | ftCo_MF_CliffAction_4_5 | Ft_MF_KeepGfx |
-    Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit;
-static MotionFlags const ftCo_MF_CliffWait = ftCo_MF_CliffAction | Ft_MF_Unk19;
-static MotionFlags const ftCo_MF_CatchWait =
-    Ft_MF_FreezeState | Ft_MF_SkipMetalB;
-static MotionFlags const ftCo_MF_CatchBase =
-    ftCo_MF_CatchWait | Ft_MF_SkipModel | Ft_MF_SkipAnimVel;
-static MotionFlags const ftCo_MF_Catch =
-    ftCo_MF_CatchBase | Ft_MF_KeepFastFall | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_Throw = ftCo_MF_CatchBase | Ft_MF_SkipItemVis;
-static MotionFlags const ftCo_MF_CatchAttack =
-    ftCo_MF_Throw | Ft_MF_KeepColAnimHitStatus;
-static MotionFlags const ftCo_MF_ThrowF =
-    ftCo_MF_CatchAttack | Ft_MF_KeepFastFall;
-static MotionFlags const ftCo_MF_ThrowB = ftCo_MF_CatchAttack | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_ThrowHi = ftCo_MF_ThrowF | Ft_MF_KeepGfx;
-static MotionFlags const ftCo_MF_ThrowLw = ftCo_MF_Throw | Ft_MF_SkipHit;
-static MotionFlags const ftCo_MF_Capture =
-    ftCo_MF_CatchWait | Ft_MF_UnkUpdatePhys;
-static MotionFlags const ftCo_MF_CaptureAir =
-    ftCo_MF_Capture | Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_Thrown =
-    ftCo_MF_Capture | Ft_MF_KeepSwordTrail;
-static MotionFlags const ftCo_MF_ThrownAir =
-    ftCo_MF_Thrown | Ft_MF_SkipParasol;
-static MotionFlags const ftCo_MF_Shouldered = ftCo_MF_Capture | Ft_MF_Unk19;
-static MotionFlags const ftCo_MF_Rebirth =
-    Ft_MF_SkipModelPartVis | Ft_MF_SkipMetalB;
-static MotionFlags const ftCo_MF_ThrownStar =
-    ftCo_MF_Rebirth | Ft_MF_KeepSwordTrail;
-static MotionFlags const ftCo_MF_Dead = ftCo_MF_Dazed | Ft_MF_SkipMetalB;
-static MotionFlags const ftCo_MF_Sleep = ftCo_MF_Dead | Ft_MF_KeepSwordTrail;
-static MotionFlags const ftCo_MF_Special =
-    Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
-    Ft_MF_FreezeState;
+                                           Ft_MF_UnkUpdatePhys);
+STATIC_CONST(MotionFlags, ftCo_MF_StopWall, Ft_MF_KeepFastFall | Ft_MF_KeepGfx | Ft_MF_SkipHit | Ft_MF_SkipAnimVel |
+    Ft_MF_Unk06 | Ft_MF_SkipMetalB);
+STATIC_CONST(MotionFlags, ftCo_MF_Pass, ftCo_MF_StopWall | Ft_MF_KeepColAnimHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_OttottoWait, Ft_MF_Unk19 | Ft_MF_SkipMetalB);
+STATIC_CONST(MotionFlags, ftCo_MF_CliffAction, Ft_MF_UnkUpdatePhys | Ft_MF_SkipMetalB);
+STATIC_CONST(MotionFlags, ftCo_MF_CliffAction_4_5, ftCo_MF_CliffAction | Ft_MF_SkipModel | Ft_MF_SkipAnimVel);
+STATIC_CONST(MotionFlags, ftCo_MF_CliffCatch, ftCo_MF_CliffAction_4_5 | Ft_MF_Unk06);
+STATIC_CONST(MotionFlags, ftCo_MF_CliffAttackSlow, ftCo_MF_AttackBase | ftCo_MF_CliffAction_4_5 | Ft_MF_KeepGfx |
+    Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit);
+STATIC_CONST(MotionFlags, ftCo_MF_CliffWait, ftCo_MF_CliffAction | Ft_MF_Unk19);
+STATIC_CONST(MotionFlags, ftCo_MF_CatchWait, Ft_MF_FreezeState | Ft_MF_SkipMetalB);
+STATIC_CONST(MotionFlags, ftCo_MF_CatchBase, ftCo_MF_CatchWait | Ft_MF_SkipModel | Ft_MF_SkipAnimVel);
+STATIC_CONST(MotionFlags, ftCo_MF_Catch, ftCo_MF_CatchBase | Ft_MF_KeepFastFall | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_Throw, ftCo_MF_CatchBase | Ft_MF_SkipItemVis);
+STATIC_CONST(MotionFlags, ftCo_MF_CatchAttack, ftCo_MF_Throw | Ft_MF_KeepColAnimHitStatus);
+STATIC_CONST(MotionFlags, ftCo_MF_ThrowF, ftCo_MF_CatchAttack | Ft_MF_KeepFastFall);
+STATIC_CONST(MotionFlags, ftCo_MF_ThrowB, ftCo_MF_CatchAttack | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_ThrowHi, ftCo_MF_ThrowF | Ft_MF_KeepGfx);
+STATIC_CONST(MotionFlags, ftCo_MF_ThrowLw, ftCo_MF_Throw | Ft_MF_SkipHit);
+STATIC_CONST(MotionFlags, ftCo_MF_Capture, ftCo_MF_CatchWait | Ft_MF_UnkUpdatePhys);
+STATIC_CONST(MotionFlags, ftCo_MF_CaptureAir, ftCo_MF_Capture | Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_Thrown, ftCo_MF_Capture | Ft_MF_KeepSwordTrail);
+STATIC_CONST(MotionFlags, ftCo_MF_ThrownAir, ftCo_MF_Thrown | Ft_MF_SkipParasol);
+STATIC_CONST(MotionFlags, ftCo_MF_Shouldered, ftCo_MF_Capture | Ft_MF_Unk19);
+STATIC_CONST(MotionFlags, ftCo_MF_Rebirth, Ft_MF_SkipModelPartVis | Ft_MF_SkipMetalB);
+STATIC_CONST(MotionFlags, ftCo_MF_ThrownStar, ftCo_MF_Rebirth | Ft_MF_KeepSwordTrail);
+STATIC_CONST(MotionFlags, ftCo_MF_Dead, ftCo_MF_Dazed | Ft_MF_SkipMetalB);
+STATIC_CONST(MotionFlags, ftCo_MF_Sleep, ftCo_MF_Dead | Ft_MF_KeepSwordTrail);
+STATIC_CONST(MotionFlags, ftCo_MF_Special, Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
+    Ft_MF_FreezeState);
 
 typedef enum ftCommon_MotionState {
     ftCo_MS_None = -1,

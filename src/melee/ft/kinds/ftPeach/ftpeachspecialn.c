@@ -268,10 +268,9 @@ static void setupColl(HSD_GObj* gobj)
     }
 }
 
-static MotionFlags const coll_mf =
-    Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit | Ft_MF_SkipMatAnim |
+STATIC_CONST(MotionFlags, coll_mf, Ft_MF_KeepColAnimHitStatus | Ft_MF_SkipHit | Ft_MF_SkipMatAnim |
     Ft_MF_SkipColAnim | Ft_MF_UpdateCmd | Ft_MF_SkipItemVis | Ft_MF_Unk19 |
-    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_SkipModelPartVis | Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 static void doColl(HSD_GObj* gobj)
 {

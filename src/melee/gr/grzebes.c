@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grzebes.h"
 
 #include <Runtime/platform.h>
@@ -251,6 +254,9 @@ void grZebes_801D84A0(bool arg) {}
 void grZebes_801D84A4(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grzebes(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
     grZebes_801D8558(0);

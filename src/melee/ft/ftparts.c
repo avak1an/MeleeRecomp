@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 #include "ftparts.h"
 
 #include <placeholder.h>
@@ -512,6 +515,9 @@ void ftParts_8007487C(FtPartsDesc* desc, FtPartsVis* vis, u32 costume_id,
     void*(*vis_table)[4];
     PAD_STACK(0x8);
 
+#ifdef TARGET_PC
+    pc_swap_parts_desc_lazy(desc, (int) costume_id);
+#endif
     vis_table = desc->vis_table;
     vis->model_num = desc->model_num;
     if (vis->model_num > 11) {
@@ -699,7 +705,12 @@ Fighter_Part ftParts_GetBoneIndex(Fighter* fp, Fighter_Part part)
 
 int ftPartsRemap(size_t to_table_idx, size_t from_table_idx, size_t joint_idx)
 {
-    FighterPartsTable* from_table = ftPartsTable[from_table_idx];
+    FighterPartsTable* from_table;
+#ifdef TARGET_PC
+    pc_swap_ft_kind_entry((int) from_table_idx);
+    pc_swap_ft_kind_entry((int) to_table_idx);
+#endif
+    from_table = ftPartsTable[from_table_idx];
     if (joint_idx < from_table->parts_num) {
         size_t part_idx = from_table->joint_to_part[joint_idx];
         if (part_idx != FTPART_INVALID) {
@@ -715,6 +726,9 @@ u32 ftParts_8007506C(enum FighterKind ftkind, int part)
     int i;
     struct Fighter_804D6540_t* temp_r3;
 
+#ifdef TARGET_PC
+    pc_swap_ft_kind_entry((int) ftkind);
+#endif
     temp_r3 = Fighter_804D6540[ftkind];
     if (temp_r3 != NULL && temp_r3->x4 != 0) {
         var_r3 = temp_r3->x0;

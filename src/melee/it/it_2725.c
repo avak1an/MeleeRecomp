@@ -650,6 +650,18 @@ void it_80273670(Item_GObj* item_gobj, int arg1, f32 arg8)
             lb_8000B804(item_jobj2, joint->child);
         }
         desc = item->xD0_itemStateDesc;
+#ifdef TARGET_PC
+        if (((uintptr_t) desc->x0_anim_joint < 0x1000 && desc->x0_anim_joint != NULL) ||
+            (uintptr_t) desc->x0_anim_joint == 0xFFFFFFFFu) {
+            const u32* w = (const u32*) item->xC4_article_data->xC_itemStates;
+            int q;
+            for (q = 0; q < 12; q++) {
+                OSReport("[pc]   state %d: %08x %08x %08x %08x\n", q, w[q * 4], w[q * 4 + 1], w[q * 4 + 2], w[q * 4 + 3]);
+            }
+            OSReport("[pc] it_80273670: item kind %d state %d: anim joint %p is not a pointer (states %p)\n",
+                     item->kind, arg1, (void*) desc->x0_anim_joint, (void*) item->xC4_article_data->xC_itemStates);
+        }
+#endif
         HSD_JObjAddAnimAll(item_jobj1, desc->x0_anim_joint,
                            desc->x4_matanim_joint, desc->x8_parameters);
         lb_8000BA0C(item_jobj1, item->x5D0_animFrameSpeed);

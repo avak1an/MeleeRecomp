@@ -11,9 +11,18 @@
 /// @todo Declared as `__jmp_buf` (0xF8 bytes) by users, but the object is
 /// 0x828 bytes: a JpegWork whose first member is the jmp_buf (see hsd_3B34.c).
 /* 4D2648 */ u8 hsd_804D2648[0x828];
+#ifdef TARGET_PC
+/* The card code indexes hsd_804D1138 as an array of 0x24-byte entries that
+ * runs straight into hsd_804D1148, and addresses the command queue
+ * hsd_804D2348 as hsd_804D1138 + 0x1210; on the console the linker places
+ * them back to back. Give them one block here (see hsd_3A94.h for the
+ * aliases). */
+u8 hsd_card_area[0x10 + 0x80 * 0x9 * 4 + 0x300];
+#else
 /* 4D2348 */ u8 hsd_804D2348[0x300];
 /* 4D1148 */ u32 hsd_804D1148[0x80][0x9];
 /* 4D1138 */ u8 hsd_804D1138[0x10];
+#endif
 
 /* 4D799C */ s32 hsd_804D799C;
 /* 4D7998 */ s32 hsd_804D7998;

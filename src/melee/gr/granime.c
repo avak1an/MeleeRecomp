@@ -1,8 +1,11 @@
 #include "granime.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <Runtime/platform.h>
 
-#include <setjmp.h>
+#include <Runtime/Gecko_setjmp.h>
 #include <stdarg.h>
 
 #include "grdatfiles.h"
@@ -126,6 +129,11 @@ static inline HSD_TexAnim* HSD_TexAnimFindById(HSD_TexAnim* cur, int id)
 
 void grAnime_801C6710(HSD_TObj* tobj, HSD_TexAnim* texanim)
 {
+#ifdef TARGET_PC
+    /* the stage code's own copy of HSD_TObjAddAnim: swap the list the way
+     * the HSD one does (Onett's textures come through here) */
+    pc_swap_texanim(texanim);
+#endif
     if (tobj == NULL) {
         return;
     }
@@ -510,7 +518,13 @@ void grAnime_801C6F50(HSD_AObj* aobj, void* obj, u32 flags, void* func,
 {
     switch (type) {
     case 0:
+#ifdef TARGET_PC
+        /* The console build calls this with no arguments and the callee
+         * still finds aobj in r3; on x86 it must be passed explicitly. */
+        ((void (*)(HSD_AObj*)) func)(aobj);
+#else
         ((Event) func)();
+#endif
         break;
     case 1:
         ((Callback1) func)(aobj, obj, flags, *(float*) param);

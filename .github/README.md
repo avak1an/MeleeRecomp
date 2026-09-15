@@ -1,253 +1,108 @@
-Super Smash Bros Melee \
-[![Build Status]][actions]
-[![Discord Badge]][discord]
-[![Fuzzy Progress]][progress]
-[![Perfect Progress]][progress]
-[![Linked Progress]][progress]
-=============
+# About this fork: MeleeRecomp
 
-[<img src="https://decomp.dev/doldecomp/melee.svg?w=512&h=256" width="512" height="256">][Progress]
+This repository is a copy of [doldecomp/melee](https://github.com/doldecomp/melee)
+with one addition: **MeleeRecomp**, a native Windows port of the game built
+from the decompiled sources. No emulator: the game's own code, compiled for
+x86, with the console's SDK replaced by a small runtime (disc access, an
+OpenGL renderer for the GX graphics API, a software audio mixer, video
+decoding, memory cards, controllers, the window).
 
-[actions]: https://github.com/doldecomp/melee/actions/workflows/build.yml
-[discord]: https://discord.gg/hKx3FJJgrV
-[progress]: https://decomp.dev/doldecomp/melee
+<table>
+  <tr>
+    <td><img src="assets/pc-title.jpg" alt="Title screen"></td>
+    <td><img src="assets/pc-select.jpg" alt="Character select"></td>
+  </tr>
+  <tr>
+    <td><img src="assets/pc-brinstar.jpg" alt="Mario against Donkey Kong on Brinstar"></td>
+    <td><img src="assets/pc-greens.jpg" alt="A four-player match on Green Greens"></td>
+  </tr>
+  <tr>
+    <td><img src="assets/pc-temple.jpg" alt="Peach against Mario on Temple"></td>
+    <td><img src="assets/pc-launcher.png" alt="The launcher"></td>
+  </tr>
+</table>
 
-[Build Status]: https://github.com/doldecomp/melee/actions/workflows/build.yml/badge.svg
-[Fuzzy Progress]: https://decomp.dev/doldecomp/melee.svg?mode=shield&measure=fuzzy_match_percent&label=fuzzy&category=all
-[Perfect Progress]: https://decomp.dev/doldecomp/melee.svg?mode=shield&measure=code&label=perfect&category=all
-[Linked Progress]: https://decomp.dev/doldecomp/melee.svg?mode=shield&measure=complete_code&label=linked&category=all
-[Discord Badge]: https://img.shields.io/discord/727908905392275526?color=%237289DA&logo=discord&logoColor=%23FFFFFF
+*Rendered at 2x the console's resolution with 4x anti-aliasing; the last
+picture is the launcher.*
 
-This repo contains a WIP decompilation of Super Smash Bros Melee (US).
+The port lives in the [`pc/`](../pc) directory and is documented in
+[`pc/README.md`](../pc/README.md). What it does today:
 
-> [!TIP]
-> The DOL this repository builds can be shifted! Meaning you are able to now add and remove code as you see fit, for modding or research purposes.
+- **Plays the game natively**: the menus, the character and stage select,
+  VS matches with every stage, fighter, item and hazard, Classic,
+  Adventure's first stage, Event Match, Target Test, Home-Run Contest,
+  Multi-Man Melee and Training, the trophy and records screens, the intro
+  and other movies.
+- **Resolution scaling**: the game renders at 1x to 8x its 640x480 (or at
+  the window's size), with multisample anti-aliasing and anisotropic
+  filtering, in a resizable window or full screen; the console's own look
+  is one setting away.
+- **Sound**: every sound effect and music stream through a software mixer,
+  including the console's reverb and delay effects.
+- **Saves you can carry around**: the memory card is a raw card image in
+  the format Dolphin uses, with the data in the console's byte order, so
+  a save moves between MeleeRecomp, Dolphin and a real GameCube without
+  conversion, and `.gci` files import.
+- **Controllers**: the official GameCube controller adapter (Nintendo's and
+  the compatible ones, over WinUSB; the launcher installs the driver and
+  shows the adapter's state), XInput gamepads on ports 1-4, or the
+  keyboard on port 1 with a remappable layout.
+- **A launcher**, [`pc/dist/melee-launcher.exe`](../pc/dist), committed
+  ready to run. It verifies your disc image (SHA-1 against the v1.02 disc),
+  builds the game from this checkout with your own disc, sets the window
+  size, rendering resolution, anti-aliasing, full screen, volume, keyboard
+  layout and save folder, extracts the disc's files, manages mods, and
+  starts the game.
+- **Mods**: a folder of replacement files in the disc's own layout, enabled
+  from the launcher or `mods\enabled.txt`; the extracted disc is the
+  starting point.
+- **Performance**: vertices are transformed and lit on the GPU and draws
+  are batched, so a four-player match takes a few milliseconds a frame on
+  an ordinary machine.
 
-It builds `main.dol`:
+## Getting started
 
-|Version|Game ID|SHA-1
--|-|-
-1.02|`GALE01`|`08e0bf20134dfcb260699671004527b2d6bb1a45`
+1. Install [Visual Studio](https://visualstudio.microsoft.com/) (Community
+   is free) with "Desktop development with C++" and the "C++ Clang tools for
+   Windows" component.
+2. Clone this repository.
+3. Run `pc\dist\melee-launcher.exe`. Point "Game disc" at your own Super
+   Smash Bros. Melee (USA) v1.02 disc image and click "Verify SHA-1".
+   The port targets exactly the executable the
+   [doldecomp/melee](https://github.com/doldecomp/melee) decompilation
+   matches, GALE01 revision 2 (NTSC 1.02), whose `main.dol` has the SHA-1
+   `08e0bf20134dfcb260699671004527b2d6bb1a45` (the same hash upstream's
+   README asks for). The launcher checks that hash, and the whole disc
+   image against `d4e70c064cc714ba8400a849cf299dbd1aa326fc`; the game
+   checks `main.dol` again when it starts and refuses any other revision.
+4. Click "Build" in the launcher's Build card (or run `pc\build.cmd`). A
+   console shows the build; the first one takes a few minutes. The
+   GameCube build described below is not needed.
+5. Click Play. `Escape` quits, `F11` toggles full screen.
 
-# Dependencies
+To use a controller, plug a GameCube controller adapter in and click
+"Adapter setup..." on the Controls card once (it installs the WinUSB
+driver); XInput gamepads and the keyboard need no setup. To keep playing
+a Dolphin save, copy Dolphin's `MemoryCardA.USA.raw` (from its
+`GC\USA\Card A` folder) into the saves folder shown on the Saves card, or
+drop a `.gci` file there; copy the file back to carry your progress to
+Dolphin.
 
-## Windows:
-On Windows, it's **highly recommended** to use native tooling. WSL or msys2 are **not** required.
-When running under WSL, [objdiff](#diffing) is unable to get filesystem notifications for automatic rebuilds.
+The game executable is never distributed: it embeds tables taken from
+the disc's `main.dol`, so each copy is built from its owner's disc. The
+repository contains no game data. Other revisions of the game (1.00, 1.01,
+PAL, Japanese) have different data layouts and are not supported.
 
-- Install [Python](https://www.python.org/downloads/) and add it to `%PATH%`.
-  - Also available from the [Windows Store](https://apps.microsoft.com/store/detail/python-311/9NRWMJP3717K).
-- Download [ninja](https://github.com/ninja-build/ninja/releases) and add it to `%PATH%`.
-  - Quick install via pip: `pip install ninja`
+## How the port is built
 
-## macOS:
-- Install [ninja](https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages):
-  ```
-  brew install ninja
-  ```
-- Install [wine-crossover](https://github.com/Gcenx/homebrew-wine):
-  ```
-  brew install --cask --no-quarantine gcenx/wine/wine-crossover
-  ```
-
-After OS upgrades, if macOS complains about `Wine Crossover.app` being unverified, you can unquarantine it using:
-```sh
-sudo xattr -rd com.apple.quarantine '/Applications/Wine Crossover.app'
-```
-
-## Linux:
-- Install [ninja](https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages).
-- For non-x86(_64) platforms: Install wine from your package manager.
-  - For x86(_64), [WiBo](https://github.com/decompals/WiBo), a minimal 32-bit Windows binary wrapper, will be automatically downloaded and used.
-
-# Building
-- Clone the repository:
-  ```
-  git clone https://github.com/doldecomp/melee.git --depth=1
-  ```
-- Using [Dolphin Emulator](https://dolphin-emu.org/), find your ISO and click `Properties`. Go to the `Filesystem` tab, right-click `Disc - GALE01` and select `Extract System Data`. Choose `orig/GALE01` of this repository.
-  - To save space, only `main.dol` (and `.gitkeep`) are necessary. Other files can be deleted.
-  ![](assets/dolphin-extract.png)
-- Configure:
-  ```
-  python configure.py
-  ```
-- Build:
-  ```
-  ninja
-  ```
-
-# Tooling
-
-We use Python for our command line tooling. It is recommended that you use a [virtual environment](https://docs.python.org/3/library/venv.html).
-
-1. Create a virtual environment.
-    ```sh
-    python -m venv --upgrade-deps '.venv'
-    ```
-1. You'll need to activate it whenever you open a new shell.
-    * Windows:
-        ```ps1
-        .venv/Scripts/Activate.ps1
-        ```
-    * Linux/macOS:
-        ```ps1
-        . .venv/bin/activate
-        ```
-1. After that, you can install or update our packages with:
-    ```sh
-    pip install -r reqs/decomp.txt
-    ```
-1. Now you can run `decomp.py` to decomp a function using [m2c](https://github.com/matt-kempster/m2c). Pass it `-h` to see all the options.
-    ```sh
-    python tools/decomp.py my_function_name
-    ```
-
-# Modding
-Coming soon.
-
-# Containers
-Coming soon.
-
-# Diffing
-
-Once the initial build succeeds, an `objdiff.json` should exist in the project root.
-
-Download the latest release from [encounter/objdiff](https://github.com/encounter/objdiff). Under project settings, set `Project directory`. The configuration should be loaded automatically.
-
-Select an object from the left sidebar to begin diffing. Changes to the project will rebuild automatically: changes to source files, headers, `configure.py`, `splits.txt` or `symbols.txt`.
-
-![](assets/objdiff.png)
-
-> [!TIP]
-> It's recommended that you enable the `Relax relocation diffs` option under `Diff Options`.
-
-![](assets/relax.png)
-
-# Contributing
-
-Contributions are welcome! If you're new to decomp, check out our [Getting Started guide](https://doldecomp.github.io/melee/getting_started.html). Before [opening a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request), please read our [contributing guidelines](CONTRIBUTING.md). If you're new to Git and don't know how to create a pull request, we encourage you to [create an issue](https://github.com/doldecomp/melee/issues/new) with your decomp.me link and a maintainer will add your code to the repository.
-
-We're also happy to answer any questions in the `#smash-bros-melee` channel on Discord.
-
-[![Gamecube/Wii Decompilation Discord](https://discordapp.com/api/guilds/727908905392275526/widget.png?style=banner2)](https://discord.gg/hKx3FJJgrV)
-
-# FAQ
-## How is the codebase structured?
-
-The code in `src` is divided into several modules, the main one being `melee`, which is the game code.
-
-### `melee`
-The main game code is divided into several two-letter folders, which were left behind by HAL in assert messages and game data on the original disc.
-
-Short|Full|Notes
--|-|-
-`cm`|Camera|
-`db`|Debug|
-`ef`|Effect|Visual effects.
-`ft`|Fighter|The player characters.
-`gm`|Game|The main game loop.
-`gr`|Ground|Stages and other levels.
-`if`|Interface|User interface.
-`it`|Items|
-`lb`|Library|Utility functions that are often thin wrappers around `dolphin` or `baselib` code.
-`mn`|Menu|
-`mp`|Map|Related to stages and contains things like `mpcoll` (map collisions).
-`pl`|Player|As in users.
-`sc`|Scene|Menu, versus mode, single-player, etc. The game mode.
-`ty`|Toy|Trophies.
-`vi`|Visual|Cutscenes, etc.
-
-#### `melee/ft/chara`
-
-HAL also used two-letter abbreviations for each fighter.
-
-Short|Full|Canonical English
--|-|-
-`Bo`|Zako<sup>1</sup> Boy|[Male wire frame](https://www.ssbwiki.com/Fighting_Wire_Frames#Male_Wire_Frame.2FCaptain_Falcon)
-`Ca`|Captain|Captain Falcon
-`Ch`|Crazy Hand|
-`Cl`|Child Link|Young Link
-`Co`|Common|Shared code
-`Dk`|Donkey Kong|
-`Dr`|Dr. Mario|
-`Fc`|Falco|
-`Fe`|Fire Emblem|Roy
-`Fx`|Fox|
-`Gk`|Giga Koopa|Giga Bowser
-`Gl`|Zako Girl|[Female wire frame](https://www.ssbwiki.com/Fighting_Wire_Frames#Female_Wire_Frame.2FZelda)
-`Gn`|Ganondorf|
-`Gw`|Mr. Game & Watch|
-`Kb`|Kirby|
-`Kp`|Koopa|Bowser
-`Lg`|Luigi|
-`Lk`|Link|
-`Mh`|Master Hand|
-`Mr`|Mario|
-`Ms`|Mars|Marth
-`Mt`|Mewtwo|
-`Nn`|Nana|
-`Ns`|Ness|
-`Pc`|Pichu|
-`Pe`|Peach|
-`Pk`|Pikachu|
-`Pp`|Popo|
-`Pr`|Purin|Jigglypuff
-`Sb`|Sandbag|
-`Sk`|Seak|Sheik
-`Ss`|Samus|
-`Ys`|Yoshi|
-`Zd`|Zelda|
-
-<sup>1</sup> Zako (雑魚) is Japanese for "trash mob" in video games, literally "small fish."
-
-### `sysdolphin/baselib`
-
-HAL's core internal library.
-Class|Full
--|-
-`AObj`|Animation
-`CObj`|Camera
-`DObj`|Draw/Display
-`FObj`|Frame
-`GObj`|Global/Game
-`JObj`|Joint
-`LObj`|Light
-`MObj`|Material
-`PObj`|Polygon
-`TObj`|Texture
-`RObj`|Reference
-`SObj`|Scene
-`WObj`|World
-
-### `dolphin`
-
-The [Dolphin SDK](https://wiki.raregamingdump.ca/index.php/Dolphin_SDK).
-
-### `MetroTRK`
-
-The Metrowerks Target Resident Kernel.
-
-### `MSL`
-
-The Metrowerks Standard Library.
-
-### `Runtime`
-
-The Gekko hardware runtime.
-
-## What can be done after decompiling Melee?
-
-Note that this project's purpose is to only match the ASM with C code. This is entirely for research and archival purposes. After this is created, you essentially have a C project that can be compiled into Melee, but it won't be portable (aka you can't compile it to run on a normal computer).
-
-So creating mods would be a lot easier as C code is much easier to consume than ASM. However, there are additional projects that could be undertaken once this is complete, but those technical endeavours are out-of-scope for this repo.
-
-## Do we know how the compiler works?
-
-- Kind of. We don’t have its source though.
-
-### How do we get the compiler to pick a certain register allocation?
-
-Considering we don't have the source for the compiler, this is kind of "anything goes" territory. Unfortunately [register allocation is an NP-hard problem](https://en.wikipedia.org/wiki/Register_allocation?oldformat=true) which means there are all types of heuristics you can use to select registers, some of which can be confused by things as silly as variable names.
-
-One option is to attempt to automatically [permute the source code](https://github.com/simonlindholm/decomp-permuter) to get the correct register allocation.
+- The game and engine sources in `src/` are shared with the GameCube build
+  and stay byte-for-byte compatible with it; PC-specific code sits behind
+  `TARGET_PC`, and the PC runtime (`pc/src/`) replaces the console's SDK:
+  disc access, the GX renderer on OpenGL, the AX audio mixer, THP video,
+  memory cards, controllers, the window.
+- `pc/build.cmd` produces `build/pc/melee.exe`, a 32-bit Windows binary
+  that reads its files straight from the disc image, plus the launcher and
+  a build-time tool that pulls the font tables out of the disc.
+- `pc/README.md` has the full story: status by milestone, every option,
+  what the renderer and the mixer cover, the debugging aids, the changes
+  made to shared sources and the known gaps.

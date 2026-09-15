@@ -1,4 +1,7 @@
 #include "mncharsel.h"
+#ifdef TARGET_PC
+#include <stdlib.h>
+#endif
 
 #include <melee/ft/forward.h>
 #include <sysdolphin/baselib/forward.h>
@@ -112,7 +115,7 @@ static s8 mnCharSel_804D6CF9;
 #define ICONBNDS_COL8_L 24.4F
 #define ICONBNDS_COL8_R 30.2F
 
-static CSSIconsData mnCharSel_803F0A48 = {
+static CSSIconsData PC_ADJACENT(a) mnCharSel_803F0A48 = {
     {
         // GnW Name
         0x82, 0x6C, 0x82, 0x92, // 0x803F0A48
@@ -152,7 +155,7 @@ static CSSIconsData mnCharSel_803F0A48 = {
     },
 };
 
-static CSSIcon icons[25 + 1] = {
+static CSSIcon PC_ADJACENT(b) icons[25 + 1] = {
     // -------- Icons Top Row --------
 
     { // Dr. Mario -                      0x803F0B24
@@ -263,7 +266,7 @@ static CSSIcon icons[25 + 1] = {
       ICONROWHT_BTM_BTM }
 };
 
-static CSSDoorsData mnCharSel_803F0DFC = {
+static CSSDoorsData PC_ADJACENT(c) mnCharSel_803F0DFC = {
     { { 0x2E, 0x33, 0x38, 0x85, 0x29,  0xA6,  0x3D,  0x41,
         0x40, 0,    0,    0,    0,     0,     0,     0,
         0,    0,    0,    0,    -35.6, -28.6, -26.8, -21.0F },
@@ -277,19 +280,19 @@ static CSSDoorsData mnCharSel_803F0DFC = {
         0x00, 0x00, 0x00, 0x00, 11.0F, 17.0F, 19.0F, 24.6 } },
 };
 
-static CSSTag mnCharSel_803F0E8C[4] = {
+static CSSTag PC_ADJACENT(d) mnCharSel_803F0E8C[4] = {
     { NULL, 0x70, 0x73, 0x74, 0x72, 0x71 },
     { NULL, 0x75, 0x78, 0x79, 0x77, 0x76 },
     { NULL, 0x7A, 0x7D, 0x7E, 0x7C, 0x7B },
     { NULL, 0x7F, 0x82, 0x83, 0x81, 0x80 },
 };
 
-static struct CSSDoorsMisc mnCharSel_803F0EBC = {
+static struct CSSDoorsMisc PC_ADJACENT(e) mnCharSel_803F0EBC = {
     0,    0,    0, 0, 0x4A, 0x4D, 0x4E,  0x4C, 0x4B, 0,    0,    0,
     0x2F, 0x01, 0, 0, 0,    NULL, -10.9, -4.2, 12.5, 19.6, -6.8, -12.1,
 };
 
-static struct CSSDoorsData2 data2 = {
+static struct CSSDoorsData2 PC_ADJACENT(f) data2 = {
     { 0x35, 0x39, 0x36, 0x38, 0x37 },
     0,
     0,
@@ -2040,6 +2043,21 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
         icon_idx = temp;
         icon_offset = getIconOffset(icon_idx);
     } while (icons[icon_idx].state == 0);
+#ifdef TARGET_PC
+    {
+        /* --char N,M: a CPU on port 2 gets character M instead of a random one */
+        extern int pc_debug_p2_char(void);
+        if (door == 1 && pc_debug_p2_char() >= 0) {
+            s32 k;
+            for (k = 0; k < 25; k++) {
+                if (icons[k].char_kind == pc_debug_p2_char()) {
+                    icon_idx = k;
+                    icon_offset = getIconOffset((u32) k);
+                }
+            }
+        }
+    }
+#endif
 
     mnCharSel_804D6CB0->vs.start.players[getPlayerForDoor(door)].ckind =
         (&icons[0].char_kind)[icon_offset];
@@ -2650,6 +2668,27 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                         m2->xC > icons[i].bound_d &&
                                         icons[i].state >= 1)
                                     {
+#ifdef TARGET_PC
+                                        {
+                                            /* --char N: port 1's pick is
+                                             * always character N */
+                                            extern int pc_debug_p1_char(void);
+                                            extern int pc_debug_p2_char(void);
+                                            int want = door == 0 ? pc_debug_p1_char()
+                                                       : door == 1 ? pc_debug_p2_char() : -1;
+                                            int k;
+                                            if (getenv("MELEE_TRACE_CSS") != NULL) {
+                                                OSReport("[pc] css drop: door %d icon %d (want %d)\n", door, i, want);
+                                            }
+                                            if (want >= 0) {
+                                                for (k = 0; k < 25; k++) {
+                                                    if (icons[k].char_kind == want) {
+                                                        i = k;
+                                                    }
+                                                }
+                                            }
+                                        }
+#endif
                                         all_data->doors_data.doors[door]
                                             .sel_icon = (u8) i;
                                         mnCharSel_8025DB34(door);
@@ -2999,6 +3038,14 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                     mnCharSel_804A0BC0[door]->x5 != 1)
                                 {
                                     tag_data = mnCharSel_803F0E8C[door].data;
+#ifdef TARGET_PC
+                                    if (getenv("MELEE_TRACE_CSS") != NULL) {
+                                        OSReport("[pc] css A: cursor (%g %g) door %d tag state %d toggle x %g..%g\n",
+                                                 cursor->xC, cursor->x10, door, tag_data->state,
+                                                 mnCharSel_803F0DFC.doors[door].togglebtn_left,
+                                                 mnCharSel_803F0DFC.doors[door].togglebtn_right);
+                                    }
+#endif
                                     if (tag_data->state != 0) {
                                         continue;
                                     }
@@ -5305,6 +5352,22 @@ s32 mnCharSel_802640A0(void)
 
 void mnCharSel_Scene_OnEnter(void* arg0)
 {
+#ifdef TARGET_PC
+    /* CSS_ALL is a view over six consecutive statics (see PC_ADJACENT). */
+    if ((u8*) &mnCharSel_803F0DFC - (u8*) &mnCharSel_803F0A48 != 0x3B4 ||
+        (u8*) mnCharSel_803F0E8C - (u8*) &mnCharSel_803F0A48 != 0x444 ||
+        (u8*) &mnCharSel_803F0EBC - (u8*) &mnCharSel_803F0A48 != 0x474 ||
+        (u8*) &data2 - (u8*) &mnCharSel_803F0A48 != 0x4A4)
+    {
+        OSPanic(__FILE__, __LINE__,
+                "character select statics are not laid out as CSSAllData expects "
+                "(doors %+d tags %+d misc %+d data2 %+d)",
+                (int) ((u8*) &mnCharSel_803F0DFC - (u8*) &mnCharSel_803F0A48),
+                (int) ((u8*) mnCharSel_803F0E8C - (u8*) &mnCharSel_803F0A48),
+                (int) ((u8*) &mnCharSel_803F0EBC - (u8*) &mnCharSel_803F0A48),
+                (int) ((u8*) &data2 - (u8*) &mnCharSel_803F0A48));
+    }
+#endif
     PAD_STACK(8);
 
     lbCardNew_AllocWorkArea();

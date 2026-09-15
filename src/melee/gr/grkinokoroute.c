@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grkinokoroute.h"
 
 #include <Runtime/platform.h>
@@ -108,6 +111,9 @@ void grKinokoRoute_8020741C(bool arg) {}
 void grKinokoRoute_80207420(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grkinokoroute(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     grKinokoRoute_8020754C(2);

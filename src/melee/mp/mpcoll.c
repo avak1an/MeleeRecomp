@@ -985,6 +985,16 @@ bool mpColl_80043754(mpColl_Callback cb, CollData* coll, u32 flags)
     step = 0;
     coll->cur_pos = coll->last_pos;
     coll->x34_flags.b5 = 0;
+#ifdef TARGET_PC
+    if (steps > 64) {
+        OSReport("[pc] mpColl_80043754: %d steps, last_pos %g %g cur %g %g vel %g %g ecb L%g R%g T%g B%g "
+                 "desired L%g R%g T%g B%g\n", steps,
+                 coll->last_pos.x, coll->last_pos.y, coll->cur_pos.x, coll->cur_pos.y, vel.x, vel.y,
+                 coll->ecb.left.x, coll->ecb.right.x, coll->ecb.top.y, coll->ecb.bottom.y,
+                 coll->desired_ecb.left.x, coll->desired_ecb.right.x, coll->desired_ecb.top.y,
+                 coll->desired_ecb.bottom.y);
+    }
+#endif
     while ((step < steps) && !coll->x34_flags.b5) {
         mpCollInterpolateECB(coll, 1.0F / (steps - step));
         coll->prev_pos = coll->cur_pos;

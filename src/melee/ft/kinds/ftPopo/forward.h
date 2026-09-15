@@ -4,42 +4,30 @@
 #include <melee/ft/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 
-static MotionFlags const ftPp_MF_Special =
-    Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
-    Ft_MF_FreezeState;
+STATIC_CONST(MotionFlags, ftPp_MF_Special, Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
+    Ft_MF_FreezeState);
 
-static MotionFlags const ftPp_MF_SpecialLw =
-    ftPp_MF_Special | Ft_MF_KeepColAnimHitStatus;
+STATIC_CONST(MotionFlags, ftPp_MF_SpecialLw, ftPp_MF_Special | Ft_MF_KeepColAnimHitStatus);
 
-static MotionFlags const ftPp_MF_SpecialN =
-    ftPp_MF_Special | Ft_MF_KeepFastFall | Ft_MF_SkipThrowException;
+STATIC_CONST(MotionFlags, ftPp_MF_SpecialN, ftPp_MF_Special | Ft_MF_KeepFastFall | Ft_MF_SkipThrowException);
 
-static MotionFlags const ftPp_MF_SpecialS =
-    ftPp_MF_Special | Ft_MF_KeepGfx | Ft_MF_KeepSfx;
+STATIC_CONST(MotionFlags, ftPp_MF_SpecialS, ftPp_MF_Special | Ft_MF_KeepGfx | Ft_MF_KeepSfx);
 
-static MotionFlags const ftPp_MF_SpecialHi =
-    ftPp_MF_SpecialS | Ft_MF_KeepFastFall;
+STATIC_CONST(MotionFlags, ftPp_MF_SpecialHi, ftPp_MF_SpecialS | Ft_MF_KeepFastFall);
 
-static MotionFlags const ftPp_MF_MS_358 =
-    ftPp_MF_SpecialLw | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftPp_MF_MS_358, ftPp_MF_SpecialLw | Ft_MF_SkipParasol);
 
-static MotionFlags const ftPp_MF_SpecialAirN =
-    ftPp_MF_SpecialN | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftPp_MF_SpecialAirN, ftPp_MF_SpecialN | Ft_MF_SkipParasol);
 
-static MotionFlags const ftPp_MF_SpecialAirS =
-    ftPp_MF_SpecialS | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftPp_MF_SpecialAirS, ftPp_MF_SpecialS | Ft_MF_SkipParasol);
 
-static MotionFlags const ftPp_MF_SpecialAirHi =
-    ftPp_MF_SpecialHi | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftPp_MF_SpecialAirHi, ftPp_MF_SpecialHi | Ft_MF_SkipParasol);
 
-static MotionFlags const ftPp_MF_SpecialHi_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_SkipHit;
+STATIC_CONST(MotionFlags, ftPp_MF_SpecialHi_Coll, ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_SkipHit);
 
-static MotionFlags const ftPp_MF_SpecialLw_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_KeepSfx;
+STATIC_CONST(MotionFlags, ftPp_MF_SpecialLw_Coll, ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_KeepSfx);
 
-static MotionFlags const ftPp_MF_SpecialS_Coll =
-    ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_SkipHit | Ft_MF_KeepSfx;
+STATIC_CONST(MotionFlags, ftPp_MF_SpecialS_Coll, ftCommon_GroundAirColl_MF | Ft_MF_KeepGfx | Ft_MF_SkipHit | Ft_MF_KeepSfx);
 
 typedef enum ftPopo_MotionState {
     ftPp_MS_SpecialN = ftCo_MS_Count,

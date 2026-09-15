@@ -1,4 +1,7 @@
 #include "aobj.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <math.h>
 #include <stdarg.h>
@@ -178,6 +181,9 @@ void HSD_AObjInterpretAnim(HSD_AObj* aobj, void* obj,
 
 HSD_AObj* HSD_AObjLoadDesc(HSD_AObjDesc* aobjdesc)
 {
+#ifdef TARGET_PC
+    pc_swap_aobjdesc(aobjdesc);
+#endif
     HSD_FObjDesc* fobjdesc;
     HSD_AObj* aobj;
 

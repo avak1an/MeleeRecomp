@@ -101,8 +101,16 @@ void it_802CD4FC(Item_GObj* gobj)
         HSD_JObjSetRotationZ(ip->xBBC_dynamicBoneTable->bones[4],
                              0.017453292f * ip->xDD4_itemVar.sonans.x64);
     }
+#ifdef TARGET_PC
+    /* the counter damage decays below zero between hits; the console's
+     * float-to-unsigned conversion saturates negatives to 0, x86's does
+     * not (it gave 0xFFFFFFFF damage) */
+    it_80272460(&ip->x5D4_hitboxes[0].hit,
+                ip->xDD4_itemVar.sonans.x68 > 0.0f ? (u32) ip->xDD4_itemVar.sonans.x68 : 0, gobj);
+#else
     it_80272460(&ip->x5D4_hitboxes[0].hit, (u32) ip->xDD4_itemVar.sonans.x68,
                 gobj);
+#endif
     ip->xDD4_itemVar.sonans.x68 -= attrs->x20;
 }
 

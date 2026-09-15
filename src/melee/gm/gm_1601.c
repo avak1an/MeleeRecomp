@@ -3084,6 +3084,12 @@ float fn_80166A8C(register Vec3* src, register Vec3* dst)
     register float x = src->x;
     asm { psq_st x, Vec3.x(dst), 1, qr3 }
     return x;
+#elif defined(TARGET_PC)
+    /* psq_st with qr3 (unsigned 16-bit, no scale): the value clamped to a
+     * u16 in the first two bytes of dst */
+    float x = src->x;
+    *(u16*) dst = (u16) (x <= 0.0f ? 0 : x >= 65535.0f ? 65535 : (u32) x);
+    return x;
 #endif
 }
 
@@ -3902,6 +3908,11 @@ void fn_80168A6C(void* arg0, void* arg1, s32 idx)
 f32 gm_80168B34(CharacterKind ckind, int arg1, int arg2)
 {
     int base;
+#ifdef TARGET_PC
+    /* base is never assigned for the regular characters; the console
+     * returns ckind because both live in the same register */
+    base = ckind;
+#endif
     if (ckind == CKIND_GKOOPS) {
         return 58.0F;
     }
@@ -3934,6 +3945,9 @@ float gm_80168BF8(int arg0)
 {
     CharacterKind ckind = Player_GetPlayerCharacter(arg0);
     u32 costume = Player_GetCostumeId(arg0);
+#ifdef TARGET_PC
+    return /* f1 of the last call on the console */
+#endif
     gm_80168B34(ckind, Player_80036394(arg0), costume);
 }
 

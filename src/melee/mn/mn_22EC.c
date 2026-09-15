@@ -1,4 +1,8 @@
 #include "mncharsel.h"
+#ifdef TARGET_PC
+#include <stdlib.h>
+#include <dolphin/os.h>
+#endif
 #include "mnmain.h"
 #include "types.h"
 #include <dolphin/pad.h>
@@ -269,6 +273,12 @@ void mn_8022F360(HSD_AObj* aobj, void* obj, u32 arg2)
 {
     HSD_FObj* fobj = aobj->fobj;
     while (fobj != NULL) {
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_ANIM") != NULL) {
+            OSReport("[pc] mn_8022F360: aobj %p fobj %p type %u (want %u) state %u\n", aobj, fobj, fobj->obj_type,
+                     arg2, fobj->flags);
+        }
+#endif
         if (fobj->obj_type == arg2 || arg2 == 0xFF) {
             HSD_FObjStopAnim(fobj, obj, NULL, 0.0F);
         }

@@ -1,4 +1,9 @@
 #include "fighter.h"
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#include "pc_runtime.h"
+#include <stdlib.h>
+#endif
 
 #include <math.h>
 #include <placeholder.h>
@@ -180,6 +185,9 @@ void Fighter_LoadCommonData(void)
 {
     void** pData;
     lbArchive_LoadSymbols("PlCo.dat", (void**) &pData, "ftLoadCommonData", 0);
+#ifdef TARGET_PC
+    pc_swap_ft_common(pData);
+#endif
 
     // copy 23 4-byte chunks from pData to p_ftCommonData in reverse order,
     // equivalent to this: for(i=0; i<23; i++)
@@ -840,11 +848,26 @@ static void Fighter_Create_Inline2(Fighter_GObj* gobj)
             fp->x2E4 = lbAnim_8001E8F8(ftData_80085E50(fp, 9));
             fp->x2E8 = lbAnim_8001E8F8(ftData_80085E50(fp, 0x25));
         }
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_MOTION") != NULL) {
+            OSReport("[pc] P%d anim lengths: landingfallspecial %g jumps %g %g %g %g\n", fp->player_id + 1, fp->x2EC,
+                     fp->x2DC, fp->x2E0, fp->x2E4, fp->x2E8);
+        }
+#endif
     }
 }
 
 Fighter_GObj* Fighter_Create(struct plAllocInfo* input)
 {
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_MOTION") != NULL) {
+        static int shown;
+        if (shown++ < 8) {
+            OSReport("[pc] Fighter_Create: slot %d internal id %d; from:\n", input->slot, input->internal_id);
+            pc_print_backtrace();
+        }
+    }
+#endif
     Fighter_GObj* gobj;
     Fighter* fp;
     HSD_JObj* jobj;
@@ -941,6 +964,26 @@ void Fighter_ChangeMotionState(Fighter_GObj* gobj, FtMotionId msid,
     struct Fighter_WaitAnimData* unk_struct_x18;
     s32 bone_index;
     u8(*unk_byte_ptr)[2];
+#ifdef TARGET_PC
+    {
+        static int trace = -1;
+        if (trace < 0) {
+            trace = getenv("MELEE_TRACE_MOTION") != NULL;
+        }
+        if (trace && msid == 88 && fp->motion_id == 88) {
+            static int shown;
+            if (shown++ < 2) {
+                OSReport("[pc] DamageFlyN re-entered; from:\n");
+                pc_print_backtrace();
+            }
+        }
+        if (trace) {
+            OSReport("[pc] frame %u: P%d (kind %d, %p) motion %d -> %d (flags %x, start %g) at (%.1f %.1f) vel (%.2f %.2f) ground %d\n",
+                     pc_frame_count, fp->player_id + 1, fp->kind, (void*) gobj, fp->motion_id, msid, flags, anim_start, fp->cur_pos.x,
+                     fp->cur_pos.y, fp->self_vel.x, fp->self_vel.y, fp->ground_or_air);
+        }
+    }
+#endif
     bool animflags_bool;
     union Struct2070 x2070;
 
@@ -1260,6 +1303,18 @@ void Fighter_ChangeMotionState(Fighter_GObj* gobj, FtMotionId msid,
                 } else {
                     ftData_80085CD8(fp, fp, fp->anim_id);
                 }
+#ifdef TARGET_PC
+                pc_swap_script(unk_struct_x18->xC, PC_SCRIPT_FIGHTER);
+                if (pc_debug_gx) {
+                    u32* w = (u32*) unk_struct_x18->xC;
+                    int k;
+                    OSReport("[gx] fighter script start %p (msid %d):", (void*) w, msid);
+                    for (k = 0; w != NULL && k < 12; k++) {
+                        OSReport(" %08x", w[k]);
+                    }
+                    OSReport("\n");
+                }
+#endif
                 fp->x3E4_fighterCmdScript.u = unk_struct_x18->xC;
                 fp->x3E4_fighterCmdScript.loop_count = 0;
 
@@ -2858,6 +2913,16 @@ void Fighter_ProcessHit_8006D1EC(Fighter_GObj* gobj)
             Fighter_UnkTakeDamage_8006CC30(fp, fp->dmg.x1838_percentTemp);
             ftCo_Damage_CalcKnockback(fp);
             ftKb_SpecialN_800F5BA4(fp);
+#ifdef TARGET_PC
+            if (getenv("MELEE_TRACE_MOTION") != NULL) {
+                OSReport("[pc] frame %u: P%d hit: damage %g kb %g (mag %g, ratio %g, def %g, atk %g, weight %g) angle %d src ply %d kind %d x1908 %d at (%.1f %.1f)\n",
+                         pc_frame_count, fp->player_id + 1, fp->dmg.x1838_percentTemp, fp->dmg.kb_applied,
+                         fp->dmg.x18A4_knockbackMagnitude, gm_8016B248(), Player_GetDefenseRatio(fp->player_id),
+                         fp->dmg.x18c4_source_ply < 6 ? Player_GetAttackRatio(fp->dmg.x18c4_source_ply) : -1.0f,
+                         fp->co_attrs.weight, fp->dmg.x1848_kb_angle, fp->dmg.x18c4_source_ply, fp->dmg.x1840, fp->dmg.x1908, fp->cur_pos.x,
+                         fp->cur_pos.y);
+            }
+#endif
 
             if (fp->take_dmg_2_cb) {
                 fp->take_dmg_2_cb(gobj);

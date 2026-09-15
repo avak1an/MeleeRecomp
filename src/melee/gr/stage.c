@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#endif
 #include "stage.h"
 
 #include "ground.h"
@@ -497,6 +500,11 @@ void Stage_802251E8(StKind stkind, s32* _)
 {
     StageIdPair local_data;
 
+#ifdef TARGET_PC
+    if (pc_config.stage > 0 && stkind < St_Kind_Last) {
+        stkind = (StKind) pc_config.stage; /* --stage: every match on this stage */
+    }
+#endif
     selected_stage.stkind = stkind;
     selected_stage.entry = &stage_id_map[stkind];
 
@@ -536,6 +544,11 @@ void Stage_802252E4(StKind stkind, HSD_GObj* _)
 {
     StageIdPair local_data;
 
+#ifdef TARGET_PC
+    if (pc_config.stage > 0 && stkind < St_Kind_Last) {
+        stkind = (StKind) pc_config.stage;
+    }
+#endif
     local_data = default_stage_pair;
 
     local_data.grkind = selected_stage.entry->grkind;

@@ -91,6 +91,12 @@ static int bisectValue(int val, ItemPickTable* table, int lo, int hi)
 ItemKind it_8026C65C(ItemPickTable* table)
 {
     int temp_r6 = table->x8;
+#ifdef TARGET_PC
+    if (table->size == 0 || table->x4 == NULL || table->xC == NULL) {
+        OSReport("[pc] item pick table %p: size %d total %d kinds %p weights %p\n", (void*) table,
+                 table->size, table->x8, (void*) table->x4, (void*) table->xC);
+    }
+#endif
     return table->x4[bisectValue(HSD_Randi(temp_r6), table, 0, table->size)];
 }
 
@@ -288,6 +294,14 @@ void it_8026CB9C(s32* counts, u64 mask, f32 weight)
     }
 }
 
+/* The original addresses the second pick table as the memory right after
+ * the spawner; the two globals are only adjacent on the console. */
+#ifdef TARGET_PC
+#define PICK_TABLE_AFTER(spawner) (&it_804A0E50)
+#else
+#define PICK_TABLE_AFTER(spawner) ((ItemPickTable*) ((spawner) + 1))
+#endif
+
 void it_8026CD50(s32* counts, u64 mask, f32 weight)
 {
     /// @todo #it_804A0E50 immediately follows #it_804A0E30; the original
@@ -317,10 +331,10 @@ void it_8026CD50(s32* counts, u64 mask, f32 weight)
         it_kind++;
         mask >>= 1;
     }
-    ((ItemPickTable*) (spawner + 1))->size = cnt;
-    *(item_kinds = &((ItemPickTable*) (spawner + 1))->x4) =
+    (PICK_TABLE_AFTER(spawner))->size = cnt;
+    *(item_kinds = &(PICK_TABLE_AFTER(spawner))->x4) =
         HSD_MemAlloc(cnt * 4);
-    *(weights = &((ItemPickTable*) (spawner + 1))->xC) = HSD_MemAlloc(cnt * 4);
+    *(weights = &(PICK_TABLE_AFTER(spawner))->xC) = HSD_MemAlloc(cnt * 4);
 
     idx = (cnt2 = 0);
     mask = backup;

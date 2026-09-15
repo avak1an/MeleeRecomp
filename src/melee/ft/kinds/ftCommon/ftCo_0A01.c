@@ -22,6 +22,30 @@
 #include <melee/ft/ft_3C61.h>
 #include <melee/ft/ftcmdscript.h>
 #include <melee/ft/ftcpuattack.h>
+
+#ifdef TARGET_PC
+#include <intrin.h>
+#include "pc_runtime.h"
+#include <stddef.h>
+#include <stdlib.h>
+extern unsigned int pc_frame_count;
+/* MELEE_TRACE_CPU=1: every place that changes the CPU's destination */
+static void pc_cpu_target_set(struct CpuFighter* cpu, int line)
+{
+    static int trace = -1;
+    if (trace < 0) {
+        trace = getenv("MELEE_TRACE_CPU") != NULL;
+    }
+    if (trace) {
+        Fighter* fp = (Fighter*) ((u8*) cpu - offsetof(Fighter, cpu));
+        OSReport("[pc] frame %u: P%d cpu target set (%.1f %.1f) at ftCo_0A01.c:%d x60 %d x18 %d\n", pc_frame_count,
+                 fp->player_id + 1, cpu->x54.x, cpu->x54.y, line, cpu->x60, cpu->x18);
+    }
+}
+#define PC_CPU_TARGET_SET(cpu) pc_cpu_target_set(cpu, __LINE__)
+#else
+#define PC_CPU_TARGET_SET(cpu)
+#endif
 #include <melee/ft/ftlib.h>
 #include <melee/ft/inlines.h>
 #include <melee/ft/kinds/ftPopo/ftpopospeciallw.h>
@@ -716,9 +740,11 @@ void ftCo_800A101C(Fighter* arg0, int arg1, int arg2, int arg3)
     {
         temp_r30->x64.x = temp_r30->x54.x = sp50.x;
         temp_r30->x64.y = temp_r30->x54.y = sp50.y;
+        PC_CPU_TARGET_SET(temp_r30);
     } else {
         temp_r30->x64.x = temp_r30->x54.x = arg0->cur_pos.x;
         temp_r30->x64.y = temp_r30->x54.y = arg0->cur_pos.y;
+        PC_CPU_TARGET_SET(temp_r30);
     }
     temp_r30->x60 = 0;
     temp_r30->x74.y = 0.0f;
@@ -971,6 +997,7 @@ static inline void ftCo_800A1CC4_inline1(Fighter* fp, float x, float y)
     fp->cpu.x64.y = fp->cpu.x54.y;
     fp->cpu.x54.x = x;
     fp->cpu.x54.y = y;
+    PC_CPU_TARGET_SET(&fp->cpu);
     fp->cpu.x38 = 5.0F;
 }
 
@@ -1033,9 +1060,16 @@ void ftCo_800A1F3C_noinline2(Fighter* fp, float arg1, float arg2, float arg3)
 void ftCo_800A1F3C(Fighter* fp, float arg1, float arg2, float arg3)
 {
     struct CpuFighter* data = &fp->cpu;
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_CPU") != NULL && data->x60 == 0) {
+        OSReport("[pc] frame %u: P%d cpu destination (%.1f %.1f) r %g from %s (x18 %d)\n", pc_frame_count,
+                 fp->player_id + 1, arg1, arg2, arg3, pc_symbol_name(_ReturnAddress()), data->x18);
+    }
+#endif
     if (data->x60 == 0) {
         data->x54.x = arg1;
         data->x54.y = arg2;
+        PC_CPU_TARGET_SET(data);
         data->x38 = arg3;
         ftCo_800A1CC4(fp, ftCo_803C6594[stage_info.grkind]);
     }
@@ -1053,6 +1087,7 @@ static inline void ftCo_800A75DC_set_target(Fighter* fp, const int* x60,
     if (*x60 == 0) {
         data->x54.x = arg1;
         data->x54.y = arg2;
+        PC_CPU_TARGET_SET(data);
         data->x38 = arg3;
         ftCo_ApplyStageEntry(fp, stage_info.grkind);
     }
@@ -1857,6 +1892,7 @@ bool ftCo_800A3554(Fighter* fp, float arg1)
                 data->x60 = 0;
                 data->x54.x = data->x64.x;
                 data->x54.y = data->x64.y;
+                PC_CPU_TARGET_SET(data);
                 ftCo_800A1CC4(fp, ftCo_803C6594[stage_info.grkind]);
                 return false;
             }
@@ -3916,6 +3952,7 @@ static inline void ftCo_800A8210_inline0(Fighter* fp, Vec3* out)
     if (data->x60 == 0) {
         data->x54.x = x;
         data->x54.y = y;
+        PC_CPU_TARGET_SET(data);
         data->x38 = 5.0f;
         ftCo_800A1CC4(fp, ftCo_803C6594[stage_info.grkind]);
     }
@@ -5114,6 +5151,7 @@ bool ftCo_800AAF48(Fighter* fp)
                 fp->cpu.x64.y = fp->cpu.x54.y;
                 fp->cpu.x54.x = sp44.x;
                 fp->cpu.x54.y = sp44.y;
+                PC_CPU_TARGET_SET(&fp->cpu);
                 fp->cpu.x38 = 5.0F;
                 return true;
             }
@@ -5147,6 +5185,7 @@ bool ftCo_800AAF48(Fighter* fp)
                 fp->cpu.x64.y = fp->cpu.x54.y;
                 fp->cpu.x54.x = spC.x;
                 fp->cpu.x54.y = spC.y;
+                PC_CPU_TARGET_SET(&fp->cpu);
                 fp->cpu.x38 = 5.0f;
                 return true;
             }
@@ -6128,13 +6167,16 @@ static bool ftCo_800ADE48(Fighter* fp)
             if (found != 0) {
                 data->x54.x = floor_pos.x;
                 data->x54.y = floor_pos.y;
+                PC_CPU_TARGET_SET(data);
             } else {
                 data->x54.x = fp->cur_pos.x;
                 data->x54.y = fp->cur_pos.y;
+                PC_CPU_TARGET_SET(data);
             }
         } else {
             data->x54.x = fp->cur_pos.x;
             data->x54.y = fp->cur_pos.y;
+            PC_CPU_TARGET_SET(data);
         }
     } while (0);
     dy = fp->cur_pos.y - fp->cpu.x54.y;
@@ -8532,6 +8574,7 @@ void ftCo_800B33B0(Fighter* fp)
         if (data->x60 == 0) {
             data->x54.x = data->x64.x;
             data->x54.y = data->x64.y;
+            PC_CPU_TARGET_SET(data);
         }
     }
     sy = data->x54.y;

@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 #include "ftkirby.h"
 
 #include <stddef.h>
@@ -3250,6 +3253,17 @@ void ftKb_SpecialN_800EFAF0(Fighter_GObj* gobj)
 static inline void ftKb_LoadHat(Fighter_GObj* gobj, Fighter* fp,
                                 KirbyHatStruct* hat)
 {
+#ifdef TARGET_PC
+    {
+        int k, kind = -1;
+        for (k = 0; k < FTKIND_MAX; k++) {
+            if (ft_80459B88.hats[k] == hat) {
+                kind = k;
+            }
+        }
+        pc_swap_kirby_hat(hat, kind); /* the hat's descriptors, from PlKb*.dat */
+    }
+#endif
     fp->u.kb.hat.x14.data = HSD_ObjAlloc(&fighter_x2040_alloc_data);
     ftPartsPObjSetDefaultClass();
     fp->u.kb.hat.jobj = HSD_JObjLoadJoint(hat->hat_joint);

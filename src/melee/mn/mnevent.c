@@ -710,7 +710,14 @@ void mnEvent_8024E524(s32 event_idx)
     f32 y_a;
     f32 y_b;
 
+#ifdef TARGET_PC
+    /* the strings are addressed as offsets from the animation settings
+     * that precede them in the console's data layout; here the string
+     * block itself is 0x60 past that point */
+    strs = mnEvent_803EF7A0 - 0x60;
+#else
     strs = (char*) &mnEvent_803EF740;
+#endif
     assets = mnEvent_804A08F8;
 
     gobj = GObj_Create(6, 7, 0x80);
@@ -750,7 +757,11 @@ void mnEvent_8024E838(int event_idx, int first_time)
 {
     HSD_GObjProc* proc;
     void** arr = mnEvent_804A08F8;
+#ifdef TARGET_PC
+    char* base = mnEvent_803EF7A0 - 0x60; /* see mnEvent_8024E524 */
+#else
     char* base = (char*) &mnEvent_803EF740;
+#endif
 
     mn_804D6BC8.cooldown = 5;
     mn_804A04F0.prev_menu = mn_804A04F0.cur_menu;

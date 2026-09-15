@@ -2063,6 +2063,102 @@ void _tyDisplay_8031BA78(s32 arg0, s32 arg1, f32 farg0)
 /// #tyDisplay_8031C454 and #tyDisplay_8031C5E4 address them as a single
 /// #TyDspNameTables block, matching how the retail code indexes across
 /// the adjacent tables from the first one.
+#ifdef TARGET_PC
+/* tyDisplay_8031C454 and tyDisplay_8031C5E4 read the three name tables as
+ * one TyDspNameTables starting at the first (link order); on PC they are
+ * one object. */
+static TyDspNameTables const pc_tydisplay_names = {
+    {
+        "ToyDspQues_Top_joint",       "ToyDspMycharaCmA_Top_joint",
+        "ToyDspMycharaCmB_Top_joint", "ToyDspMycharaCmC_Top_joint",
+        "ToyDspMycharaCmD_Top_joint", "ToyDspMycharaCmE_Top_joint",
+        "ToyDspMycharaR1A_Top_joint", "ToyDspMycharaR1B_Top_joint",
+        "ToyDspMycharaR1C_Top_joint", "ToyDspMycharaR1D_Top_joint",
+        "ToyDspMycharaR1E_Top_joint", "ToyDspMycharaR2A_Top_joint",
+        "ToyDspMycharaR2B_Top_joint", "ToyDspMycharaR2C_Top_joint",
+        "ToyDspMycharaR2D_Top_joint", "ToyDspMycharaR2E_Top_joint",
+        "ToyDspMapA_Top_joint",       "ToyDspMapB_Top_joint",
+        "ToyDspMapC_Top_joint",       "ToyDspMapD_Top_joint",
+        "ToyDspMapE_Top_joint",       "ToyDspFgseriesA_Top_joint",
+        "ToyDspFgseriesB_Top_joint",  "ToyDspFgseriesC_Top_joint",
+        "ToyDspFgseriesD_Top_joint",  "ToyDspFgseriesE_Top_joint",
+        "ToyDspFgetcA_Top_joint",     "ToyDspFgetcB_Top_joint",
+        "ToyDspFgetcC_Top_joint",     "ToyDspFgetcD_Top_joint",
+        "ToyDspFgetcE_Top_joint",     "ToyDspPokemonA_Top_joint",
+        "ToyDspPokemonB_Top_joint",   "ToyDspPokemonC_Top_joint",
+        "ToyDspPokemonD_Top_joint",   "ToyDspPokemonE_Top_joint",
+        "ToyDspItemA_Top_joint",      "ToyDspItemB_Top_joint",
+        "ToyDspItemC_Top_joint",      "ToyDspItemD_Top_joint",
+        "ToyDspItemE_Top_joint",      "ToyDspStand_Top_joint",
+        "ToyDspQues_Top_joint",
+    },
+    {
+        "",
+        "ToyDspMycharaCmA_Top_matanim_joint",
+        "ToyDspMycharaCmB_Top_matanim_joint",
+        "ToyDspMycharaCmC_Top_matanim_joint",
+        "ToyDspMycharaCmD_Top_matanim_joint",
+        "ToyDspMycharaCmE_Top_matanim_joint",
+        "ToyDspMycharaR1A_Top_matanim_joint",
+        "ToyDspMycharaR1B_Top_matanim_joint",
+        "ToyDspMycharaR1C_Top_matanim_joint",
+        "ToyDspMycharaR1D_Top_matanim_joint",
+        "ToyDspMycharaR1E_Top_matanim_joint",
+        "ToyDspMycharaR2A_Top_matanim_joint",
+        "ToyDspMycharaR2B_Top_matanim_joint",
+        "ToyDspMycharaR2C_Top_matanim_joint",
+        "ToyDspMycharaR2D_Top_matanim_joint",
+        "ToyDspMycharaR2E_Top_matanim_joint",
+        "ToyDspMapA_Top_matanim_joint",
+        "ToyDspMapB_Top_matanim_joint",
+        "ToyDspMapC_Top_matanim_joint",
+        "ToyDspMapD_Top_matanim_joint",
+        "ToyDspMapE_Top_matanim_joint",
+        "ToyDspFgseriesA_Top_matanim_joint",
+        "ToyDspFgseriesB_Top_matanim_joint",
+        "ToyDspFgseriesC_Top_matanim_joint",
+        "ToyDspFgseriesD_Top_matanim_joint",
+        "ToyDspFgseriesE_Top_matanim_joint",
+        "ToyDspFgetcA_Top_matanim_joint",
+        "ToyDspFgetcB_Top_matanim_joint",
+        "ToyDspFgetcC_Top_matanim_joint",
+        "ToyDspFgetcD_Top_matanim_joint",
+        "ToyDspFgetcE_Top_matanim_joint",
+        "ToyDspPokemonA_Top_matanim_joint",
+        "ToyDspPokemonB_Top_matanim_joint",
+        "ToyDspPokemonC_Top_matanim_joint",
+        "ToyDspPokemonD_Top_matanim_joint",
+        "ToyDspPokemonE_Top_matanim_joint",
+        "ToyDspItemA_Top_matanim_joint",
+        "ToyDspItemB_Top_matanim_joint",
+        "ToyDspItemC_Top_matanim_joint",
+        "ToyDspItemD_Top_matanim_joint",
+        "ToyDspItemE_Top_matanim_joint",
+        "",
+        "",
+    },
+    {
+    {
+        "TyQuesD.dat",  "TyMycCmA.dat", "TyMycCmB.dat", "TyMycCmC.dat",
+        "TyMycCmD.dat", "TyMycCmE.dat", "TyMycR1A.dat", "TyMycR1B.dat",
+        "TyMycR1C.dat", "TyMycR1D.dat", "TyMycR1E.dat", "TyMycR2A.dat",
+        "TyMycR2B.dat", "TyMycR2C.dat", "TyMycR2D.dat", "TyMycR2E.dat",
+        "TyMapA.dat",   "TyMapB.dat",   "TyMapC.dat",   "TyMapD.dat",
+        "TyMapE.dat",   "TySeriA.dat",  "TySeriB.dat",  "TySeriC.dat",
+        "TySeriD.dat",  "TySeriE.dat",  "TyEtcA.dat",   "TyEtcB.dat",
+        "TyEtcC.dat",   "TyEtcD.dat",   "TyEtcE.dat",   "TyPokeA.dat",
+        "TyPokeB.dat",  "TyPokeC.dat",  "TyPokeD.dat",  "TyPokeE.dat",
+        "TyItemA.dat",  "TyItemB.dat",  "TyItemC.dat",  "TyItemD.dat",
+        "TyItemE.dat",  "TyStandD.dat", "TyQuesD.dat",
+    },
+    },
+    0,
+};
+#define _tyDisplay_803B8988 (*(TyDspArchNames const*) pc_tydisplay_names.jobj_names)
+#define _tyDisplay_803B8A34 (*(TyDspArchNames const*) pc_tydisplay_names.matanim_names)
+#define _tyDisplay_803B8AE0 (pc_tydisplay_names.arch_names)
+#define PC_TYDSP_TABLES (&pc_tydisplay_names)
+#else
 /* 3B8988 */ static TyDspArchNames const _tyDisplay_803B8988 = {
     {
         "ToyDspQues_Top_joint",       "ToyDspMycharaCmA_Top_joint",
@@ -2153,6 +2249,8 @@ void _tyDisplay_8031BA78(s32 arg0, s32 arg1, f32 farg0)
         "TyItemE.dat",  "TyStandD.dat", "TyQuesD.dat",
     },
 };
+#define PC_TYDSP_TABLES ((TyDspNameTables const*) &_tyDisplay_803B8988)
+#endif
 
 s32 tyDisplay_8031BB34(s8 idx)
 {
@@ -2394,7 +2492,7 @@ s32 tyDisplay_8031C454(s32 arg0)
     const TyDspNameTables* tables;
 
     PAD_STACK(0x4);
-    tables = (TyDspNameTables const*) &_tyDisplay_803B8988;
+    tables = PC_TYDSP_TABLES;
     result = 0;
     archArr = _tyDisplay_804A2DE8;
 
@@ -2455,7 +2553,7 @@ HSD_JObj* tyDisplay_8031C5E4(s32 arg0)
     HSD_JObj* child;
     u8 cat;
     const TyDspNameTables* tables =
-        (TyDspNameTables const*) &_tyDisplay_803B8988;
+        PC_TYDSP_TABLES;
 
     HSD_Archive** archives = _tyDisplay_804A2DE8;
     u8 _3[4];

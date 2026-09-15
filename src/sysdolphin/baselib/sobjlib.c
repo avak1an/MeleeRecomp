@@ -1,5 +1,8 @@
 #define SOBJLIB_INTERNAL
 #include "sobjlib.h"
+#ifdef TARGET_PC
+#include <pc_hsd_swap.h>
+#endif
 
 #include <math.h>
 
@@ -169,6 +172,13 @@ HSD_SObj* HSD_SObjLib_803A477C(HSD_GObj* gobj, HSD_SObjDesc* desc,
         tlut = desc->tlut;
     }
 
+#ifdef TARGET_PC
+    /* sprite descriptors come straight from the archive (the opening's
+     * title text, the how-to-play captions) */
+    pc_swap_imagedesc(image);
+    pc_swap_imagedesc(image2);
+    pc_swap_tlutdesc((HSD_TlutDesc*) tlut);
+#endif
     sobj = HSD_ObjAlloc(&HSD_SObjLib_804D10E0);
     HSD_ASSERT(287, sobj);
 

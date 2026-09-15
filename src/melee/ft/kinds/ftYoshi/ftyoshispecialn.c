@@ -135,12 +135,17 @@ static void setupCallbacks(Fighter_GObj* gobj, HSD_GObjEvent grab_cb,
     ftCommon_8007E2D0(fp, 4, grab_cb, arg1, grabbed_cb);
 }
 
+#ifdef TARGET_PC
+enum { motion_flags0 = Ft_MF_KeepGfx | Ft_MF_SkipModel | Ft_MF_Unk19 };
+enum { motion_flags1 = motion_flags0 | Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim };
+#else
 u32 const motion_flags0 = Ft_MF_KeepGfx | Ft_MF_SkipModel | Ft_MF_Unk19;
 u32 const motion_flags1 =
     motion_flags0 | Ft_MF_SkipMatAnim | Ft_MF_SkipColAnim;
-static u32 const motion_flags2 = motion_flags1 | Ft_MF_KeepGfx |
+#endif
+STATIC_CONST(u32, motion_flags2, motion_flags1 | Ft_MF_KeepGfx |
                                  Ft_MF_SkipModel | Ft_MF_SkipMatAnim |
-                                 Ft_MF_SkipColAnim | Ft_MF_Unk19;
+                                 Ft_MF_SkipColAnim | Ft_MF_Unk19);
 
 void ftYs_SpecialN_Enter(HSD_GObj* gobj)
 {

@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grfigureget.h"
 
 #include <Runtime/platform.h>
@@ -100,6 +103,9 @@ void grFigureGet_OnDemoInit(int unused) {}
 void grFigureGet_OnInit(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grfigureget(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 1;
     grFigureGet_802195CC(0);

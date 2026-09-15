@@ -146,6 +146,13 @@ void HSD_GObj_80391304(HSD_GObjLibInitDataType*);
 
 static inline void* HSD_GObjGetUserData(HSD_GObj* gobj)
 {
+#ifdef TARGET_PC
+    /* several matching tricks evaluate GET_FIGHTER(0) / GET_GROUND(0) for
+     * their stack layout; reading address 0x2C is harmless on the console */
+    if (gobj == NULL) {
+        return NULL;
+    }
+#endif
     return gobj->user_data;
 }
 

@@ -364,6 +364,23 @@ void fn_8017A078(s32 arg0)
     GObj_SetupGXLinkMax(gobj, callbacks.funcs[arg0], 5);
 }
 
+#ifdef TARGET_PC
+/* The console reads these through CameraKindData laid over the statics
+ * that follow gmResultPlayerColors in link order (gmresultplayer.c); on PC
+ * they are separate objects, so name them directly. */
+#define RES_X_OFF(k, v) gmResultCharacterScaleData[k].x0[v]
+#define RES_Y_OFF(k, v) gmResultCharacterScaleData[k].x0[4 + (v)]
+#define RES_Z_SCALE(k, v) gmResultCharacterScaleData[k].x20[v]
+#define RES_SLOT_OFF(k, a, s) gmResultCharacterData.slot_off[k][a][s]
+#define RES_COBJ_DESC ((HSD_CObjDesc*) &gmResultCameraDesc)
+#else
+#define RES_X_OFF(k, v) data->kind[k].x_off[v]
+#define RES_Y_OFF(k, v) data->kind[k].y_off[v]
+#define RES_Z_SCALE(k, v) data->kind[k].z_scale[v]
+#define RES_SLOT_OFF(k, a, s) data->slot_off[k][a][s]
+#define RES_COBJ_DESC (&data->cobj_desc)
+#endif
+
 HSD_GObj* fn_8017A318(s32 arg0)
 {
     static Scissor const scissor_init = { 270, 370, 124, 276 };
@@ -401,7 +418,7 @@ HSD_GObj* fn_8017A318(s32 arg0)
     }
 
     gobj = GObj_Create(0x13, 0x14, 0);
-    cobj = HSD_CObjLoadDesc(&data->cobj_desc);
+    cobj = HSD_CObjLoadDesc(RES_COBJ_DESC);
     HSD_GObjObject_80390A70(gobj, HSD_GObj_CameraKind, cobj);
 
     {
@@ -416,28 +433,28 @@ HSD_GObj* fn_8017A318(s32 arg0)
 
     kind_data = disp->state.char_kind[arg0];
     (void) kind_data;
-    eye.y += data->kind[kind_data].y_off[vi];
+    eye.y += RES_Y_OFF(kind_data, vi);
 
     vi = ((s32) variant <= 2) ? variant : 3;
-    interest.y += data->kind[kind_data].y_off[vi];
+    interest.y += RES_Y_OFF(kind_data, vi);
 
     vi = ((s32) variant <= 2) ? variant : 3;
-    eye.x += data->kind[kind_data].x_off[vi];
+    eye.x += RES_X_OFF(kind_data, vi);
 
     {
         f32 interest_x;
         vi = ((s32) variant <= 2) ? variant : 3;
-        interest_x = interest.x + data->kind[kind_data].x_off[vi];
+        interest_x = interest.x + RES_X_OFF(kind_data, vi);
 
         {
             f32 x_off, y_off;
 
             interest.x = interest_x;
-            x_off = data->slot_off[kind_data][0][slot];
+            x_off = RES_SLOT_OFF(kind_data, 0, slot);
             eye.x += x_off;
             interest.x += x_off;
 
-            eye.y = eye.y + (y_off = data->slot_off[kind_data][1][slot]);
+            eye.y = eye.y + (y_off = RES_SLOT_OFF(kind_data, 1, slot));
             interest.y += y_off;
         }
     }
@@ -447,12 +464,12 @@ HSD_GObj* fn_8017A318(s32 arg0)
     }
 
     vi = ((s32) variant <= 2) ? variant : 3;
-    if ((1.0f - data->kind[kind_data].z_scale[vi]) < 0.0f) {
+    if ((1.0f - RES_Z_SCALE(kind_data, vi)) < 0.0f) {
         vi = ((s32) variant <= 2) ? variant : 3;
-        eye.z += 100.0f * (1.0f - data->kind[kind_data].z_scale[vi]);
+        eye.z += 100.0f * (1.0f - RES_Z_SCALE(kind_data, vi));
     } else {
         vi = ((s32) variant <= 2) ? variant : 3;
-        eye.z += 300.0f * (1.0f - data->kind[kind_data].z_scale[vi]);
+        eye.z += 300.0f * (1.0f - RES_Z_SCALE(kind_data, vi));
     }
 
     HSD_CObjSetEyePosition(cobj, &eye);
@@ -463,6 +480,9 @@ HSD_GObj* fn_8017A318(s32 arg0)
     if (slot == 0) {
         fn_8017A078(arg0);
     }
+#ifdef TARGET_PC
+    return gobj;
+#endif
 }
 
 Fighter_GObj* fn_8017A67C(CharacterKind kind, int arg1, int arg2)

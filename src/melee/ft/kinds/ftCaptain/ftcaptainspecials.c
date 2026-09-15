@@ -125,10 +125,9 @@ void ftCa_SpecialAirS_Enter(HSD_GObj* gobj)
     ftCommon_8007D60C(fp);
 }
 
-static u32 const transition_flags =
-    Ft_MF_KeepGfx | Ft_MF_SkipMatAnim | Ft_MF_UpdateCmd | Ft_MF_SkipColAnim |
+STATIC_CONST(u32, transition_flags, Ft_MF_KeepGfx | Ft_MF_SkipMatAnim | Ft_MF_UpdateCmd | Ft_MF_SkipColAnim |
     Ft_MF_SkipItemVis | Ft_MF_Unk19 | Ft_MF_SkipModelPartVis |
-    Ft_MF_SkipModelFlags | Ft_MF_Unk27;
+    Ft_MF_SkipModelFlags | Ft_MF_Unk27);
 
 static void onDetectGround(HSD_GObj* gobj)
 {

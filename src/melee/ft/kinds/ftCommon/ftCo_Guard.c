@@ -1,4 +1,8 @@
 #include "ftCo_Guard.h"
+#ifdef TARGET_PC
+#include <stdlib.h>
+#include <dolphin/os.h>
+#endif
 
 #include <math.h>
 
@@ -186,6 +190,16 @@ static inline float inlineB0(Fighter* fp)
              p_ftCommonData->x2D4);
         float n2 = 1 - p_ftCommonData->x264;
         float n3 = n2 * n1 + p_ftCommonData->x264;
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_SHIELD") != NULL) {
+            OSReport("[pc] shield size %g: health %g / start %g, x264 %g, x2D4 %g, x2D8 %g, light %g, init %g, "
+                     "joint %u\n",
+                     n3 * fp->co_attrs.initial_shield_size, fp->shield_health,
+                     p_ftCommonData->x260_startShieldHealth, p_ftCommonData->x264, p_ftCommonData->x2D4,
+                     p_ftCommonData->x2D8, fp->lightshield_amount, fp->co_attrs.initial_shield_size,
+                     fp->ft_data->x8->x11);
+        }
+#endif
         return n3 * fp->co_attrs.initial_shield_size;
     }
 }
@@ -194,6 +208,15 @@ void ftCo_80091D58(Fighter* fp)
 {
     Vec3 scl;
     scl.x = scl.y = scl.z = inlineB0(fp);
+#ifdef TARGET_PC
+    if (getenv("MELEE_TRACE_SHIELD") != NULL) {
+        OSReport("[pc] shield scale %g: health %g / start %g, x264 %g, x2D4 %g, x2D8 %g, light %g, init size %g, "
+                 "joint %u\n",
+                 scl.x, fp->shield_health, p_ftCommonData->x260_startShieldHealth, p_ftCommonData->x264,
+                 p_ftCommonData->x2D4, p_ftCommonData->x2D8, fp->lightshield_amount,
+                 fp->co_attrs.initial_shield_size, fp->ft_data->x8->x11);
+    }
+#endif
     HSD_JObjSetScale(fp->parts[fp->ft_data->x8->x11].joint, &scl);
 }
 
@@ -441,6 +464,12 @@ void ftCo_GuardOn_Anim(Fighter_GObj* gobj)
     Fighter* fp = gobj->user_data;
     fp->mv.co.guard.x0 += 1;
     if (ftCo_800925A4(gobj) == 0) {
+#ifdef TARGET_PC
+        if (getenv("MELEE_TRACE_SHIELD") != NULL) {
+            OSReport("[pc] guard on: x0 %g x2E8 %g x4 %g x8 %g\n", fp->mv.co.guard.x0, fp->x2E8, fp->mv.co.guard.x4,
+                     fp->mv.co.guard.x8);
+        }
+#endif
         if (fp->mv.co.guard.x0 >= fp->x2E8) {
             ftCo_800928CC(gobj);
         } else {

@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grtfox.h"
 
 #include "granime.h"
@@ -67,6 +70,9 @@ void grTFox_80220B80(bool unk) {}
 void grTFox_80220B84(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grtfox(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
 

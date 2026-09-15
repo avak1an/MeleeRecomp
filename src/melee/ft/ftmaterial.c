@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include "ftmaterial.h"
 
 #include "fighter.h"
@@ -26,6 +27,13 @@ struct ft_MObjInfo {
     HSD_TECnst texp_tmpl;
 };
 
+#ifdef TARGET_PC
+static struct ft_MObjInfo pc_ft_mobj_info;
+#define FT_MOBJ_INFO() (&pc_ft_mobj_info)
+#else
+#define FT_MOBJ_INFO() ((struct ft_MObjInfo*) &ftMObj)
+#endif
+
 static HSD_TevDesc ftMaterial_803C69D0 = {
     NULL,
     TEVCONF_MODE,
@@ -53,6 +61,12 @@ void ftMaterial_800BF260(void)
                      "sysdolphin_base_library", "ft_mobj",
                      sizeof(HSD_MObjInfo), sizeof(HSD_MObj));
     ftMObj.setup = (HSD_MObjSetupFunc) (Event) ftMaterial_800BF2B8;
+#ifdef TARGET_PC
+    /* the original reads the two templates through ft_MObjInfo as the data
+     * that follows ftMObj; on PC keep an explicit copy instead */
+    pc_ft_mobj_info.tevdesc_tmpl = ftMaterial_803C69D0;
+    pc_ft_mobj_info.texp_tmpl = ftMaterial_803C6A44;
+#endif
 }
 
 void ftMaterial_800BF2B8(HSD_MObj* mobj, u32 rendermode, u32 unused)
@@ -159,7 +173,7 @@ HSD_TExp* ftMaterial_800BF534(Fighter* fp, HSD_MObj* mobj, HSD_TExp* texp,
     HSD_TevDesc sp_tevdesc;
     s32 reg;
     bool chk;
-    struct ft_MObjInfo* info = (struct ft_MObjInfo*) &ftMObj;
+    struct ft_MObjInfo* info = FT_MOBJ_INFO();
     ColorOverlay* overlay = ftCo_800C0658(fp);
 
     if (overlay->x7C_flag2 && overlay->x7C_light_enable) {
@@ -213,7 +227,7 @@ void ftMaterial_800BF6BC(Fighter* fp, HSD_MObj* mobj, HSD_TExp* texp)
     s32 var_r3;
     ColorOverlay* overlay;
     s32 var_r5;
-    struct ft_MObjInfo* info = (struct ft_MObjInfo*) &ftMObj;
+    struct ft_MObjInfo* info = FT_MOBJ_INFO();
 
     if (!fp->x2223_b3) {
         overlay = ftCo_800C0658(fp);

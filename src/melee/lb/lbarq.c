@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include "pc_runtime.h"
+#endif
 #include "lbarq.h"
 
 #include <placeholder.h>
@@ -40,6 +43,11 @@ typedef struct lbArqHandle {
 #endif
 static lbArqState lbArq_80014ABC(lbArqNode* arg0)
 {
+#ifdef TARGET_PC
+    /* Transfers complete from the pump instead of an interrupt, and the
+     * caller spins on this state without ever reaching the retrace. */
+    pc_pump();
+#endif
     return arg0->state;
 }
 #ifdef __MWERKS__

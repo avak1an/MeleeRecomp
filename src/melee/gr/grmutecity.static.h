@@ -24,6 +24,6 @@ typedef struct grMc_CarEntry {
 
 ASSERT_SIZE(grMc_CarEntry, 0x2C);
 
-static grMc_CarEntry grMc_8049F4B8[30];
+static grMc_CarEntry PC_ADJACENT(i) grMc_8049F4B8[30];
 
 #endif

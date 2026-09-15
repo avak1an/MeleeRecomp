@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grshrineroute.h"
 
 #include "granime.h"
@@ -181,6 +184,9 @@ void grShrineRoute_OnDemoInit(bool arg) {}
 void grShrineRoute_OnInit(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grshrineroute(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 0;
     stage_info.unk8C.b5 = 0;
     grShrineRoute_802088C0(0);

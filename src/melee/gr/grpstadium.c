@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grpstadium.h"
 
 #include <sysdolphin/baselib/forward.h>
@@ -163,6 +166,9 @@ void grStadium_OnDemoInit(int unused) {}
 void grStadium_OnInit(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grpstadium(yakumono_param);
+#endif
 
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;

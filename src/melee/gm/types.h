@@ -21,6 +21,20 @@
 /// @deprecated Replace with inline bitfields
 typedef union UnkFlagStruct {
     u8 u8;
+#ifdef TARGET_PC
+    /* the byte view is written with console bit numbering (b0 is the most
+     * significant bit), so the fields are declared in reverse on PC */
+    struct {
+        u8 b7 : 1;
+        u8 b6 : 1;
+        u8 b5 : 1;
+        u8 b4 : 1;
+        u8 b3 : 1;
+        u8 b2 : 1;
+        u8 b1 : 1;
+        u8 b0 : 1;
+    };
+#else
     struct {
         u8 b0 : 1;
         u8 b1 : 1;
@@ -31,6 +45,7 @@ typedef union UnkFlagStruct {
         u8 b6 : 1;
         u8 b7 : 1;
     };
+#endif
 } UnkFlagStruct;
 
 struct UnkMultimanData {
@@ -831,7 +846,7 @@ struct TmData {
     u8 x32;
     u8 x33;
     u8 pad_x34[0x37 - 0x34];
-#if defined(MUST_MATCH) || defined(LINT)
+#if defined(MUST_MATCH) || defined(LINT) || defined(TARGET_PC)
 #pragma pack(push, 1)
 #endif
     struct TmUnkMenuData {
@@ -852,7 +867,7 @@ struct TmData {
         u8 xF;
         u8 pad_X10[0x12 - 0x10];
     } x37[64];
-#if defined(MUST_MATCH) || defined(LINT)
+#if defined(MUST_MATCH) || defined(LINT) || defined(TARGET_PC)
 #pragma pack(pop)
 #endif
     u8 pad_x4B7[0x4B8 - 0x4B7];

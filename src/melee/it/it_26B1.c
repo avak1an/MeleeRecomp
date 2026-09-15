@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 #include "it_26B1.h"
 
 #include <sysdolphin/baselib/forward.h>
@@ -204,12 +207,22 @@ int it_8026B3C0(ItemKind kind)
 /// Store Item article pointer to table
 void it_8026B3F8(Article* article, s32 kind)
 {
+#ifdef TARGET_PC
+    /* a fighter's own item (from its Pl*.dat), not part of the ItCo tables;
+     * its item-specific attribute block is swapped like a stage item's
+     * (unswapped, the Ice Climbers' blizzard spun on a garbage angle and
+     * their rope allocated links until the heap was gone) */
+    pc_swap_stage_article(article);
+#endif
     it_804D6D38[kind - It_Kind_Kuriboh] = article;
 }
 
 /// Store Stage Item article pointer to table
 void it_8026B40C(Article* article, s32 kind)
 {
+#ifdef TARGET_PC
+    pc_swap_stage_article(article);
+#endif
     it_804A0F60[kind - It_Kind_Old_Kuri] = article;
 }
 

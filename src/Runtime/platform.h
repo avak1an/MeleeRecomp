@@ -152,13 +152,63 @@ typedef bool (*Predicate)(void);
 #define STATIC_ASSERT(cond) _Static_assert((cond), "(" #cond ") failed")
 #endif
 
-#if defined(MUST_MATCH) || defined(LINT)
+#if defined(MUST_MATCH) || defined(LINT) || defined(TARGET_PC)
 #define ASSERT_SIZE(expr, size) STATIC_ASSERT(sizeof(expr) == size)
 #define ASSERT_OFFSET(type, member, offset)                                   \
     STATIC_ASSERT(offsetof(type, member) == offset)
 #else
 #define ASSERT_SIZE(expr, size)
 #define ASSERT_OFFSET(expr, member, offset)
+#endif
+
+/// Marks globals that the game addresses as one contiguous block through a
+/// larger struct (an original-link-order dependency). On PC they go into a
+/// dedicated data section so the linker keeps them adjacent and in order;
+/// on the console the attribute is empty.
+/// PC_ADJACENT(k): k is a single letter giving the position in the block;
+/// the linker sorts ".pcadj$k" contributions alphabetically into ".pcadj".
+#ifdef TARGET_PC
+#pragma section(".pcadj$a", read, write)
+#pragma section(".pcadj$b", read, write)
+#pragma section(".pcadj$c", read, write)
+#pragma section(".pcadj$d", read, write)
+#pragma section(".pcadj$e", read, write)
+#pragma section(".pcadj$f", read, write)
+#pragma section(".pcadj$g", read, write)
+#pragma section(".pcadj$h", read, write)
+#pragma section(".pcadj$i", read, write)
+#pragma section(".pcadj$j", read, write)
+#pragma section(".pcadj$k", read, write)
+#pragma section(".pcadj$l", read, write)
+#pragma section(".pcadj$m", read, write)
+#pragma section(".pcadj$n", read, write)
+/* __declspec(allocate) wants a single string literal (no concatenation). */
+#define PC_ADJ_SECTION_a ".pcadj$a"
+#define PC_ADJ_SECTION_b ".pcadj$b"
+#define PC_ADJ_SECTION_c ".pcadj$c"
+#define PC_ADJ_SECTION_d ".pcadj$d"
+#define PC_ADJ_SECTION_e ".pcadj$e"
+#define PC_ADJ_SECTION_f ".pcadj$f"
+#define PC_ADJ_SECTION_g ".pcadj$g"
+#define PC_ADJ_SECTION_h ".pcadj$h"
+#define PC_ADJ_SECTION_i ".pcadj$i"
+#define PC_ADJ_SECTION_j ".pcadj$j"
+#define PC_ADJ_SECTION_k ".pcadj$k"
+#define PC_ADJ_SECTION_l ".pcadj$l"
+#define PC_ADJ_SECTION_m ".pcadj$m"
+#define PC_ADJ_SECTION_n ".pcadj$n"
+#define PC_ADJACENT(k) __declspec(allocate(PC_ADJ_SECTION_##k))
+#else
+#define PC_ADJACENT(k)
+#endif
+
+/// Defines a file-local integer constant that may be built from other such
+/// constants. Metrowerks and clang fold `static T const` initializers; MSVC
+/// does not, so the PC build makes these enumerators instead.
+#ifdef TARGET_PC
+#define STATIC_CONST(type, name, ...) enum { name = (int) (__VA_ARGS__) }
+#else
+#define STATIC_CONST(type, name, ...) static type const name = __VA_ARGS__
 #endif
 
 #define RETURN_IF(cond)                                                       \

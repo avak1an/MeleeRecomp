@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_game_swap.h>
+#endif
 #include "grmaterial.h"
 
 #include <melee/lb/forward.h>
@@ -508,7 +511,7 @@ void grMaterial_801C9470(Item_GObj* gobj, CommandInfo* cmd)
 void grMaterial_801C9490(Item_GObj* gobj, CommandInfo* cmd)
 {
     Ground* gp = gobj->user_data;
-    u32 val = (*(u16*) cmd->ptr[0] >> 2) & 0xFF;
+    u32 val = (((u16*) cmd->ptr[0])[CMD_HALF(0)] >> 2) & 0xFF;
     gp->xC0 = (f32) val;
     gp->x10_flags.b6 = 1;
 }
@@ -580,6 +583,9 @@ void grMaterial_801C9604(HSD_GObj* gobj, int arg1, bool arg2)
     Ground* gp = grMaterial_801C9604_inline(gobj);
     ColorOverlay* co = grMaterial_GetOverlay(gp);
     co->x4_pri = arg2;
+#ifdef TARGET_PC
+    pc_swap_script((void*) arg1, PC_SCRIPT_OVERLAY);
+#endif
     co->x8_ptr1 = (union ColorOverlay_x8_t*) arg1;
     co->x0_timer = 0;
     co->xC_loop = 0;

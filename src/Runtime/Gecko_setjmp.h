@@ -29,7 +29,17 @@ typedef struct __jmp_buf {
     double fpscr; /* 240: saved FPSCR		*/
 } __jmp_buf;
 
+#ifdef TARGET_PC
+/* The host jmp_buf is stored inside the (larger) __jmp_buf so that struct
+ * layouts stay unchanged. setjmp cannot be wrapped in a function, so it is
+ * a macro; longjmp goes through pc_longjmp (pc/src/pc_setjmp.c). */
+#include <setjmp.h>
+void pc_longjmp(__jmp_buf* env, int val);
+#define __setjmp(env) setjmp(*(jmp_buf*) (env))
+#define longjmp(env, val) pc_longjmp((env), (val))
+#else
 int __setjmp(register __jmp_buf*);
 void longjmp(register __jmp_buf* env, register int val);
+#endif
 
 #endif

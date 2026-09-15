@@ -4,58 +4,42 @@
 #include <melee/ft/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 
-static MotionFlags const ftNs_MF_Attack4 =
-    Ft_MF_SkipHit | Ft_MF_SkipRumble | Ft_MF_SkipItemVis | Ft_MF_FreezeState;
+STATIC_CONST(MotionFlags, ftNs_MF_Attack4, Ft_MF_SkipHit | Ft_MF_SkipRumble | Ft_MF_SkipItemVis | Ft_MF_FreezeState);
 
-static MotionFlags const ftNs_MF_AttackHi4 = ftNs_MF_Attack4 | Ft_MF_KeepGfx;
+STATIC_CONST(MotionFlags, ftNs_MF_AttackHi4, ftNs_MF_Attack4 | Ft_MF_KeepGfx);
 
-static MotionFlags const ftNs_MF_AttackLw4 =
-    ftNs_MF_AttackHi4 | Ft_MF_KeepFastFall;
+STATIC_CONST(MotionFlags, ftNs_MF_AttackLw4, ftNs_MF_AttackHi4 | Ft_MF_KeepFastFall);
 
-static MotionFlags const ftNs_MF_AttackHi4Start =
-    ftNs_MF_AttackHi4 | Ft_MF_KeepSfx;
+STATIC_CONST(MotionFlags, ftNs_MF_AttackHi4Start, ftNs_MF_AttackHi4 | Ft_MF_KeepSfx);
 
-static MotionFlags const ftNs_MF_AttackLw4Start =
-    ftNs_MF_AttackLw4 | Ft_MF_KeepSfx;
+STATIC_CONST(MotionFlags, ftNs_MF_AttackLw4Start, ftNs_MF_AttackLw4 | Ft_MF_KeepSfx);
 
-static MotionFlags const ftNs_MF_AttackS4 =
-    ftNs_MF_Attack4 | Ft_MF_KeepFastFall | Ft_MF_KeepSfx | Ft_MF_SkipColAnim;
+STATIC_CONST(MotionFlags, ftNs_MF_AttackS4, ftNs_MF_Attack4 | Ft_MF_KeepFastFall | Ft_MF_KeepSfx | Ft_MF_SkipColAnim);
 
-static MotionFlags const ftNs_MF_Special =
-    Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
-    Ft_MF_FreezeState;
+STATIC_CONST(MotionFlags, ftNs_MF_Special, Ft_MF_SkipModel | Ft_MF_SkipItemVis | Ft_MF_UnkUpdatePhys |
+    Ft_MF_FreezeState);
 
-static MotionFlags const ftNs_MF_SpecialLw =
-    ftNs_MF_Special | Ft_MF_KeepColAnimHitStatus;
+STATIC_CONST(MotionFlags, ftNs_MF_SpecialLw, ftNs_MF_Special | Ft_MF_KeepColAnimHitStatus);
 
-static MotionFlags const ftNs_MF_Special_SkipUpdateThrowException =
-    ftNs_MF_Special | Ft_MF_SkipThrowException;
+STATIC_CONST(MotionFlags, ftNs_MF_Special_SkipUpdateThrowException, ftNs_MF_Special | Ft_MF_SkipThrowException);
 
-static MotionFlags const ftNs_MF_SpecialN =
-    ftNs_MF_Special_SkipUpdateThrowException | Ft_MF_KeepFastFall;
+STATIC_CONST(MotionFlags, ftNs_MF_SpecialN, ftNs_MF_Special_SkipUpdateThrowException | Ft_MF_KeepFastFall);
 
-static MotionFlags const ftNs_MF_SpecialS =
-    ftNs_MF_Special_SkipUpdateThrowException | Ft_MF_KeepGfx;
+STATIC_CONST(MotionFlags, ftNs_MF_SpecialS, ftNs_MF_Special_SkipUpdateThrowException | Ft_MF_KeepGfx);
 
-static MotionFlags const ftNs_MF_SpecialHi = ftNs_MF_SpecialN | Ft_MF_KeepGfx;
+STATIC_CONST(MotionFlags, ftNs_MF_SpecialHi, ftNs_MF_SpecialN | Ft_MF_KeepGfx);
 
-static MotionFlags const ftNs_MF_SpecialAirLw =
-    ftNs_MF_SpecialLw | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftNs_MF_SpecialAirLw, ftNs_MF_SpecialLw | Ft_MF_SkipParasol);
 
-static MotionFlags const ftNs_MF_SpecialAirN =
-    ftNs_MF_SpecialN | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftNs_MF_SpecialAirN, ftNs_MF_SpecialN | Ft_MF_SkipParasol);
 
-static MotionFlags const ftNs_MF_SpecialAirS =
-    ftNs_MF_SpecialS | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftNs_MF_SpecialAirS, ftNs_MF_SpecialS | Ft_MF_SkipParasol);
 
-static MotionFlags const ftNs_MF_SpecialAirHi =
-    ftNs_MF_SpecialHi | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftNs_MF_SpecialAirHi, ftNs_MF_SpecialHi | Ft_MF_SkipParasol);
 
-static MotionFlags const ftNs_MF_SpecialLwLoop =
-    ftNs_MF_SpecialLw | Ft_MF_Unk19;
+STATIC_CONST(MotionFlags, ftNs_MF_SpecialLwLoop, ftNs_MF_SpecialLw | Ft_MF_Unk19);
 
-static MotionFlags const ftNs_MF_SpecialAirLwLoop =
-    ftNs_MF_SpecialLwLoop | Ft_MF_SkipParasol;
+STATIC_CONST(MotionFlags, ftNs_MF_SpecialAirLwLoop, ftNs_MF_SpecialLwLoop | Ft_MF_SkipParasol);
 
 typedef enum ftNess_MotionState {
     ftNs_MS_AttackS4 = ftCo_MS_Count,

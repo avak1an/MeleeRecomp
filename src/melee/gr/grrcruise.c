@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "grrcruise.h"
 
 #include <Runtime/platform.h>
@@ -136,6 +139,9 @@ void grRCruise_801FF168(void)
     HSD_GObj* gobj4;
 
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_grrcruise(yakumono_param);
+#endif
     stage_info.unk8C.b4 = 1;
     stage_info.unk8C.b5 = 0;
     jgobj = grRCruise_801FF2C8(3);

@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "groldkongo.h"
 
 #include <Runtime/platform.h>
@@ -145,6 +148,9 @@ void grOldKongo_8020F468(bool arg) {}
 void grOldKongo_8020F46C(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_groldkongo(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
     setupStageCallbacks(0);

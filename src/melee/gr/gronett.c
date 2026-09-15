@@ -1,3 +1,6 @@
+#ifdef TARGET_PC
+#include <pc_yakumono_swap.h>
+#endif
 #include "gronett.h"
 
 #include <Runtime/platform.h>
@@ -123,6 +126,9 @@ void grOnett_801E3734(bool arg) {}
 void grOnett_801E3738(void)
 {
     yakumono_param = Ground_GetYakumonoParam();
+#ifdef TARGET_PC
+    pc_swap_yakumono_gronett(yakumono_param);
+#endif
     stage_info.unk8C.b4 = false;
     stage_info.unk8C.b5 = true;
     grOnett_801E37F4(0);
