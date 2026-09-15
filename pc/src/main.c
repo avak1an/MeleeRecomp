@@ -65,6 +65,10 @@ static void usage(void)
             "                  in mods/enabled.txt next to the exe are used\n"
             "  --fullscreen    start full screen (F11 or Alt+Enter toggles)\n"
             "  --scale N       window size N x 640x480 (default 1)\n"
+            "  --internal N    render at N x 640x480 and scale to the window (default: the\n"
+            "                  window's size; 1 is the console's resolution)\n"
+            "  --msaa N        anti-aliasing with N samples (2, 4, 8; default off)\n"
+            "  --aniso N       anisotropic texture filtering, N-fold (2..16; default off)\n"
             "  --keymap FILE   keyboard layout: lines of ACTION = KEY (see pc/README.md)\n"
             "  --volume N      audio volume in percent (default 100); --no-audio mutes\n"
             "  --extract DIR   write every file of the disc to DIR/files (and the\n"
@@ -223,6 +227,21 @@ int main(int argc, char** argv)
             pc_config.scale = atoi(argv[++i]);
             if (pc_config.scale < 1 || pc_config.scale > 8) {
                 pc_config.scale = 1;
+            }
+        } else if (strcmp(argv[i], "--internal") == 0 && i + 1 < argc) {
+            pc_config.internal_scale = atoi(argv[++i]);
+            if (pc_config.internal_scale < 0 || pc_config.internal_scale > 8) {
+                pc_config.internal_scale = 0;
+            }
+        } else if (strcmp(argv[i], "--msaa") == 0 && i + 1 < argc) {
+            pc_config.msaa = atoi(argv[++i]);
+            if (pc_config.msaa < 0 || pc_config.msaa > 16) {
+                pc_config.msaa = 0;
+            }
+        } else if (strcmp(argv[i], "--aniso") == 0 && i + 1 < argc) {
+            pc_config.aniso = atoi(argv[++i]);
+            if (pc_config.aniso < 0 || pc_config.aniso > 16) {
+                pc_config.aniso = 0;
             }
         } else if (strcmp(argv[i], "--keymap") == 0 && i + 1 < argc) {
             pc_config.keymap = argv[++i];

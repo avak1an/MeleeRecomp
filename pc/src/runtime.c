@@ -596,9 +596,16 @@ unsigned pc_game_seed(void)
     return pc_config.seed != 0 ? pc_config.seed : (unsigned) host_ticks();
 }
 
+/* The console's time base counts from 2000-01-01 (the real-time clock);
+ * the calendar offset at start-up is added so save comments and the
+ * clock-dependent screens show today's date. */
 OSTime OSGetTime(void)
 {
-    return host_ticks();
+    static OSTime epoch;
+    if (epoch == 0) {
+        epoch = (OSTime) (time(NULL) - 946684800) * (OSTime) (__OSBusClock / 4);
+    }
+    return host_ticks() + epoch;
 }
 
 void OSTicksToCalendarTime(OSTime ticks, OSCalendarTime* td)

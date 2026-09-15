@@ -37,6 +37,18 @@ enum {
     IDC_SCALE_2,
     IDC_SCALE_3,
     IDC_SCALE_4,
+    IDC_INTERNAL_0, /* window, 1x .. 4x */
+    IDC_INTERNAL_1,
+    IDC_INTERNAL_2,
+    IDC_INTERNAL_3,
+    IDC_INTERNAL_4,
+    IDC_MSAA_0, /* off, 2x, 4x, 8x */
+    IDC_MSAA_1,
+    IDC_MSAA_2,
+    IDC_MSAA_3,
+    IDC_ANISO_0, /* off, 4x, 16x */
+    IDC_ANISO_1,
+    IDC_ANISO_2,
     IDC_FULLSCREEN,
     IDC_NO_CONSOLE,
     IDC_VOLUME,
@@ -748,6 +760,9 @@ static void mods_move(int delta)
 static int scale_get(void);
 static int volume_get(void);
 static int toggle_get(int id);
+static int seg_get(int first, int n, int def);
+static const int msaa_values[4] = { 0, 2, 4, 8 };
+static const int aniso_values[3] = { 0, 4, 16 };
 
 static void save_settings(void)
 {
@@ -755,6 +770,9 @@ static void save_settings(void)
     get_text(IDC_ISO_EDIT, buf, sizeof(buf));
     ini_set("iso", buf);
     ini_set_int("scale", scale_get());
+    ini_set_int("internal", seg_get(IDC_INTERNAL_0, 5, 0));
+    ini_set_int("msaa", msaa_values[seg_get(IDC_MSAA_0, 4, 0)]);
+    ini_set_int("aniso", aniso_values[seg_get(IDC_ANISO_0, 3, 0)]);
     ini_set_int("fullscreen", toggle_get(IDC_FULLSCREEN));
     ini_set_int("no_console", toggle_get(IDC_NO_CONSOLE));
     ini_set_int("volume", volume_get());
@@ -958,6 +976,8 @@ static void play(void)
     if (toggle_get(IDC_FULLSCREEN)) {
         n += (size_t) snprintf(args + n, sizeof(args) - n, " --fullscreen");
     }
+    n += (size_t) snprintf(args + n, sizeof(args) - n, " --internal %d --msaa %d --aniso %d", seg_get(IDC_INTERNAL_0, 5, 0),
+                           msaa_values[seg_get(IDC_MSAA_0, 4, 0)], aniso_values[seg_get(IDC_ANISO_0, 3, 0)]);
     if (toggle_get(IDC_MUTE)) {
         n += (size_t) snprintf(args + n, sizeof(args) - n, " --no-audio");
     }
@@ -1109,7 +1129,7 @@ static const struct {
     wchar_t icon;
     int h;
 } card_info[CARD_COUNT] = {
-    { "Super Smash Bros. Melee", 0, 196 }, { "Build", 0xE90F, 172 },   { "Display", 0xE7F4, 184 },
+    { "Super Smash Bros. Melee", 0, 196 }, { "Build", 0xE90F, 172 },   { "Display", 0xE7F4, 322 },
     { "Audio", 0xE767, 184 },              { "Controls", 0xE7FC, 200 }, { "Saves", 0xE74E, 280 },
     { "Mods", 0xEA86, 280 },               { "Advanced", 0xE9E9, 150 },
 };
@@ -1215,6 +1235,27 @@ static void scale_set(int scale)
         InvalidateRect(ctl(IDC_SCALE_1 + i), NULL, FALSE);
     }
     InvalidateRect(content_wnd, NULL, FALSE);
+}
+
+/* a row of segment buttons: which one is on */
+static int seg_get(int first, int n, int def)
+{
+    int i;
+    for (i = 0; i < n; i++) {
+        if (INFO(first + i).state) {
+            return i;
+        }
+    }
+    return def;
+}
+
+static void seg_set(int first, int n, int which)
+{
+    int i;
+    for (i = 0; i < n; i++) {
+        INFO(first + i).state = (i == which);
+        InvalidateRect(ctl(first + i), NULL, FALSE);
+    }
 }
 
 static int volume_get(void)
@@ -1733,6 +1774,20 @@ static void build_ui(void)
     for (i = 0; i < 4; i++) {
         button(scales[i], IDC_SCALE_1 + i, CARD_DISPLAY, K_SEGMENT, 0);
     }
+    {
+        static const char* internal[] = { "Window", "1x", "2x", "3x", "4x" };
+        static const char* msaa[] = { "Off", "2x", "4x", "8x" };
+        static const char* aniso[] = { "Off", "4x", "16x" };
+        for (i = 0; i < 5; i++) {
+            button(internal[i], IDC_INTERNAL_0 + i, CARD_DISPLAY, K_SEGMENT, 0);
+        }
+        for (i = 0; i < 4; i++) {
+            button(msaa[i], IDC_MSAA_0 + i, CARD_DISPLAY, K_SEGMENT, 0);
+        }
+        for (i = 0; i < 3; i++) {
+            button(aniso[i], IDC_ANISO_0 + i, CARD_DISPLAY, K_SEGMENT, 0);
+        }
+    }
     button("Full screen (F11 or Alt+Enter in the game)", IDC_FULLSCREEN, CARD_DISPLAY, K_TOGGLE, 0);
     button("Hide the console window (output in melee.log)", IDC_NO_CONSOLE, CARD_DISPLAY, K_TOGGLE, 0);
 
@@ -1842,8 +1897,19 @@ static void layout_card(int c, RECT rc)
         for (i = 0; i < 4; i++) {
             place(IDC_SCALE_1 + i, x + S(100) + i * S(60), row, S(54), S(32));
         }
-        place(IDC_FULLSCREEN, x, row + S(46), w, S(24));
-        place(IDC_NO_CONSOLE, x, row + S(78), w, S(24));
+        /* the first choice is a word, the others a factor */
+        place(IDC_INTERNAL_0, x + S(100), row + S(46), S(68), S(32));
+        for (i = 1; i < 5; i++) {
+            place(IDC_INTERNAL_0 + i, x + S(100) + S(72) + (i - 1) * S(48), row + S(46), S(44), S(32));
+        }
+        for (i = 0; i < 4; i++) {
+            place(IDC_MSAA_0 + i, x + S(100) + i * S(60), row + S(92), S(54), S(32));
+        }
+        for (i = 0; i < 3; i++) {
+            place(IDC_ANISO_0 + i, x + S(100) + i * S(60), row + S(138), S(54), S(32));
+        }
+        place(IDC_FULLSCREEN, x, row + S(184), w, S(24));
+        place(IDC_NO_CONSOLE, x, row + S(216), w, S(24));
         break;
     }
     case CARD_AUDIO:
@@ -2117,6 +2183,9 @@ static void paint_card_body(HDC dc, int c, RECT rc)
             text(dc, font_small, C_TEXT_DIM, x + S(100) + 4 * S(60), row, right - (x + S(100) + 4 * S(60)), S(32),
                  res[scale_get() - 1], DT_SINGLELINE | DT_VCENTER | DT_RIGHT);
         }
+        text(dc, ui_font, C_TEXT, x, row + S(46), S(96), S(32), "Rendering", DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+        text(dc, ui_font, C_TEXT, x, row + S(92), S(96), S(32), "Anti-aliasing", DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+        text(dc, ui_font, C_TEXT, x, row + S(138), S(96), S(32), "Anisotropic", DT_SINGLELINE | DT_VCENTER | DT_LEFT);
         break;
     }
     case CARD_AUDIO:
@@ -2158,7 +2227,8 @@ static void paint_card_body(HDC dc, int c, RECT rc)
     case CARD_SAVES:
         text(dc, font_small, C_TEXT_DIM, x, row + S(92), w, S(80),
              "Leave the folder empty for the saves folder next to melee.exe. The game creates its save file on "
-             "first boot. Slot A is a virtual memory card; slot B is always empty.",
+             "first boot into MemoryCardA.USA.raw, the format Dolphin uses: copy the file to or from "
+             "Dolphin's card folder, or drop a .gci file here to import it. Slot B is always empty.",
              DT_WORDBREAK);
         break;
     case CARD_MODS:
@@ -2286,6 +2356,12 @@ static void load_settings(void)
     refresh_iso_status();
     i = ini_get_int("scale", 2);
     scale_set(i >= 1 && i <= 4 ? i : 2);
+    i = ini_get_int("internal", 0);
+    seg_set(IDC_INTERNAL_0, 5, i >= 0 && i <= 4 ? i : 0);
+    i = ini_get_int("msaa", 0);
+    seg_set(IDC_MSAA_0, 4, i == 2 ? 1 : i == 4 ? 2 : i == 8 ? 3 : 0);
+    i = ini_get_int("aniso", 0);
+    seg_set(IDC_ANISO_0, 3, i == 4 ? 1 : i == 16 ? 2 : 0);
     toggle_set(IDC_FULLSCREEN, ini_get_int("fullscreen", 0));
     toggle_set(IDC_NO_CONSOLE, ini_get_int("no_console", 0));
     i = ini_get_int("volume", 100);
@@ -2327,6 +2403,18 @@ static void on_command(int id, int code)
     }
     if (id >= IDC_SCALE_1 && id <= IDC_SCALE_4) {
         scale_set(id - IDC_SCALE_1 + 1);
+        return;
+    }
+    if (id >= IDC_INTERNAL_0 && id <= IDC_INTERNAL_4) {
+        seg_set(IDC_INTERNAL_0, 5, id - IDC_INTERNAL_0);
+        return;
+    }
+    if (id >= IDC_MSAA_0 && id <= IDC_MSAA_3) {
+        seg_set(IDC_MSAA_0, 4, id - IDC_MSAA_0);
+        return;
+    }
+    if (id >= IDC_ANISO_0 && id <= IDC_ANISO_2) {
+        seg_set(IDC_ANISO_0, 3, id - IDC_ANISO_0);
         return;
     }
     if (INFO(id).kind == K_TOGGLE) {

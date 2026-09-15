@@ -56,6 +56,8 @@ void pc_swap_ext_attrs(void* attrs, size_t size, int sword_off);
 struct FigaTree;
 void pc_swap_figatree(struct FigaTree* tree);
 void pc_swap_rumble_data(void* table);
+/* save_swap.c: a memory-card payload between host and console order */
+void pc_card_swap_payload(void* payload, int size, int to_console);
 void pc_swap_trophy_tables(void* init_tbl, void* init_d_tbl, void* sort_tbl, void* exp_tbl,
                            void* no_get_us_tbl, void* display_tbl, void* display_us_tbl);
 

@@ -9,6 +9,9 @@
 #include <melee/gm/gm_unsplit.h>
 #include <melee/gm/gmmain_lib.h>
 #include <melee/if/textlib.h>
+#ifdef TARGET_PC
+#include <pc_endian.h>
+#endif
 #include <sysdolphin/baselib/cobj.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjgxlink.h>
@@ -308,6 +311,20 @@ void lb_8001D21C(void)
     _p(xC) = 0;
     _p(x10) = 0;
     _p(x14) = 0;
+#ifdef TARGET_PC
+    {
+        /* the icon descriptor is read byte-wise by the card library
+         * (banner format, icon formats, frame flags): its words are kept
+         * in console order so the byte view matches */
+        static int swapped;
+        if (!swapped) {
+            swapped = 1;
+            pc_swap32(&lb_803BAB60.x0);
+            pc_swap32(&lb_803BAB60.x4);
+            pc_swap32(&lb_803BAB60.x8);
+        }
+    }
+#endif
     lb_803BAB74[1].data = (u8*) gmMainLib_GetSaveData();
 
     for (i = 0; i < 7; i++) {

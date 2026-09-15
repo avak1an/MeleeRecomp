@@ -1,6 +1,7 @@
 #include "hsd_3A94.h"
 #ifdef TARGET_PC
 #include "pc_runtime.h"
+#include <pc_game_swap.h>
 #include <stdlib.h>
 #endif
 
@@ -199,6 +200,9 @@ void hsd_803A949C(s32 chan, s32 arg1)
                 if (CMD_PTR(0x28) != NULL) {
                     u8* src = (u8*) (offset + (u32) state->x0);
                     memcpy(CMD_PTR(0x28), src + 0x20, CMD_S32(0x30));
+#ifdef TARGET_PC
+                    pc_card_swap_payload(CMD_PTR(0x28), CMD_S32(0x30), 0);
+#endif
                 }
             }
             result = hsd_803A949C_Close(state);
@@ -210,6 +214,9 @@ void hsd_803A949C(s32 chan, s32 arg1)
             }
             if (CMD_S32(0x30) > 0 && CMD_PTR(0x28) != NULL) {
                 memcpy((void*) CMD_S32(0x28), state->x0 + 0x20, CMD_S32(0x30));
+#ifdef TARGET_PC
+                pc_card_swap_payload(CMD_PTR(0x28), CMD_S32(0x30), 0);
+#endif
             }
             result = hsd_803A949C_Close(state);
         }
@@ -705,6 +712,22 @@ s32 fn_803AA790(void)
 #define CMD_X1C cmd[7]
 #define CMD_X20 cmd[8]
 
+#ifdef TARGET_PC
+/* A sector carries a whole sector's worth of an entry (the copy over-reads
+ * past a short entry, as on the console); the entry itself starts where
+ * the copy starts from the entry's buffer, and that is what is converted
+ * to console byte order. */
+static void pc_swap_entry_out(CardState* state, s32 idx, const void* src,
+                              void* dst, s32 size)
+{
+    if (state != NULL && idx >= 0 && idx < 9 && src == state->x70[idx].ptr &&
+        state->x4C[idx] > 0 && state->x4C[idx] <= size)
+    {
+        pc_card_swap_payload(dst, state->x4C[idx], 1);
+    }
+}
+#endif
+
 static inline s32 retryCardFastOpen(s32 chan, s32 file_no,
                                     CARDFileInfo* file_info)
 {
@@ -1172,6 +1195,10 @@ void hsd_803AAA48(void)
                 size = CMD_X20;
                 if (size > 0 && CMD_X18 != NULL) {
                     memcpy(&CMD_STATE->x0[hdr_offset + 0x20], CMD_X18, size);
+#ifdef TARGET_PC
+                    pc_swap_entry_out(CMD_STATE, CMD_X8, CMD_X18,
+                                      &CMD_STATE->x0[hdr_offset + 0x20], size);
+#endif
                 }
                 rem = (CMD_STATE->x8 - hdr_offset) - size - 0x20;
                 if (rem != 0) {
@@ -2118,6 +2145,11 @@ s32 fn_803ACFC0(CardState* state, s32 block_idx, s32 file_id, s32 seq_num,
     if (payload_size > 0) {
         memcpy(&fn_803ACFC0_header(state, hdr_offset)[0x20], payload,
                payload_size);
+#ifdef TARGET_PC
+        pc_swap_entry_out(state, version, payload,
+                          &fn_803ACFC0_header(state, hdr_offset)[0x20],
+                          payload_size);
+#endif
     }
 
     {
@@ -2787,6 +2819,9 @@ static inline s32 readCardDataBlockFirst(CardState* state, u32 sector_size,
     }
     if (length != 0 && dst != NULL) {
         memcpy(dst, state->x0 + (read_ofs + 0x20), length);
+#ifdef TARGET_PC
+        pc_card_swap_payload(dst, length, 0);
+#endif
     }
     return 0;
 }
@@ -2828,6 +2863,9 @@ static inline s32 readCardDataBlockFinal(CardState* state, u32 sector_size,
     }
     if (length != 0 && dst != NULL) {
         memcpy(dst, state->x0 + (read_ofs + 0x20), length);
+#ifdef TARGET_PC
+        pc_card_swap_payload(dst, length, 0);
+#endif
     }
     return 0;
 }

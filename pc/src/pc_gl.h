@@ -70,6 +70,21 @@ typedef void(APIENTRY* PFN_glFramebufferTexture2D)(GLenum, GLenum, GLenum, GLuin
 typedef void(APIENTRY* PFN_glBlitFramebuffer)(GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum);
 typedef void(APIENTRY* PFN_glDrawRangeElements)(GLenum, GLuint, GLuint, GLsizei, GLenum, const void*);
 typedef void(APIENTRY* PFN_glGenBuffers)(GLsizei, GLuint*);
+typedef void(APIENTRY* PFN_glGenRenderbuffers)(GLsizei, GLuint*);
+typedef void(APIENTRY* PFN_glDeleteRenderbuffers)(GLsizei, const GLuint*);
+typedef void(APIENTRY* PFN_glBindRenderbuffer)(GLenum, GLuint);
+typedef void(APIENTRY* PFN_glRenderbufferStorage)(GLenum, GLenum, GLsizei, GLsizei);
+typedef void(APIENTRY* PFN_glRenderbufferStorageMultisample)(GLenum, GLsizei, GLenum, GLsizei, GLsizei);
+typedef void(APIENTRY* PFN_glFramebufferRenderbuffer)(GLenum, GLenum, GLenum, GLuint);
+typedef void(APIENTRY* PFN_glDeleteFramebuffers)(GLsizei, const GLuint*);
+#define GL_RENDERBUFFER 0x8D41
+#define GL_RGBA8 0x8058
+#define GL_DEPTH24_STENCIL8 0x88F0
+#define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
+#define GL_FRAMEBUFFER_COMPLETE 0x8CD5
+#define GL_MAX_SAMPLES 0x8D57
+#define GL_TEXTURE_MAX_ANISOTROPY_EXT 0x84FE
+#define GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT 0x84FF
 typedef void(APIENTRY* PFN_glBindBuffer)(GLenum, GLuint);
 typedef void(APIENTRY* PFN_glBufferStorage)(GLenum, GLsizeiptr, const void*, GLbitfield);
 typedef void*(APIENTRY* PFN_glMapBufferRange)(GLenum, GLintptr, GLsizeiptr, GLbitfield);
@@ -117,6 +132,13 @@ extern PFN_glFramebufferTexture2D pc_glFramebufferTexture2D;
 extern PFN_glBlitFramebuffer pc_glBlitFramebuffer;
 extern PFN_glDrawRangeElements pc_glDrawRangeElements;
 extern PFN_glGenBuffers pc_glGenBuffers;
+extern PFN_glGenRenderbuffers pc_glGenRenderbuffers;
+extern PFN_glDeleteRenderbuffers pc_glDeleteRenderbuffers;
+extern PFN_glBindRenderbuffer pc_glBindRenderbuffer;
+extern PFN_glRenderbufferStorage pc_glRenderbufferStorage;
+extern PFN_glRenderbufferStorageMultisample pc_glRenderbufferStorageMultisample;
+extern PFN_glFramebufferRenderbuffer pc_glFramebufferRenderbuffer;
+extern PFN_glDeleteFramebuffers pc_glDeleteFramebuffers;
 extern PFN_glBindBuffer pc_glBindBuffer;
 extern PFN_glBufferStorage pc_glBufferStorage;
 extern PFN_glMapBufferRange pc_glMapBufferRange;

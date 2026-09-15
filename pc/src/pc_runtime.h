@@ -36,6 +36,9 @@ typedef struct PCConfig {
     bool quiet_stubs;    ///< --quiet-stubs: also silences informational prints
     bool fullscreen;     ///< start in a borderless full-screen window
     int scale;           ///< initial window size, in multiples of 640x480 (default 1)
+    int internal_scale;  ///< --internal: render at N x 640x480 (0 = the window's size)
+    int msaa;            ///< --msaa: multisample anti-aliasing samples (0 = off)
+    int aniso;           ///< --aniso: anisotropic texture filtering (0/1 = off)
     const char* keymap;  ///< keyboard layout file (see pad.c)
     int volume;          ///< audio output volume in percent (default 100)
     bool no_audio;       ///< do not open the audio device

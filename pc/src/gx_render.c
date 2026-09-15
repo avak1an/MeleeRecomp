@@ -202,6 +202,7 @@ static u32 indices_cap;
  * them strips of one model sharing every state. */
 static u32 batch_verts, batch_idx, batch_min; /* batch_min: first vertex the batch refers to */
 static u32 stats_gl_draws;
+static float aniso_max; /* the driver's anisotropic filtering limit (0 = none) */
 static double prof_ms[9]; /* frame, draws, shader, texture, copy, present, vertex decode+transform, param upload, gl draw */
 static GLuint unit_tex[9];      /* the texture bound to each unit (0xFFFFFFFF = unknown); 8 = the parameter texture */
 static int active_unit;
@@ -1292,6 +1293,10 @@ static GLuint bind_texture(const PCTexObj* t, int unit)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, gl_wrap(t->wrap_s));
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, gl_wrap(t->wrap_t));
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, t->mag_filt == GX_NEAR ? GL_NEAREST : GL_LINEAR);
+            if (aniso_max > 1.0f && pc_config.aniso > 1) {
+                float a = (float) pc_config.aniso;
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, a > aniso_max ? aniso_max : a);
+            }
             e->params_set = 1;
             e->p_min = min_filter;
             e->p_wrap_s = t->wrap_s;
@@ -1993,13 +1998,191 @@ static struct {
 static Shader* attrib_shader;   /* whose vertex attributes are set up ... */
 static void* attrib_base;       /* ... for this vertex buffer */
 
+/* --- The scene framebuffer ------------------------------------------------
+ * The frame is rendered into an off-screen framebuffer of its own size:
+ * `--internal N` times 640x480, or the window's 4:3 area when N is 0 (the
+ * default). With `--msaa` it is multisampled and resolved on the way out.
+ * The EFB copies, the screenshots and the present read it back; the
+ * present scales it into the window. Without the framebuffer extensions
+ * (or if creating it fails) the frame is drawn straight into the window
+ * as before. */
+static GLuint scene_fbo, scene_color, scene_depth, resolve_fbo, resolve_color;
+static int scene_w, scene_h, scene_samples, scene_failed;
+
+static void scene_destroy(void)
+{
+    if (scene_fbo != 0) {
+        pc_glDeleteFramebuffers(1, &scene_fbo);
+        pc_glDeleteRenderbuffers(1, &scene_color);
+        pc_glDeleteRenderbuffers(1, &scene_depth);
+    }
+    if (resolve_fbo != 0) {
+        pc_glDeleteFramebuffers(1, &resolve_fbo);
+        pc_glDeleteRenderbuffers(1, &resolve_color);
+    }
+    scene_fbo = scene_color = scene_depth = resolve_fbo = resolve_color = 0;
+    scene_w = scene_h = scene_samples = 0;
+}
+
+static int scene_create(int w, int h, int samples)
+{
+    pc_glGenFramebuffers(1, &scene_fbo);
+    pc_glGenRenderbuffers(1, &scene_color);
+    pc_glGenRenderbuffers(1, &scene_depth);
+    pc_glBindRenderbuffer(GL_RENDERBUFFER, scene_color);
+    if (samples > 0) {
+        pc_glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, w, h);
+    } else {
+        pc_glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, w, h);
+    }
+    pc_glBindRenderbuffer(GL_RENDERBUFFER, scene_depth);
+    if (samples > 0) {
+        pc_glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH24_STENCIL8, w, h);
+    } else {
+        pc_glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);
+    }
+    pc_glBindFramebuffer(GL_FRAMEBUFFER, scene_fbo);
+    pc_glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, scene_color);
+    pc_glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, scene_depth);
+    if (pc_glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        pc_glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        scene_destroy();
+        return 0;
+    }
+    if (samples > 0) {
+        pc_glGenFramebuffers(1, &resolve_fbo);
+        pc_glGenRenderbuffers(1, &resolve_color);
+        pc_glBindRenderbuffer(GL_RENDERBUFFER, resolve_color);
+        pc_glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, w, h);
+        pc_glBindFramebuffer(GL_FRAMEBUFFER, resolve_fbo);
+        pc_glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolve_color);
+        if (pc_glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            pc_glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            scene_destroy();
+            return 0;
+        }
+    }
+    pc_glBindFramebuffer(GL_FRAMEBUFFER, scene_fbo);
+    scene_w = w;
+    scene_h = h;
+    scene_samples = samples;
+    glGetError();
+    return 1;
+}
+
+/* (Re)create the scene framebuffer for the current window and options. */
+static void ensure_scene_target(void)
+{
+    int vx, vy, vw, vh, w, h, samples;
+    if (!scene_failed && getenv("MELEE_GX_NOFBO") != NULL) {
+        scene_failed = 1; /* MELEE_GX_NOFBO=1: draw straight into the window */
+    }
+    if (scene_failed || pc_glGenFramebuffers == NULL || pc_glGenRenderbuffers == NULL ||
+        pc_glBlitFramebuffer == NULL || pc_glFramebufferRenderbuffer == NULL)
+    {
+        return;
+    }
+    pc_window_viewport(&vx, &vy, &vw, &vh);
+    if (pc_config.internal_scale > 0) {
+        w = EFB_W * pc_config.internal_scale;
+        h = EFB_H * pc_config.internal_scale;
+    } else {
+        w = vw;
+        h = vh;
+    }
+    samples = pc_config.msaa;
+    if (samples == 1) {
+        samples = 0;
+    }
+    if (samples > 0) {
+        GLint max_samples = 0;
+        glGetIntegerv(GL_MAX_SAMPLES, &max_samples);
+        if (samples > max_samples) {
+            samples = max_samples;
+        }
+    }
+    if (scene_fbo != 0 && scene_w == w && scene_h == h && scene_samples == samples) {
+        return;
+    }
+    flush_batch();
+    scene_destroy();
+    if (!scene_create(w, h, samples) && !(samples > 0 && scene_create(w, h, 0))) {
+        scene_failed = 1;
+        fprintf(stderr, "[gx] scene framebuffer %dx%d could not be created: drawing into the window\n", w, h);
+        return;
+    }
+    rs.valid = 0;
+    fprintf(stderr, "[gx] rendering at %dx%d%s%s\n", scene_w, scene_h,
+            scene_samples > 0 ? ", multisampled x" : "", scene_samples > 0 ? "" : "");
+    if (scene_samples > 0) {
+        fprintf(stderr, "[gx] anti-aliasing: %d samples\n", scene_samples);
+    }
+}
+
+static void bind_scene(void)
+{
+    pc_glBindFramebuffer(GL_FRAMEBUFFER, scene_fbo);
+}
+
+/* The rectangle the frame is rendered into: the whole scene framebuffer,
+ * or the window's 4:3 area when drawing straight into the window. */
+static void target_rect(int* x, int* y, int* w, int* h)
+{
+    if (scene_fbo == 0 && !scene_failed && rendering) {
+        ensure_scene_target();
+    }
+    if (scene_fbo != 0) {
+        *x = 0;
+        *y = 0;
+        *w = scene_w;
+        *h = scene_h;
+    } else {
+        pc_window_viewport(x, y, w, h);
+    }
+}
+
+/* A framebuffer the region can be read from: the scene itself, or, when it
+ * is multisampled, the resolve buffer with that region resolved into it. */
+static GLuint scene_read_fbo(GLint x, GLint y, GLsizei w, GLsizei h)
+{
+    if (scene_fbo != 0 && scene_samples > 0) {
+        flush_batch();
+        glDisable(GL_SCISSOR_TEST);
+        rs.valid = 0;
+        pc_glBindFramebuffer(GL_READ_FRAMEBUFFER, scene_fbo);
+        pc_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolve_fbo);
+        pc_glBlitFramebuffer(x, y, x + w, y + h, x, y, x + w, y + h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        return resolve_fbo;
+    }
+    return scene_fbo;
+}
+
+/* Scale the finished frame into the window. */
+static void present_scene(void)
+{
+    int vx, vy, vw, vh;
+    GLuint src;
+    if (scene_fbo == 0) {
+        return;
+    }
+    flush_batch();
+    pc_window_viewport(&vx, &vy, &vw, &vh);
+    src = scene_read_fbo(0, 0, scene_w, scene_h);
+    glDisable(GL_SCISSOR_TEST);
+    rs.valid = 0;
+    pc_glBindFramebuffer(GL_READ_FRAMEBUFFER, src);
+    pc_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    pc_glBlitFramebuffer(0, 0, scene_w, scene_h, vx, vy, vx + vw, vy + vh, GL_COLOR_BUFFER_BIT,
+                         (vw == scene_w && vh == scene_h) ? GL_NEAREST : GL_LINEAR);
+}
+
 static void apply_raster_state(void)
 {
     int vx, vy, vw, vh;
     float sx, sy;
     GLint vp[4], sc[4];
     int cull;
-    pc_window_viewport(&vx, &vy, &vw, &vh);
+    target_rect(&vx, &vy, &vw, &vh);
     sx = (float) vw / EFB_W;
     sy = (float) vh / EFB_H;
 
@@ -2464,6 +2647,17 @@ static void gpu_path_init(void)
     fprintf(stderr, "[gx] vertex path: GPU\n");
 }
 
+static void aniso_init(void)
+{
+    const char* ext = (const char*) glGetString(GL_EXTENSIONS);
+    if (ext != NULL && strstr(ext, "GL_EXT_texture_filter_anisotropic") != NULL) {
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso_max);
+        if (pc_config.aniso > 1) {
+            fprintf(stderr, "[gx] anisotropic filtering: x%d (the driver allows x%.0f)\n", pc_config.aniso, aniso_max);
+        }
+    }
+}
+
 /* what the attribute pointers were last set up for */
 static void* vbuf_id(void)
 {
@@ -2556,6 +2750,7 @@ static Shader* draw_setup(void)
     }
     if (gpu_path < 0) {
         gpu_path_init();
+        aniso_init();
     }
     if (use_ring < 0) {
         ring_init();
@@ -3784,7 +3979,12 @@ static void save_screenshot(void)
     u8* pixels;
     u8 hdr[54];
     u32 row_bytes, size;
-    pc_window_size(&w, &h);
+    if (scene_fbo != 0) {
+        w = scene_w;
+        h = scene_h;
+    } else {
+        pc_window_size(&w, &h);
+    }
     row_bytes = ((u32) w * 3 + 3) & ~3u;
     size = row_bytes * (u32) h;
     pixels = (u8*) calloc(size, 1);
@@ -3793,8 +3993,16 @@ static void save_screenshot(void)
     }
     flush_batch();
     glPixelStorei(GL_PACK_ALIGNMENT, 4);
-    glReadBuffer(GL_BACK);
+    if (scene_fbo != 0) {
+        pc_glBindFramebuffer(GL_READ_FRAMEBUFFER, scene_read_fbo(0, 0, w, h));
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+    } else {
+        glReadBuffer(GL_BACK);
+    }
     glReadPixels(0, 0, w, h, GL_BGR_EXT, GL_UNSIGNED_BYTE, pixels);
+    if (scene_fbo != 0) {
+        pc_glBindFramebuffer(GL_FRAMEBUFFER, scene_fbo);
+    }
     snprintf(path, sizeof(path), "%s/frame%05u.bmp", pc_config.screenshot_dir, frame_no);
     f = fopen(path, "wb");
     if (f == NULL) {
@@ -3843,7 +4051,10 @@ void GXCopyDisp(void* dest, GXBool clear)
     {
         static double frame_start;
         double t0 = prof_now(), t1;
+        present_scene();
         pc_window_present();
+        ensure_scene_target(); /* the window may have been resized */
+        bind_scene();
         t1 = prof_now();
         prof_ms[5] += t1 - t0;
         if (prof_on < 0) {
@@ -3925,7 +4136,7 @@ void GXCopyTex(void* dest, GXBool clear)
     e->height = tex_copy.ht;
     {
         int vx, vy, vw, vh;
-        pc_window_viewport(&vx, &vy, &vw, &vh);
+        target_rect(&vx, &vy, &vw, &vh);
         sx = (float) vw / EFB_W;
         sy = (float) vh / EFB_H;
         /* GX textures start at the top row, GL framebuffers at the bottom
@@ -3959,12 +4170,15 @@ void GXCopyTex(void* dest, GXBool clear)
                 e->gl_w = rw;
                 e->gl_h = rh;
             }
-            pc_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
-            pc_glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, e->tex, 0);
-            pc_glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+            {
+                GLuint src = scene_read_fbo(rx, ry, rw, rh);
+                pc_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+                pc_glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, e->tex, 0);
+                pc_glBindFramebuffer(GL_READ_FRAMEBUFFER, src);
+            }
             glDisable(GL_SCISSOR_TEST);
             pc_glBlitFramebuffer(rx, ry, rx + rw, ry + rh, 0, rh, rw, 0, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-            pc_glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            pc_glBindFramebuffer(GL_FRAMEBUFFER, scene_fbo);
             rs.valid = 0;
             prof_ms[4] += prof_now() - t0;
         } else if (rw > 0 && rh > 0) {
@@ -3978,8 +4192,14 @@ void GXCopyTex(void* dest, GXBool clear)
                 GLsizei y;
                 double t0 = prof_now();
                 flush_batch();
+                if (scene_fbo != 0) {
+                    pc_glBindFramebuffer(GL_READ_FRAMEBUFFER, scene_read_fbo(rx, ry, rw, rh));
+                }
                 glPixelStorei(GL_PACK_ALIGNMENT, 1);
                 glReadPixels(rx, ry, rw, rh, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+                if (scene_fbo != 0) {
+                    pc_glBindFramebuffer(GL_FRAMEBUFFER, scene_fbo);
+                }
                 prof_ms[4] += prof_now() - t0;
                 for (y = 0; y < rh / 2; y++) {
                     u8* a = buf + (size_t) y * row;

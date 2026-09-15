@@ -57,7 +57,7 @@ are swapped and the demo route was pushed through more stages, which
 found and fixed two compiler-layout differences (bit-field packing) and
 one more adjacent-globals case (Mute City).
 
-**Milestone 6 (play-through coverage) - in progress.** Scripted routes
+**Milestone 6 (play-through coverage) - done.** Scripted routes
 now go through the VS character select (port 1 human, port 2 CPU), the
 stage select, a full timed match and its results screen, and through
 Classic mode's first seven stages including the stage-clear bonus screen,
@@ -69,11 +69,37 @@ value and a stack-layout trick in the blur renderer), Onett's animated
 textures (the stage code's own animation walk), and the results-screen
 camera tables (another struct laid over neighbouring globals).
 
+**Milestone 7 (every mode) - done.** Routes for Adventure, Event Match,
+Target Test, Home-Run Contest, Multi-Man Melee and Training
+(`pc/scripts/*-play.txt`), a `--stage N` sweep of every VS stage and
+`--char`, `--item`, `--kill` to steer them without a player. They found
+the tables and bit-fields those modes read (event and Multi-Man
+definitions, the Home-Run block, the menu strings), the toon texgen and
+the GX indirect-texturing and emboss-bump paths the renderer still lacked,
+and the particle-script float order behind the giant flat triangles.
+
+**Milestone 8 (performance and audio) - done.** Vertices are transformed
+and lit on the GPU from parameter blocks in a float texture, uploaded
+through a persistently mapped ring buffer, draws with identical state are
+merged, and the shader and texture caches are hashed; the four-player
+results screen went from 20 ms to under 9 ms a frame. The AX mixer gained
+the console's effect buses: the SDK's reverb and delay effects, ported
+from their PowerPC code, run on the two aux sends Melee uses.
+
+**Milestone 9 (resolution scaling and Dolphin-compatible saves) - done.**
+The scene renders into an off-screen framebuffer at the window's 4:3 size
+or an `--internal` scale (1x to 8x the console's 640x480) with multisample
+anti-aliasing and anisotropic filtering, exposed on the launcher's Display
+card. The memory card is a raw image in Dolphin's format with the game's
+data in the console's byte order, so saves move between the port,
+Dolphin and a console without conversion, and `.gci` files import.
+
 Planned:
 
-6. **More coverage.** Target Test, Home-Run Contest, the trophy scenes,
-   indirect texturing and destination alpha in the renderer, save files
-   convertible to and from real memory-card dumps.
+- Adventure mode beyond its first stage, All-Star and the ending sequence
+  (no routes yet); the open renderer questions under "Known gaps".
+- Native peer-to-peer netplay between copies of the port (the game already
+  replays deterministically from a seed).
 
 ## Building (Windows)
 
@@ -107,6 +133,7 @@ build\pc\melee.exe [--iso PATH] [--fullscreen] [--scale N] [--keymap FILE] [--vo
                     [--no-audio] [--saves DIR] [--fast] [--frames N] [--autoplay] [--input FILE]
                     [--seed N] [--quiet-stubs] [--headless] [--screenshots DIR]
                     [--screenshot-every N] [--kill SLOTS@FRAME[/N]]
+                    [--internal N] [--msaa N] [--aniso N]
 ```
 
 Run from anywhere; with the disc image next to `melee.exe` (or in the
@@ -122,10 +149,14 @@ build\pc\melee.exe --headless --quiet-stubs --input pc\scripts\title-demo.txt --
 Status 0 means two demo matches played out; a crash prints a symbolized
 backtrace and a hang is reported by the watchdog (status 8). Two more
 routes cover what the demo never shows (the frame numbers assume a save
-file exists, so run the demo route once first):
+exists, so run the demo route once first; they also assume a save without
+records, because after the first finished match the title screen's Start
+leads to the game's achievement pop-up before the menu, which shifts every
+later frame: keep a copy of the freshly created card image for the
+routes):
 
 ```
-build\pc\melee.exe --headless --quiet-stubs --input pc\scriptss-match.txt --seed 1 --frames 9500 --kill 1@700
+build\pc\melee.exe --headless --quiet-stubs --input pc\scripts\vs-match.txt --seed 1 --frames 9500 --kill 1@700
 build\pc\melee.exe --headless --quiet-stubs --input pc\scripts\classic.txt --seed 1 --frames 40000 --kill 1,2,3@900/750
 ```
 
@@ -161,6 +192,16 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
 - `--fullscreen`: start in a borderless window covering the monitor. F11
   or Alt+Enter toggles at any time.
 - `--scale N`: start with an N x 640x480 window (1-8).
+- `--internal N`: render the scene at N x 640x480 (1-8) whatever the window
+  size; the default (0) renders at the size of the window's 4:3 area, so
+  a 2x window is drawn at 1280x960 and full screen at the monitor's
+  height. Screenshots are saved at the rendering size.
+- `--msaa N`: multisample anti-aliasing with N samples (2, 4, 8; 0 off),
+  `--aniso N`: anisotropic texture filtering up to N (2-16; 0 off, the
+  console's trilinear filtering). `MELEE_GX_NOFBO=1` draws straight into
+  the window instead of the off-screen scene framebuffer (the window size
+  is then the rendering size and the three options are ignored), for
+  driver trouble.
 - `--keymap FILE`: keyboard layout for port 1, see "Controllers" below.
 - `--volume N`: audio volume in percent (default 100). `--no-audio` (or
   `MELEE_NO_AUDIO=1`) does not open the audio device at all.
@@ -265,7 +306,11 @@ and the audio starved.
 
 The window starts at 640x480 (or `--scale` times that) and can be resized
 or made full screen: the frame keeps its 4:3 shape, centred with black
-bars. Escape or closing the window ends the run. The game runs at 60
+bars. The scene is rendered into an off-screen framebuffer of the window's
+4:3 size or the `--internal` scale (multisampled with `--msaa`), which the
+EFB copies, the screenshots and the present read from, so the game's
+640x480 output scales cleanly to any window; the console's own resolution
+is the 1x setting. Escape or closing the window ends the run. The game runs at 60
 frames per second: on a 60, 120, 180 or 240 Hz display the swap chain is
 synchronized to every first, second, third or fourth refresh, on other
 rates a 1 ms timer paces the loop (the startup log's `display:` line says
@@ -317,8 +362,9 @@ this repository, the launcher's own two levels up from `build\pc` by
 default, whether Visual Studio with the C++ workload is installed, and a
 Build button that builds the game from the chosen disc in a console
 window; afterwards Play runs the `melee.exe` it built); Display (window
-size, full screen, and whether the game's console window is shown; hidden,
-the game still writes everything to `melee.log`); Audio (volume, mute);
+size, the rendering resolution, anti-aliasing and anisotropic filtering,
+full screen, and whether the game's console window is shown; hidden, the
+game still writes everything to `melee.log`); Audio (volume, mute);
 Controls (adapter state and setup, the keyboard layout file with a button
 that writes the default layout and opens it for editing); Saves (the
 folder); Mods (the list with checkboxes for enabled and buttons for
@@ -327,12 +373,28 @@ passed through as typed). Settings persist in `launcher.ini` next to it.
 The launcher scales with the monitor's DPI and uses the Segoe MDL2 icon
 font that ships with Windows 10 and 11.
 
-Saves: slot A is a virtual 64 Mbit memory card whose files are
-`<name>.sav` in the saves directory: a 96-byte header (the directory
-entry: name, size, timestamp, icon and comment locations) followed by the
-raw data the game wrote. The data is the game's own in-memory layout, so
-the files are not interchangeable with real memory-card dumps, which are
-big-endian. Slot B is always empty.
+Saves: slot A is a virtual 64 Mbit memory card kept as one raw image,
+`MemoryCardA.USA.raw` in the saves directory, in the format Dolphin uses
+for its own cards (`GC\USA\Card A\MemoryCardA.USA.raw` under Dolphin's
+user folder): the card header, the two directory copies and the two
+block-allocation tables with their checksums and update counters, and the
+data blocks. The game's own card library (`hsd_3A94.c`) writes Melee's
+file into it sector by sector exactly as on the console, with its
+per-sector digests and byte cipher, and the save payloads (the main save
+block and the seven name-tag banks) are converted to the console's byte
+order on the way in and out (`pc/src/save_swap.c`, field by field:
+records, unlock masks, trophy flags, fighter statistics, including the
+one 16-bit bit-field group the console packs from the other end). So the
+image is byte-for-byte what a GameCube writes: copy it into Dolphin's
+card folder (or the other way round) and the progress carries over, and
+a `.gci` file dropped into the saves folder is imported into the card at
+the next start (then renamed `.gci.imported`). Every write updates the
+directory and allocation table the way the SDK does, into the other copy
+first, so an interrupted write leaves the older copy valid. `.sav` files
+from earlier versions of the port are not read any more (a startup line
+says so); their data was the PC's in-memory layout and does not convert.
+Slot B is always empty. `MELEE_TRACE_CARD=1` logs every card call and
+the conversions.
 
 ## Renderer
 
@@ -631,7 +693,13 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
 - `hsd_3A94.c`: the card state machine pumps completions on entry (the
   game spins on it while a request is in flight); the command queue
   `hsd_804D2348` is addressed as `hsd_804D1138 + 0x1210`, so it is part of
-  the same block.
+  the same block. The four places that copy a save entry into a sector
+  or a sector into a save entry call `pc_card_swap_payload`, so the card
+  holds the console's byte order (a sector copy takes a whole sector's
+  worth from the entry, so the entry is recognised by its buffer address
+  and converted at its own size). `lbcardgame.c` keeps the banner/icon
+  descriptor words in console order, because the library reads them as
+  bytes.
 - Bit-field packing: Metrowerks places plain bytes that follow a group of
   `u32` bit-fields inside the bit-fields' 32-bit unit, MSVC starts a new
   unit. `mn/types.h` (`StartMeleeRules`, 48 bits then bytes) and
