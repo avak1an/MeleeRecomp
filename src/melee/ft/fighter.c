@@ -2210,6 +2210,18 @@ void Fighter_procUpdate(Fighter_GObj* gobj)
     if (fp->x221F_b3) {
         return;
     }
+#ifdef TARGET_PC
+    {
+        static int trace = -1;
+        if (trace < 0) {
+            trace = getenv("MELEE_TRACE_POS") != NULL;
+        }
+        if (trace) {
+            OSReport("[pc] frame %u: P%d pos (%.2f %.2f) self_vel %.3f %.3f motion %d\n", pc_frame_count,
+                     fp->player_id + 1, fp->cur_pos.x, fp->cur_pos.y, fp->self_vel.x, fp->self_vel.y, fp->motion_id);
+        }
+    }
+#endif
 
     if (!fp->x2219_b5) {
         Vec3* p_kb_vel;

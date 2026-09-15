@@ -218,7 +218,7 @@ void pc_swap_stage_data(struct UnkStageDat* map_head, struct GroundParam* param,
 /* --- Fighter ----------------------------------------------------------------
  * The "ftData" root of Pl*.dat: attributes, animation tables, hurt boxes and
  * assorted tables of floats. Tables whose length is not known yet (x1C,
- * x28, x48, x50, ext_attr) are left alone until code that reads them is
+ * x28, x48, ext_attr) are left alone until code that reads them is
  * reached. */
 
 static void swap_anim_table(struct Fighter_WaitAnimData* t, int count)
@@ -370,6 +370,12 @@ void pc_swap_ftdata(struct ftData* d, int anim_count, int alt_anim_count, int co
     }
     swap_anim_table(d->xC, anim_count);
     swap_anim_table(d->x14, alt_anim_count);
+    /* x50: the body-push pair {centre offset, half width} that becomes
+     * fp->x2C4 (ftchangeparam.c); unswapped, the half width was a
+     * byte-reversed float and fighters pushed each other from far away */
+    if (d->x50 != NULL && pc_swap_once(d->x50)) {
+        pc_swap32_range(d->x50, 2 * 4);
+    }
     /* x24: wait animation table {int anim_id; int weight}, anim_id -1 ends */
     if (d->x24 != NULL && pc_swap_once(d->x24)) {
         s32* w = (s32*) d->x24;

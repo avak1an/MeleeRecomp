@@ -243,6 +243,9 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
 - `--screenshot-from N`: with `--screenshots`, start saving at frame N.
 - `MELEE_POKEMON=N`: every Poke Ball releases item kind N (165 Weezing);
   `MELEE_CPU_LEVEL=N`: ports 2-4 play at CPU level N.
+- `MELEE_TRACE_POS=1`: every fighter's position, own velocity and motion
+  state every frame (for movement that has no visible cause, such as the
+  body push between fighters standing next to each other).
 - `MELEE_GX_PROFILE=1` (or `--profile`): every 300 frames, where the
   frame's wall time went (vertex processing, shader and texture lookups,
   EFB copies, the present, and the rest, which is the game logic and any
