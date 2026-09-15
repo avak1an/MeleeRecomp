@@ -701,6 +701,13 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   are recognised and converted at the entry's size). `lbcardgame.c` keeps
   the banner/icon descriptor words in console order, because the library
   reads them as bytes.
+- `if/ifstatus.c`: the damage display applies its digit textures the
+  moment it requests them. The console applies a requested texture frame
+  at the next animation pass while the digit positions and the tens
+  digit's visibility change at once, so the one frame on which the
+  number changes draws the old digits in the new layout (a "0" in the
+  tens slot, the "%" over the ones digit); a display-only, one-frame
+  difference.
 - `hsd_3A64.c`: the text encoder converts UTF-8 input to Shift-JIS first
   (`pc/src/sjis.c`). The sources keep full-width text such as the
   character names as UTF-8 and the GameCube build converts every literal

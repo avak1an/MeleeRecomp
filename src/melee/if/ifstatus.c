@@ -498,6 +498,17 @@ void ifStatus_802F4EDC(HSD_GObj* gobj)
             (HSD_TexAnim*) anim_joints[0]->child->child->aobjdesc->fobjdesc);
         HSD_TObjReqAnimAll(post_digit_jobj->u.dobj->mobj->tobj, 2.0F * digit);
         HSD_AObjSetRate(post_digit_jobj->u.dobj->mobj->tobj->aobj, 0.0F);
+#ifdef TARGET_PC
+        /* The requested digit images are applied by the next frame's
+         * HSD_JObjAnimAll, while the digits' positions and the tens
+         * digit's visibility change right away, so the frame on which the
+         * number changes draws the old digits in the new layout (a "0" in
+         * the tens slot, the "%" over the ones digit). Apply them now, as
+         * the percent sign's setup above does. */
+        HSD_TObjAnim(state->jobjs[Ones]->u.dobj->mobj->tobj);
+        HSD_TObjAnim(state->jobjs[Tens]->u.dobj->mobj->tobj);
+        HSD_TObjAnim(state->jobjs[Hundreds]->u.dobj->mobj->tobj);
+#endif
     }
 
     ifStatus_UpdateDamageDisplay(state, jobj, &color, &stamina_color,
