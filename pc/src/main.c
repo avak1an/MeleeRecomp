@@ -49,6 +49,8 @@ static void usage(void)
             "  --host PORT     online play: wait for a player on UDP port PORT (you are player 1)\n"
             "  --join ADDR:PORT  online play: connect to a host (you are player 2)\n"
             "  --delay N       online play: frames of input delay, the host decides (default 2)\n"
+            "  --lockstep      online play: never predict the other player, wait for every sample\n"
+            "  --net-lag MS[,J]  online play, testing: hold outgoing packets MS (+ up to J) ms\n"
             "  --no-card       slot A is empty (online play always runs this way)\n"
             "  --quiet-stubs   do not log the first call of each SDK stub\n"
             "  --headless      no window; run the game logic only\n"
@@ -235,6 +237,13 @@ int main(int argc, char** argv)
             pc_config.net_join = argv[++i];
         } else if (strcmp(argv[i], "--delay") == 0 && i + 1 < argc) {
             pc_config.net_delay = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--lockstep") == 0) {
+            pc_config.net_lockstep = true;
+        } else if (strcmp(argv[i], "--net-lag") == 0 && i + 1 < argc) {
+            const char* spec = argv[++i];
+            const char* comma = strchr(spec, ',');
+            pc_config.net_lag = atoi(spec);
+            pc_config.net_jitter = comma != NULL ? atoi(comma + 1) : 0;
         } else if (strcmp(argv[i], "--state-hash") == 0 && i + 1 < argc) {
             pc_config.state_hash = argv[++i];
         } else if (strcmp(argv[i], "--rollback-test") == 0 && i + 1 < argc) {

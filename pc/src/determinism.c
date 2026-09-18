@@ -33,6 +33,8 @@ typedef struct {
 static Region regions[24];
 static int n_regions;
 static FILE* hash_file;
+static uint64_t* net_hashes;
+static uint32_t net_hashes_cap, net_hashes_used;
 
 /* Runtime variables that legitimately differ between two runs (host heap
  * pointers, handles, the stack cookie, the host clock's origin); they are
@@ -389,8 +391,10 @@ static int rollback_test(const void* site, uint64_t h)
             snapshot_site = site;
         }
     } else if (f % (2 * k) == 0 && f > 0 && snapshot != NULL && pc_state_frame_of(snapshot) == f - k) {
-        if (snapshot_site != site) {
-            fprintf(stderr, "[pc] rollback: frame %u: retrace site differs from frame %u's, not restored\n", f, f - k);
+        /* a snapshot carries the stack, so it can be restored from any
+         * retrace site, across scene changes too (MELEE_ROLLBACK_SAME_SITE=1
+         * restores only into the site it was taken at) */
+        if (snapshot_site != site && getenv("MELEE_ROLLBACK_SAME_SITE") != NULL) {
             return 0;
         }
         replay_until = f;
@@ -433,7 +437,23 @@ void pc_state_frame(const void* site)
                 return;
             }
         }
-        fprintf(hash_file, "%u %016llx\n", pc_frame_count, (unsigned long long) state_hash());
+        if (pc_net_active()) {
+            /* online: a frame may be simulated again after a rollback, and
+             * only its last hash counts, so they are written at exit */
+            uint32_t f = pc_frame_count;
+            if (f >= net_hashes_cap) {
+                uint32_t cap = f + 4096;
+                net_hashes = (uint64_t*) realloc(net_hashes, cap * sizeof(uint64_t));
+                memset(net_hashes + net_hashes_cap, 0, (cap - net_hashes_cap) * sizeof(uint64_t));
+                net_hashes_cap = cap;
+            }
+            net_hashes[f] = state_hash();
+            if (f + 1 > net_hashes_used) {
+                net_hashes_used = f + 1;
+            }
+        } else {
+            fprintf(hash_file, "%u %016llx\n", pc_frame_count, (unsigned long long) state_hash());
+        }
     }
     /* with the rollback test, a dump is taken on the first pass over a
      * frame and a diff on the re-simulation of it, so
@@ -450,6 +470,14 @@ void pc_state_frame(const void* site)
 
 void pc_state_close(void)
 {
+    if (hash_file != NULL && net_hashes != NULL) {
+        uint32_t f;
+        for (f = 0; f < net_hashes_used; f++) {
+            if (net_hashes[f] != 0) {
+                fprintf(hash_file, "%u %016llx\n", f, (unsigned long long) net_hashes[f]);
+            }
+        }
+    }
     if (hash_file != NULL) {
         fclose(hash_file);
         hash_file = NULL;

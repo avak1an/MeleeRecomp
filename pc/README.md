@@ -113,8 +113,13 @@ identical hashes for rollbacks of 8, 12, 20 and 30 frames. A snapshot is
 (`net.c`, `net_game.c`, see "Online play" under "Running"): direct IP over
 UDP, two players, fixed rules, no memory card; a host and a joiner played
 whole matches with identical state on every frame and no desync. The
-launcher has an Online page for it. Next: rollback on top of the
-lockstep.
+launcher has an Online page for it. Step 4, rollback, works on top of it:
+prediction of the other player's controller, a snapshot per frame, restore
+and re-simulation on a misprediction; tested with artificial latency up to
+about 185 ms round trip, both sides ending with identical state on every
+frame. Open: snapshots copy all 37 MB every frame (3.5 ms; tracking dirty
+pages would cut that), a disconnect ends the game instead of returning to
+a menu, and none of it has been played across two real machines by me.
 
 Planned:
 
@@ -400,9 +405,23 @@ controller states cross the network; a frame runs when both players'
 samples for it are there, every packet repeats the last 16 samples so lost
 packets cost nothing, and each sample carries the sender's random
 generator state, so a divergence is reported as a desync with its frame.
-This is input-delay lockstep; rollback on top of it is the next step. It
-does not connect to Slippi: that network requires the original executable
-running in its Dolphin build.
+On top of the input delay there is rollback: when the other player's
+sample for a frame has not arrived, the frame runs anyway on a prediction
+(their last known controller state), up to seven frames ahead of the last
+confirmed one, and a snapshot of the whole game state is kept for each of
+those frames. When the real sample arrives and differs from what was
+played, that frame's snapshot is restored and the frames since are
+simulated again with the right inputs inside one displayed frame, without
+drawing, presenting, sound output or pacing. So a connection slower than
+the input delay costs corrections instead of stutter; only beyond delay
+plus seven frames does the game wait. With a fast connection nothing is
+ever predicted. `--lockstep` turns prediction off (plain input delay).
+The exit summary counts the predicted frames and the rollbacks with their
+average and longest length. For testing on one machine, `--net-lag
+MS[,JITTER]` holds every outgoing packet that long: two paced copies with
+80 to 105 ms each way rolled back up to seven frames some twenty times in
+a match and stayed identical. It does not connect to Slippi: that network
+requires the original executable running in its Dolphin build.
 
 Mods: a mod is a folder holding the files it replaces in the disc's own
 layout, `MyMod\files\GrCn.dat`, `MyMod\files\audio\us\...` and so on.

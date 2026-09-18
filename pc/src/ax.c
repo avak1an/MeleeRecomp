@@ -608,8 +608,10 @@ static void ax_step(void)
         mix_aux(0);
         mix_aux(1);
     }
-    out_push(mix_buf);
-    dump_push(mix_buf);
+    if (!pc_resimulating) { /* replayed frames were heard the first time */
+        out_push(mix_buf);
+        dump_push(mix_buf);
+    }
 }
 
 /// Called once per video frame: renders the 5 ms frames that fall into it.

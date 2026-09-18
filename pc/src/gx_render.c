@@ -2751,8 +2751,8 @@ static Shader* draw_setup(void)
     int i, t;
     float proj[16];
 
-    if (!rendering) {
-        return NULL;
+    if (!rendering || pc_resimulating) {
+        return NULL; /* frames replayed after a rollback are not drawn */
     }
     if (gpu_path < 0) {
         gpu_path_init();
@@ -4041,7 +4041,7 @@ static void save_screenshot(void)
 void GXCopyDisp(void* dest, GXBool clear)
 {
     (void) dest;
-    if (!rendering) {
+    if (!rendering || pc_resimulating) {
         return;
     }
     imm_flush();
@@ -4113,7 +4113,7 @@ void GXCopyTex(void* dest, GXBool clear)
     int ww, wh, i, slot = -1;
     float sx, sy;
     CopyEntry* e;
-    if (!rendering) {
+    if (!rendering || pc_resimulating) {
         return;
     }
     imm_flush();

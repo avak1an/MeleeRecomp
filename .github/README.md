@@ -46,7 +46,7 @@ The port lives in the [`pc/`](../pc) directory and is documented in
 - **Online play**: two copies of the port play each other over direct IP,
   one player per PC, hosted and joined from the launcher's Online page:
   stock match, 3 stocks, items off, everything unlocked, no save needed.
-  Input-delay netcode today, rollback in progress. It does not connect to
+  Rollback netcode on top of a small input delay. It does not connect to
   Slippi.
 - **Controllers**: the official GameCube controller adapter (Nintendo's and
   the compatible ones, over WinUSB; the launcher installs the driver and

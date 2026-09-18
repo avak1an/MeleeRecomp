@@ -197,11 +197,12 @@ void VIWaitForRetrace(void)
     pc_frame_count++;
     retrace_count++;
     pc_state_frame(_ReturnAddress());
+    pc_net_frame(); /* a rollback resumes inside it, at an earlier retrace */
     if (!pc_window_pump()) {
         fprintf(stderr, "[pc] window closed\n");
         pc_exit(0);
     }
-    if (pc_config.realtime) {
+    if (pc_config.realtime && !pc_resimulating) {
         frame_stats(); /* before pacing: measures the work, not the wait */
         pace_to_60hz();
     }

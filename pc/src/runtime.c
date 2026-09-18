@@ -25,6 +25,9 @@
 
 PCConfig pc_config;
 uint32_t pc_frame_count;
+/* set while online play simulates frames again after a rollback: nothing
+ * is drawn, presented, played or paced for them */
+int pc_resimulating;
 const unsigned int* pc_debug_watch = NULL;
 static unsigned int pc_debug_watch_last;
 static const unsigned int* pc_debug_watch_last_ptr;
@@ -388,6 +391,10 @@ __declspec(noreturn) void pc_exit(int status)
  * frame has completed for a while (MELEE_WATCHDOG seconds, default 20). */
 static HANDLE main_thread;
 
+/* set while the process legitimately sits still (a host waiting for the
+ * other player): the watchdog does not count those seconds */
+volatile int pc_watchdog_hold;
+
 static DWORD WINAPI watchdog_main(LPVOID arg)
 {
     uint32_t last = pc_frame_count;
@@ -399,6 +406,10 @@ static DWORD WINAPI watchdog_main(LPVOID arg)
     }
     for (;;) {
         Sleep(1000);
+        if (pc_watchdog_hold) {
+            quiet = 0;
+            continue;
+        }
         if (pc_frame_count != last) {
             last = pc_frame_count;
             quiet = 0;

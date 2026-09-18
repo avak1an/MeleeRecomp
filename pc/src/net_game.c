@@ -44,6 +44,7 @@ void pc_net_register_state(void)
     pc_state_register(&scene_kind, sizeof(scene_kind), "net scene kind");
     pc_state_register(&scene_frame, sizeof(scene_frame), "net scene frame");
     pc_state_register(&autopilot_done, sizeof(autopilot_done), "net autopilot done");
+    pc_net_register_net_state();
 }
 
 static void apply_online_rules(void)

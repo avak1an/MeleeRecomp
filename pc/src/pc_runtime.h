@@ -50,6 +50,9 @@ typedef struct PCConfig {
     int net_host_port;    ///< --host PORT: wait for a player on this UDP port
     const char* net_join; ///< --join ADDRESS:PORT: connect to a host
     int net_delay;        ///< --delay N: frames of input delay (the host decides)
+    bool net_lockstep;    ///< --lockstep: never predict, wait for every sample
+    int net_lag;          ///< --net-lag MS[,JITTER]: testing, hold outgoing packets
+    int net_jitter;
     bool no_card;      ///< --no-card: slot A is empty too (online play never touches a save)
     int rollback_test; ///< --rollback-test K: every 2K frames, restore the state from K frames back and re-simulate
 } PCConfig;
@@ -101,6 +104,11 @@ void pc_net_on_scene(int mode, int state, int kind);
 /// Drives port 1 from power-on to the character select; 1 while it does.
 int pc_net_autopilot(struct PADStatus* st);
 void pc_net_register_state(void);
+void pc_net_register_net_state(void);
+/// Once per retrace, before the controllers are read: confirms or rolls back.
+void pc_net_frame(void);
+/// Set while frames are simulated again after a rollback.
+extern int pc_resimulating;
 /// After a restore: rewrites the card file if the undone frames had written it.
 void pc_card_after_restore(void);
 
