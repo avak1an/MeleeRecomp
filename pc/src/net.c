@@ -272,6 +272,10 @@ void pc_net_start(void)
         if (is_host && (type == MSG_READY || type == MSG_INPUT)) {
             break;
         }
+        if (is_host && now - start > 10u * 60u * 1000u) {
+            fprintf(stderr, "[pc] net: nobody joined in 10 minutes\n");
+            pc_exit(9);
+        }
         if (!is_host && now - start > NET_TIMEOUT_MS * 4) {
             fprintf(stderr, "[pc] net: no answer from the host\n");
             pc_exit(9);

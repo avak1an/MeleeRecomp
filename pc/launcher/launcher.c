@@ -16,6 +16,7 @@
 #include <shlobj.h>
 #include <setupapi.h>
 #include <wincrypt.h>
+#include <iphlpapi.h>
 #include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -73,10 +74,20 @@ enum {
     IDC_SRC_BROWSE,
     IDC_BUILD,
     IDC_BUILD_STATUS,
+    IDC_NET_OFF, /* online play: off, host, join */
+    IDC_NET_HOST,
+    IDC_NET_JOIN,
+    IDC_NET_ADDR,
+    IDC_NET_PORT,
+    IDC_NET_DELAY_0, /* 1, 2, 3, 4, 6 frames */
+    IDC_NET_DELAY_1,
+    IDC_NET_DELAY_2,
+    IDC_NET_DELAY_3,
+    IDC_NET_DELAY_4,
     IDC_PLAY,
     IDC_STATUS,
     IDC_NAV_FIRST, /* one sidebar item per page */
-    IDC_NAV_LAST = IDC_NAV_FIRST + 7,
+    IDC_NAV_LAST = IDC_NAV_FIRST + 8,
     IDC_LAST
 };
 
@@ -763,6 +774,7 @@ static int toggle_get(int id);
 static int seg_get(int first, int n, int def);
 static const int msaa_values[4] = { 0, 2, 4, 8 };
 static const int aniso_values[3] = { 0, 4, 16 };
+static const int net_delay_values[5] = { 1, 2, 3, 4, 6 };
 
 static void save_settings(void)
 {
@@ -783,6 +795,12 @@ static void save_settings(void)
     ini_set("saves", buf);
     get_text(IDC_EXTRA_EDIT, buf, sizeof(buf));
     ini_set("extra", buf);
+    ini_set_int("net_mode", seg_get(IDC_NET_OFF, 3, 0));
+    get_text(IDC_NET_ADDR, buf, sizeof(buf));
+    ini_set("net_addr", buf);
+    get_text(IDC_NET_PORT, buf, sizeof(buf));
+    ini_set("net_port", buf);
+    ini_set_int("net_delay", net_delay_values[seg_get(IDC_NET_DELAY_0, 5, 1)]);
     ini_set("extract_dir", extract_dir);
     get_text(IDC_SRC_EDIT, buf, sizeof(buf));
     ini_set("source", buf);
@@ -993,12 +1011,42 @@ static void play(void)
     if (buf[0] != '\0') {
         n += (size_t) snprintf(args + n, sizeof(args) - n, " %s", buf);
     }
+    {
+        int mode = seg_get(IDC_NET_OFF, 3, 0), port;
+        char addr[256];
+        get_text(IDC_NET_PORT, buf, sizeof(buf));
+        port = atoi(buf);
+        get_text(IDC_NET_ADDR, addr, sizeof(addr));
+        if (mode != 0 && (port < 1 || port > 65535)) {
+            MessageBoxA(main_wnd, "Online play: the port must be a number from 1 to 65535 (7777 is the usual one).", APP_TITLE,
+                        MB_ICONWARNING);
+            return;
+        }
+        if (mode == 1) {
+            n += (size_t) snprintf(args + n, sizeof(args) - n, " --host %d --delay %d", port,
+                                   net_delay_values[seg_get(IDC_NET_DELAY_0, 5, 1)]);
+        } else if (mode == 2) {
+            if (addr[0] == '\0' || strchr(addr, ' ') != NULL) {
+                MessageBoxA(main_wnd, "Online play: enter the host's address (an IP address or a host name) to join.", APP_TITLE,
+                            MB_ICONWARNING);
+                return;
+            }
+            n += (size_t) snprintf(args + n, sizeof(args) - n, " --join %s:%d", addr, port);
+        }
+    }
     if (toggle_get(IDC_NO_CONSOLE)) {
         if (run_game(args, CREATE_NO_WINDOW, 0)) {
             set_status("Game running without a console; its output goes to melee.log. Escape ends it.");
         }
     } else if (run_game(args, 0, 0)) {
         set_status("Game running. Escape or closing the game window ends it; F11 toggles full screen.");
+    } else {
+        return;
+    }
+    if (seg_get(IDC_NET_OFF, 3, 0) == 1) {
+        set_status("Hosting: waiting for the other player. The game window opens when they join (it gives up after 10 minutes).");
+    } else if (seg_get(IDC_NET_OFF, 3, 0) == 2) {
+        set_status("Joining: the game window opens once the host answers (it gives up after a minute).");
     }
 }
 
@@ -1098,8 +1146,8 @@ static void child_finished(void)
 
 enum { K_NONE, K_PRIMARY, K_SECONDARY, K_TOGGLE, K_SEGMENT, K_NAV };
 
-enum { CARD_GAME, CARD_BUILD, CARD_DISPLAY, CARD_AUDIO, CARD_CONTROLS, CARD_SAVES, CARD_MODS, CARD_ADVANCED, CARD_COUNT };
-enum { PAGE_SETUP, PAGE_BUILD, PAGE_DISPLAY, PAGE_AUDIO, PAGE_CONTROLS, PAGE_SAVES, PAGE_MODS, PAGE_ADVANCED, PAGE_COUNT };
+enum { CARD_GAME, CARD_BUILD, CARD_DISPLAY, CARD_AUDIO, CARD_CONTROLS, CARD_SAVES, CARD_MODS, CARD_ADVANCED, CARD_NET, CARD_COUNT };
+enum { PAGE_SETUP, PAGE_BUILD, PAGE_DISPLAY, PAGE_AUDIO, PAGE_CONTROLS, PAGE_NET, PAGE_SAVES, PAGE_MODS, PAGE_ADVANCED, PAGE_COUNT };
 
 #define SLM_SETPOS (WM_USER + 1)
 #define SLM_GETPOS (WM_USER + 2)
@@ -1108,16 +1156,18 @@ static const struct {
     const char* name;
     wchar_t icon;
 } nav_items[PAGE_COUNT] = {
-    { "Setup", 0xE713 },    { "Build", 0xE90F }, { "Display", 0xE7F4 }, { "Audio", 0xE767 },
-    { "Controls", 0xE7FC }, { "Saves", 0xE74E }, { "Mods", 0xEA86 },    { "Advanced", 0xE9E9 },
+    { "Setup", 0xE713 },    { "Build", 0xE90F },  { "Display", 0xE7F4 }, { "Audio", 0xE767 },
+    { "Controls", 0xE7FC }, { "Online", 0xE774 }, { "Saves", 0xE74E },   { "Mods", 0xEA86 },
+    { "Advanced", 0xE9E9 },
 };
 
 static const unsigned page_cards[PAGE_COUNT] = {
-    0xFF,
+    0x1FF,
     (1u << CARD_GAME) | (1u << CARD_BUILD),
     1u << CARD_DISPLAY,
     1u << CARD_AUDIO,
     1u << CARD_CONTROLS,
+    1u << CARD_NET,
     1u << CARD_SAVES,
     1u << CARD_MODS,
     1u << CARD_ADVANCED,
@@ -1131,13 +1181,14 @@ static const struct {
 } card_info[CARD_COUNT] = {
     { "Super Smash Bros. Melee", 0, 196 }, { "Build", 0xE90F, 172 },   { "Display", 0xE7F4, 322 },
     { "Audio", 0xE767, 184 },              { "Controls", 0xE7FC, 200 }, { "Saves", 0xE74E, 280 },
-    { "Mods", 0xEA86, 280 },               { "Advanced", 0xE9E9, 150 },
+    { "Mods", 0xEA86, 280 },               { "Advanced", 0xE9E9, 150 }, { "Online play", 0xE774, 300 },
 };
 
 /* the card grid of the Setup page: one or two cards per row */
 static const int card_rows[][2] = {
     { CARD_GAME, -1 },         { CARD_BUILD, -1 },       { CARD_DISPLAY, CARD_AUDIO },
-    { CARD_CONTROLS, -1 },     { CARD_MODS, CARD_SAVES }, { CARD_ADVANCED, -1 },
+    { CARD_CONTROLS, -1 },     { CARD_NET, -1 },         { CARD_MODS, CARD_SAVES },
+    { CARD_ADVANCED, -1 },
 };
 
 struct ctlinfo {
@@ -1235,6 +1286,41 @@ static void scale_set(int scale)
         InvalidateRect(ctl(IDC_SCALE_1 + i), NULL, FALSE);
     }
     InvalidateRect(content_wnd, NULL, FALSE);
+}
+
+/* This machine's address on its network, for the host's hint (the first
+ * adapter that has a gateway). */
+static const char* local_address(void)
+{
+    static char addr[64];
+    IP_ADAPTER_INFO info_buf[16];
+    ULONG size = sizeof(info_buf);
+    if (addr[0] == 0 && GetAdaptersInfo(info_buf, &size) == NO_ERROR) {
+        const IP_ADAPTER_INFO* a;
+        for (a = info_buf; a != NULL; a = a->Next) {
+            if (strcmp(a->IpAddressList.IpAddress.String, "0.0.0.0") != 0 &&
+                strcmp(a->GatewayList.IpAddress.String, "0.0.0.0") != 0)
+            {
+                snprintf(addr, sizeof(addr), "%s", a->IpAddressList.IpAddress.String);
+                break;
+            }
+        }
+    }
+    return addr[0] != 0 ? addr : "unknown";
+}
+
+static int seg_get(int first, int n, int def);
+
+/* the Play button says what it will start */
+static void net_mode_changed(void)
+{
+    int mode = seg_get(IDC_NET_OFF, 3, 0);
+    SetWindowTextA(ctl(IDC_PLAY), mode == 1 ? "Host" : mode == 2 ? "Join" : "Play");
+    InvalidateRect(ctl(IDC_PLAY), NULL, FALSE);
+    EnableWindow(ctl(IDC_NET_ADDR), mode == 2);
+    if (content_wnd != NULL) {
+        InvalidateRect(content_wnd, NULL, FALSE);
+    }
 }
 
 /* a row of segment buttons: which one is on */
@@ -1799,6 +1885,20 @@ static void build_ui(void)
     button("Browse...", IDC_KEYMAP_BROWSE, CARD_CONTROLS, K_SECONDARY, 0);
     button("Create / edit", IDC_KEYMAP_CREATE, CARD_CONTROLS, K_SECONDARY, 0xE70F);
 
+    {
+        static const char* net_modes[] = { "Off", "Host", "Join" };
+        static const char* net_delays[] = { "1", "2", "3", "4", "6" };
+        for (i = 0; i < 3; i++) {
+            button(net_modes[i], IDC_NET_OFF + i, CARD_NET, K_SEGMENT, 0);
+        }
+        edit(IDC_NET_ADDR, CARD_NET);
+        edit(IDC_NET_PORT, CARD_NET);
+        SendMessageA(ctl(IDC_NET_PORT), EM_SETLIMITTEXT, 5, 0);
+        for (i = 0; i < 5; i++) {
+            button(net_delays[i], IDC_NET_DELAY_0 + i, CARD_NET, K_SEGMENT, 0);
+        }
+    }
+
     edit(IDC_SAVES_EDIT, CARD_SAVES);
     button("Browse...", IDC_SAVES_BROWSE, CARD_SAVES, K_SECONDARY, 0xF12B);
     button("Open folder", IDC_SAVES_OPEN, CARD_SAVES, K_SECONDARY, 0xED25);
@@ -1957,6 +2057,18 @@ static void layout_card(int c, RECT rc)
     case CARD_ADVANCED:
         place_input(IDC_EXTRA_EDIT, x + S(110), row, right - (x + S(110)), S(34));
         break;
+    case CARD_NET: {
+        int i;
+        for (i = 0; i < 3; i++) {
+            place(IDC_NET_OFF + i, x + S(100) + i * S(72), row, S(66), S(32));
+        }
+        place_input(IDC_NET_ADDR, x + S(100), row + S(46), right - S(150) - (x + S(100)), S(34));
+        place_input(IDC_NET_PORT, right - S(90), row + S(46), S(90), S(34));
+        for (i = 0; i < 5; i++) {
+            place(IDC_NET_DELAY_0 + i, x + S(100) + i * S(54), row + S(94), S(48), S(32));
+        }
+        break;
+    }
     }
 }
 
@@ -2257,6 +2369,50 @@ static void paint_card_body(HDC dc, int c, RECT rc)
              "Passed to melee.exe as typed, e.g. --fast or --headless --frames 600 (see pc\\README.md).",
              DT_SINGLELINE | DT_LEFT | DT_END_ELLIPSIS);
         break;
+    case CARD_NET: {
+        int mode = seg_get(IDC_NET_OFF, 3, 0);
+        char line[512], port[16];
+        RECT t;
+        get_text(IDC_NET_PORT, port, sizeof(port));
+        text(dc, ui_font, C_TEXT, x, row, S(96), S(32), "Mode", DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+        text(dc, ui_font, mode == 2 ? C_TEXT : C_TEXT_DIM, x, row + S(46), S(96), S(34), "Host address",
+             DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+        text(dc, ui_font, C_TEXT, right - S(136), row + S(46), S(40), S(34), "Port", DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+        text(dc, ui_font, mode == 2 ? C_TEXT_DIM : C_TEXT, x, row + S(94), S(96), S(32), "Input delay",
+             DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+        text(dc, font_small, C_TEXT_DIM, x + S(100) + 5 * S(54) + S(8), row + S(94), right - (x + S(100) + 5 * S(54) + S(8)),
+             S(32), "frames; the host decides (2 suits most connections)", DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS);
+        if (mode == 1) {
+            snprintf(line, sizeof(line),
+                     "Hosting: you are player 1. Give the other player your public IP address and port %s, and forward UDP "
+                     "port %s in your router to this PC (its address on your network is %s). On the same network the other "
+                     "player joins that address directly. Play waits until they connect.",
+                     port, port, local_address());
+        } else if (mode == 2) {
+            snprintf(line, sizeof(line),
+                     "Joining: you are player 2. Enter the host's address and port, then press Join once the host is waiting. "
+                     "Your controller is whatever would be port 1 on this PC.");
+        } else {
+            snprintf(line, sizeof(line),
+                     "Play another copy of the port over the internet or your network, one player per PC: one hosts, the "
+                     "other joins with the host's address.");
+        }
+        t.left = x;
+        t.top = row + S(140);
+        t.right = x + w;
+        t.bottom = t.top + S(56);
+        SelectObject(dc, font_small);
+        SetTextColor(dc, C_TEXT_DIM);
+        SetBkMode(dc, TRANSPARENT);
+        DrawTextA(dc, line, -1, &t, DT_WORDBREAK | DT_LEFT);
+        t.top = row + S(200);
+        t.bottom = t.top + S(40);
+        DrawTextA(dc,
+                  "Rules: stock match, 3 stocks, items off, every character and stage unlocked. No memory card is used "
+                  "online, so nothing is loaded or saved. Both PCs start at the character select by themselves.",
+                  -1, &t, DT_WORDBREAK | DT_LEFT);
+        break;
+    }
     }
 }
 
@@ -2379,6 +2535,15 @@ static void load_settings(void)
     set_text(IDC_SAVES_EDIT, buf);
     ini_get("extra", buf, sizeof(buf), "");
     set_text(IDC_EXTRA_EDIT, buf);
+    i = ini_get_int("net_mode", 0);
+    seg_set(IDC_NET_OFF, 3, i >= 0 && i <= 2 ? i : 0);
+    ini_get("net_addr", buf, sizeof(buf), "");
+    set_text(IDC_NET_ADDR, buf);
+    ini_get("net_port", buf, sizeof(buf), "7777");
+    set_text(IDC_NET_PORT, buf);
+    i = ini_get_int("net_delay", 2);
+    seg_set(IDC_NET_DELAY_0, 5, i == 1 ? 0 : i == 3 ? 2 : i == 4 ? 3 : i == 6 ? 4 : 1);
+    net_mode_changed();
     ini_get("extract_dir", extract_dir, sizeof(extract_dir), "");
     ini_get("source", buf, sizeof(buf), "");
     if (buf[0] == '\0') {
@@ -2421,6 +2586,19 @@ static void on_command(int id, int code)
     }
     if (id >= IDC_ANISO_0 && id <= IDC_ANISO_2) {
         seg_set(IDC_ANISO_0, 3, id - IDC_ANISO_0);
+        return;
+    }
+    if (id >= IDC_NET_OFF && id <= IDC_NET_JOIN) {
+        seg_set(IDC_NET_OFF, 3, id - IDC_NET_OFF);
+        net_mode_changed();
+        return;
+    }
+    if (id >= IDC_NET_DELAY_0 && id <= IDC_NET_DELAY_4) {
+        seg_set(IDC_NET_DELAY_0, 5, id - IDC_NET_DELAY_0);
+        return;
+    }
+    if (id == IDC_NET_PORT && code == EN_CHANGE && content_wnd != NULL) {
+        InvalidateRect(content_wnd, NULL, FALSE); /* the hint quotes the port */
         return;
     }
     if (INFO(id).kind == K_TOGGLE) {

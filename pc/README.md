@@ -112,8 +112,9 @@ identical hashes for rollbacks of 8, 12, 20 and 30 frames. A snapshot is
 44 MB and takes about 3.5 ms. Step 3, online play with input delay, works
 (`net.c`, `net_game.c`, see "Online play" under "Running"): direct IP over
 UDP, two players, fixed rules, no memory card; a host and a joiner played
-whole matches with identical state on every frame and no desync. Next:
-the launcher's Netplay card, then rollback on top of the lockstep.
+whole matches with identical state on every frame and no desync. The
+launcher has an Online page for it. Next: rollback on top of the
+lockstep.
 
 Planned:
 
@@ -377,8 +378,11 @@ build\pc\melee.exe --host 7777
 build\pc\melee.exe --join 203.0.113.5:7777
 ```
 
-(from the launcher: put the option into "Extra options" on the Advanced
-card). The host needs UDP port 7777 reachable, which on most home
+(from the launcher: the Online page has the mode, the host's address, the
+port and the input delay; the Play button then reads Host or Join, and the
+status line says it is waiting for the other player). A host nobody joins
+gives up after ten minutes, a joiner without an answer after a minute. The
+host needs UDP port 7777 reachable, which on most home
 connections means a port forward in the router to the host's machine; on
 one network, or on one machine with `127.0.0.1`, nothing is needed. The
 host is player 1, the joiner player 2, each with whatever would be their
@@ -444,8 +448,10 @@ size, the rendering resolution, anti-aliasing and anisotropic filtering,
 full screen, and whether the game's console window is shown; hidden, the
 game still writes everything to `melee.log`); Audio (volume, mute);
 Controls (adapter state and setup, the keyboard layout file with a button
-that writes the default layout and opens it for editing); Saves (the
-folder); Mods (the list with checkboxes for enabled and buttons for
+that writes the default layout and opens it for editing); Online (host or
+join a match over direct IP: the host's address, the port, the input
+delay, and this PC's address on its network for the host to pass on; see
+"Online play"); Saves (the folder); Mods (the list with checkboxes for enabled and buttons for
 priority, plus extracting the disc's files); and Advanced (extra options
 passed through as typed). Settings persist in `launcher.ini` next to it.
 The launcher scales with the monitor's DPI and uses the Segoe MDL2 icon
