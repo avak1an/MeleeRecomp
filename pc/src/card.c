@@ -684,12 +684,12 @@ void CARDInit(void) {}
 
 int CARDProbe(long chan)
 {
-    return chan == 0;
+    return chan == 0 && !pc_config.no_card;
 }
 
 s32 CARDProbeEx(s32 chan, s32* memSize, s32* sectorSize)
 {
-    if (chan != 0) {
+    if (chan != 0 || pc_config.no_card) {
         return CARD_RESULT_NOCARD;
     }
     if (memSize != NULL) {
@@ -706,7 +706,7 @@ s32 CARDMountAsync(s32 chan, void* workArea, CARDCallback detachCallback, CARDCa
     TRACE("CARDMountAsync chan %d", chan);
     (void) workArea;
     (void) detachCallback;
-    if (chan != 0) {
+    if (chan != 0 || pc_config.no_card) {
         return CARD_RESULT_NOCARD;
     }
     load_image();

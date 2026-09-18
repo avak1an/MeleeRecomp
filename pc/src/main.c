@@ -46,6 +46,10 @@ static void usage(void)
             "  --state-diff N:FILE at frame N, list where memory differs from that dump\n"
             "  --rollback-test K   every 2K frames, restore the state from K frames back and\n"
             "                      re-simulate; the re-simulated frames must hash the same\n"
+            "  --host PORT     online play: wait for a player on UDP port PORT (you are player 1)\n"
+            "  --join ADDR:PORT  online play: connect to a host (you are player 2)\n"
+            "  --delay N       online play: frames of input delay, the host decides (default 2)\n"
+            "  --no-card       slot A is empty (online play always runs this way)\n"
             "  --quiet-stubs   do not log the first call of each SDK stub\n"
             "  --headless      no window; run the game logic only\n"
             "  --screenshots DIR  save a BMP of every 60th frame into DIR\n"
@@ -223,6 +227,14 @@ int main(int argc, char** argv)
             pc_config.screenshot_from = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--saves") == 0 && i + 1 < argc) {
             pc_config.save_dir = argv[++i];
+        } else if (strcmp(argv[i], "--no-card") == 0) {
+            pc_config.no_card = true;
+        } else if (strcmp(argv[i], "--host") == 0 && i + 1 < argc) {
+            pc_config.net_host_port = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--join") == 0 && i + 1 < argc) {
+            pc_config.net_join = argv[++i];
+        } else if (strcmp(argv[i], "--delay") == 0 && i + 1 < argc) {
+            pc_config.net_delay = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--state-hash") == 0 && i + 1 < argc) {
             pc_config.state_hash = argv[++i];
         } else if (strcmp(argv[i], "--rollback-test") == 0 && i + 1 < argc) {
@@ -329,5 +341,6 @@ int main(int argc, char** argv)
         }
     }
     pc_gx_render_init();
+    pc_net_start();
     return melee_main();
 }

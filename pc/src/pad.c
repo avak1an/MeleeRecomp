@@ -413,10 +413,53 @@ static void autoplay(PADStatus* st)
     }
 }
 
+/* Online play: this machine's controller (whatever would be port 1
+ * locally, or the input script standing in for it) goes through the
+ * lockstep exchange; the game sees the host on port 1 and the joiner on
+ * port 2, and nothing on 3 and 4. Until the character select opens, port 1
+ * is the boot autopilot on both machines. */
+static u32 net_read(struct PADStatus* status)
+{
+    PADStatus local, synced[2], pilot;
+    XINPUT_STATE xs;
+    int chan;
+    memset(&local, 0, sizeof(local));
+    if (pc_config.input_script != NULL) {
+        apply_script(&local);
+    } else if (pc_config.headless) {
+        /* no device */
+    } else if (pc_gcadapter_read(0, &local)) {
+        /* a GameCube controller */
+    } else if (pad_initialized && XInputGetState(0, &xs) == ERROR_SUCCESS) {
+        read_xinput(0, &xs.Gamepad, &local);
+    } else {
+        read_keyboard(&local);
+    }
+    local.err = 0;
+    pc_net_exchange(&local, synced);
+    for (chan = 0; chan < PAD_MAX_CONTROLLERS; chan++) {
+        memset(&status[chan], 0, sizeof(status[chan]));
+        if (chan < 2) {
+            status[chan] = synced[chan];
+        } else {
+            status[chan].err = PAD_ERR_NO_CONTROLLER;
+        }
+    }
+    memset(&pilot, 0, sizeof(pilot));
+    if (pc_net_autopilot(&pilot)) {
+        status[0] = pilot;
+        memset(&status[1], 0, sizeof(status[1]));
+    }
+    return PAD_CHAN0_BIT | PAD_CHAN1_BIT;
+}
+
 u32 PADRead(struct PADStatus* status)
 {
     int chan;
     u32 connected = 0;
+    if (pc_net_active()) {
+        return net_read(status);
+    }
     for (chan = 0; chan < PAD_MAX_CONTROLLERS; chan++) {
         XINPUT_STATE xs;
         PADStatus* st = &status[chan];

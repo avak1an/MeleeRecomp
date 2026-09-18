@@ -138,8 +138,10 @@ void gm_801A4014(GameMode* mode)
 #ifdef TARGET_PC
     {
         extern uint32_t pc_frame_count;
+        extern void pc_net_on_scene(int mode, int state, int kind);
         OSReport("[pc] scene: mode %d state %d scene_kind %d (frame %u)\n", mode->kind,
                  state->id, state->info.scene_kind, pc_frame_count);
+        pc_net_on_scene(mode->kind, state->id, state->info.scene_kind);
     }
 #endif
 

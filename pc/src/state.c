@@ -122,6 +122,7 @@ void pc_state_init(void)
     pc_swap_register_state();
     pc_ax_register_state();
     pc_gx_register_state();
+    pc_net_register_state();
 }
 
 /* --- The stack and the registers ----------------------------------------

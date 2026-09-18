@@ -375,6 +375,7 @@ __declspec(noreturn) void pc_exit(int status)
         pc_print_backtrace();
     }
     pc_state_close();
+    pc_net_close();
     fprintf(stderr, "[pc] exiting after %u frame(s), status %d\n", pc_frame_count, status);
     print_stub_summary();
     pc_ax_shutdown();

@@ -47,6 +47,10 @@ typedef struct PCConfig {
     int state_dump_frame;
     const char* state_diff; ///< --state-diff N:FILE
     int state_diff_frame;
+    int net_host_port;    ///< --host PORT: wait for a player on this UDP port
+    const char* net_join; ///< --join ADDRESS:PORT: connect to a host
+    int net_delay;        ///< --delay N: frames of input delay (the host decides)
+    bool no_card;      ///< --no-card: slot A is empty too (online play never touches a save)
     int rollback_test; ///< --rollback-test K: every 2K frames, restore the state from K frames back and re-simulate
 } PCConfig;
 
@@ -82,6 +86,21 @@ void pc_card_register_state(void);
 void pc_swap_register_state(void);
 void pc_ax_register_state(void);
 void pc_gx_register_state(void);
+/* --- Online play (net.c, net_game.c) -------------------------------------- */
+struct PADStatus;
+/// Opens the session when --host or --join was given; returns once both
+/// sides agree on the seed and the input delay.
+void pc_net_start(void);
+void pc_net_close(void);
+int pc_net_active(void);
+int pc_net_player(void);
+/// One frame of lockstep: this machine's controller in, both players' out.
+void pc_net_exchange(const struct PADStatus* local, struct PADStatus* out);
+/// The game reports every scene change (gm_1A3F.c).
+void pc_net_on_scene(int mode, int state, int kind);
+/// Drives port 1 from power-on to the character select; 1 while it does.
+int pc_net_autopilot(struct PADStatus* st);
+void pc_net_register_state(void);
 /// After a restore: rewrites the card file if the undone frames had written it.
 void pc_card_after_restore(void);
 

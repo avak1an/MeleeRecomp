@@ -109,8 +109,11 @@ observe, the memory card, and the frame loop's stack and registers, and
 `--rollback-test` proves it by restoring one every few frames and
 re-simulating: whole matches, the demo and Classic re-simulate with
 identical hashes for rollbacks of 8, 12, 20 and 30 frames. A snapshot is
-44 MB and takes about 3.5 ms. Next: input-delay lockstep over UDP, then
-rollback on top.
+44 MB and takes about 3.5 ms. Step 3, online play with input delay, works
+(`net.c`, `net_game.c`, see "Online play" under "Running"): direct IP over
+UDP, two players, fixed rules, no memory card; a host and a joiner played
+whole matches with identical state on every frame and no desync. Next:
+the launcher's Netplay card, then rollback on top of the lockstep.
 
 Planned:
 
@@ -365,6 +368,37 @@ Audio: a 32 kHz stereo mix of every voice the game's sound engine starts
 played through waveOut. Sound is generated in unpaced and headless runs
 too, so `MELEE_AUDIO_DUMP=out.wav` records what a scripted run would have
 played.
+
+Online play: two copies of the port play each other over UDP, direct IP.
+One player hosts, the other joins:
+
+```
+build\pc\melee.exe --host 7777
+build\pc\melee.exe --join 203.0.113.5:7777
+```
+
+(from the launcher: put the option into "Extra options" on the Advanced
+card). The host needs UDP port 7777 reachable, which on most home
+connections means a port forward in the router to the host's machine; on
+one network, or on one machine with `127.0.0.1`, nothing is needed. The
+host is player 1, the joiner player 2, each with whatever would be their
+port 1 controller locally. Both machines then boot by themselves to the VS
+character select (an autopilot answers the prompts and walks the menu),
+and from there the two players pick characters and a stage as they would
+on one console; after the results screen the select screen comes back for
+a rematch. The rules are fixed: stock match, 3 stocks, items off, every
+character and stage unlocked. An online session runs without a memory
+card, so nothing is read from or written to either player's save.
+`--delay N` sets the input delay in frames (the host decides; default 2,
+about 33 ms; raise it for a distant opponent). How it works: both machines
+run the same deterministic game from a seed the host picks, and only the
+controller states cross the network; a frame runs when both players'
+samples for it are there, every packet repeats the last 16 samples so lost
+packets cost nothing, and each sample carries the sender's random
+generator state, so a divergence is reported as a desync with its frame.
+This is input-delay lockstep; rollback on top of it is the next step. It
+does not connect to Slippi: that network requires the original executable
+running in its Dolphin build.
 
 Mods: a mod is a folder holding the files it replaces in the disc's own
 layout, `MyMod\files\GrCn.dat`, `MyMod\files\audio\us\...` and so on.
