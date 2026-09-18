@@ -45,6 +45,16 @@
 static uintptr_t* reg;
 static u32 reg_used;
 
+/* A set is rebuilt into a new array when a range is forgotten, so each
+ * allocation registers the array under the set's name for state snapshots
+ * (a name re-registered replaces the previous address). */
+static uintptr_t* new_registry(const char* name)
+{
+    uintptr_t* r = (uintptr_t*) calloc(REG_SIZE, sizeof(uintptr_t));
+    pc_state_register(r, REG_SIZE * sizeof(uintptr_t), name);
+    return r;
+}
+
 static u32 reg_hash(uintptr_t p)
 {
     p ^= p >> 16;
@@ -81,7 +91,7 @@ static bool once(const void* ptr)
         return false;
     }
     if (reg == NULL) {
-        reg = (uintptr_t*) calloc(REG_SIZE, sizeof(uintptr_t));
+        reg = new_registry("swap registry");
     }
     if (reg_used > REG_SIZE / 2) {
         fprintf(stderr, "[pc] swap registry full (%u entries)\n", reg_used);
@@ -147,6 +157,7 @@ void pc_swap_note_reloc_target(const void* slot, const void* target)
 {
     if (reloc_targets == NULL) {
         reloc_targets = calloc(MAX_RELOC_TARGETS, sizeof(*reloc_targets));
+        pc_state_register(reloc_targets, MAX_RELOC_TARGETS * sizeof(*reloc_targets), "reloc targets");
     }
     if (reloc_target_count < MAX_RELOC_TARGETS) {
         reloc_targets[reloc_target_count].target = (uintptr_t) target;
@@ -163,6 +174,16 @@ static struct {
     uintptr_t lo, hi;
 } archives[MAX_ARCHIVES];
 static u32 archive_count;
+
+void pc_swap_register_state(void)
+{
+    pc_state_register(&reg_used, sizeof(reg_used), "swap registry used");
+    pc_state_register(&reloc_used, sizeof(reloc_used), "reloc registry used");
+    pc_state_register(&reloc_target_count, sizeof(reloc_target_count), "reloc target count");
+    pc_state_register(&reloc_targets_sorted, sizeof(reloc_targets_sorted), "reloc targets sorted");
+    pc_state_register(archives, sizeof(archives), "archives");
+    pc_state_register(&archive_count, sizeof(archive_count), "archive count");
+}
 
 void pc_swap_note_archive(const void* base, size_t size)
 {
@@ -270,7 +291,7 @@ void pc_swap_note_reloc_slot(const void* ptr)
     uintptr_t p = (uintptr_t) ptr;
     u32 i;
     if (reloc_reg == NULL) {
-        reloc_reg = (uintptr_t*) calloc(REG_SIZE, sizeof(uintptr_t));
+        reloc_reg = new_registry("reloc registry");
     }
     if (reloc_used > REG_SIZE / 2) {
         fprintf(stderr, "[pc] relocation registry full (%u entries)\n", reloc_used);
@@ -315,7 +336,7 @@ void pc_swap_forget_range(void* base, size_t size)
     /* Deleting from an open-addressing table: rebuild without the range. */
     {
         uintptr_t* old = reg;
-        reg = (uintptr_t*) calloc(REG_SIZE, sizeof(uintptr_t));
+        reg = new_registry("swap registry");
         reg_used = 0;
         for (i = 0; i < REG_SIZE; i++) {
             if (old[i] != 0 && !(old[i] >= lo && old[i] < hi)) {
@@ -344,7 +365,7 @@ void pc_swap_forget_range(void* base, size_t size)
     }
     if (reloc_reg != NULL) {
         uintptr_t* old = reloc_reg;
-        reloc_reg = (uintptr_t*) calloc(REG_SIZE, sizeof(uintptr_t));
+        reloc_reg = new_registry("reloc registry");
         reloc_used = 0;
         for (i = 0; i < REG_SIZE; i++) {
             if (old[i] != 0 && !(old[i] >= lo && old[i] < hi)) {

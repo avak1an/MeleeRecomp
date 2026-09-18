@@ -11,6 +11,7 @@
 
 #include <dolphin/gx/GXStruct.h>
 #include <dolphin/vi.h>
+#include <intrin.h>
 
 #include <stdio.h>
 #include <windows.h>
@@ -35,6 +36,15 @@ static VIRetraceCallback post_cb;
 static u32 retrace_count;
 static void* next_fb;
 static void* current_fb;
+
+void pc_vi_register_state(void)
+{
+    pc_state_register(&pre_cb, sizeof(pre_cb), "vi pre cb");
+    pc_state_register(&post_cb, sizeof(post_cb), "vi post cb");
+    pc_state_register(&retrace_count, sizeof(retrace_count), "vi retrace count");
+    pc_state_register(&next_fb, sizeof(next_fb), "vi next fb");
+    pc_state_register(&current_fb, sizeof(current_fb), "vi current fb");
+}
 static LARGE_INTEGER last_frame;
 
 void VIInit(void) {}
@@ -186,7 +196,7 @@ void VIWaitForRetrace(void)
 {
     pc_frame_count++;
     retrace_count++;
-    pc_state_frame();
+    pc_state_frame(_ReturnAddress());
     if (!pc_window_pump()) {
         fprintf(stderr, "[pc] window closed\n");
         pc_exit(0);

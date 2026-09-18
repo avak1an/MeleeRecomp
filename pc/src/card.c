@@ -65,6 +65,7 @@
 static int trace = -1; /* MELEE_TRACE_CARD=1: every API call */
 #define TRACE(...) do { if (trace < 0) trace = getenv("MELEE_TRACE_CARD") != NULL; if (trace) { fprintf(stderr, "[pc] card: " __VA_ARGS__); fputc(10, stderr); } } while (0)
 static u8* image;   /* the whole card */
+static u32 mem_writes, disk_writes; /* see pc_card_after_restore */
 static int loaded;  /* image read or formatted */
 static int mounted;
 static s32 xferred;
@@ -185,6 +186,17 @@ static int bat_ok(u32 b)
  * by commit_system(), which also refreshes the other copy. */
 static u32 cur_dir = 1, cur_bat = 3;
 
+void pc_card_register_state(void)
+{
+    pc_state_register(queue, sizeof(queue), "card queue");
+    pc_state_register(&queue_len, sizeof(queue_len), "card queue len");
+    pc_state_register(&mounted, sizeof(mounted), "card mounted");
+    pc_state_register(&xferred, sizeof(xferred), "card xferred");
+    pc_state_register(&cur_dir, sizeof(cur_dir), "card dir copy");
+    pc_state_register(&cur_bat, sizeof(cur_bat), "card bat copy");
+    pc_state_register(&mem_writes, sizeof(mem_writes), "card writes");
+}
+
 static void choose_copies(void)
 {
     int ok1 = dir_ok(1), ok2 = dir_ok(2), ok3 = bat_ok(3), ok4 = bat_ok(4);
@@ -242,9 +254,27 @@ static const char* image_path(void)
     return image_path_buf;
 }
 
+/* Writes are counted twice: mem_writes is part of the game's state and
+ * rolls back with it, disk_writes is what the file has seen. When a restore
+ * leaves the two apart, the file holds blocks from the undone frames and is
+ * rewritten whole (pc_card_after_restore). */
+void pc_card_after_restore(void)
+{
+    if (mem_writes != disk_writes && image != NULL && loaded) {
+        FILE* fp = fopen(image_path(), "wb");
+        if (fp != NULL) {
+            fwrite(image, 1, IMAGE_BYTES, fp);
+            fclose(fp);
+        }
+        disk_writes = mem_writes;
+    }
+}
+
 static void write_range(u32 first_block, u32 count)
 {
     FILE* fp;
+    mem_writes++;
+    disk_writes++;
     CreateDirectoryA(save_dir(), NULL);
     fp = fopen(image_path(), "r+b");
     if (fp == NULL) {
@@ -541,6 +571,9 @@ static void load_image(void)
     loaded = 1;
     if (image == NULL) {
         image = (u8*) calloc(IMAGE_BYTES, 1);
+        if (image != NULL) {
+            pc_state_register(image, IMAGE_BYTES, "card image");
+        }
         if (image == NULL) {
             return;
         }

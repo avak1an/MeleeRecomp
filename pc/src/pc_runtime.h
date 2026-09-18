@@ -47,11 +47,43 @@ typedef struct PCConfig {
     int state_dump_frame;
     const char* state_diff; ///< --state-diff N:FILE
     int state_diff_frame;
+    int rollback_test; ///< --rollback-test K: every 2K frames, restore the state from K frames back and re-simulate
 } PCConfig;
 
-/// Per-frame state hash / dump / diff (determinism.c), from VIWaitForRetrace.
-void pc_state_frame(void);
+/// Per-frame state hash / dump / diff and the rollback self-test
+/// (determinism.c), from VIWaitForRetrace; `site` is its caller.
+void pc_state_frame(const void* site);
 void pc_state_close(void);
+
+/* --- Whole-state snapshots (state.c) ------------------------------------ */
+/// Runtime state the game can observe, registered by its owner (address
+/// and size; re-registering an address updates the size).
+void pc_state_register(void* p, size_t n, const char* name);
+/// Registers every module's state; call once at start-up.
+void pc_state_init(void);
+/// The game's writable sections and the arena.
+int pc_state_game_regions(const uint8_t** bases, size_t* sizes, const char** names, int max);
+size_t pc_state_size(void);
+/// Copies the state (memory, registered ranges, the stack and registers of
+/// this call) into `dst` (at least pc_state_size() bytes). Returns 1 when
+/// saved, 0 if `cap` is too small, and 2 when this very call returns a
+/// second time because pc_state_load restored its snapshot.
+int pc_state_save(void* dst, size_t cap);
+/// Restores a snapshot and resumes inside the pc_state_save call that took
+/// it; returns 0 only if the snapshot is unusable.
+int pc_state_load(const void* src);
+uint32_t pc_state_frame_of(const void* src);
+/* per-module registration, called by pc_state_init */
+void pc_runtime_register_state(void);
+void pc_vi_register_state(void);
+void pc_dvd_register_state(void);
+void pc_aram_register_state(void);
+void pc_card_register_state(void);
+void pc_swap_register_state(void);
+void pc_ax_register_state(void);
+void pc_gx_register_state(void);
+/// After a restore: rewrites the card file if the undone frames had written it.
+void pc_card_after_restore(void);
 
 extern PCConfig pc_config;
 

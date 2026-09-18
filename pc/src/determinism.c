@@ -315,12 +315,115 @@ static void state_diff(const char* path)
             total > shown ? " (first 80 shown)" : "");
 }
 
-void pc_state_frame(void)
+/* --- Rollback self-test -------------------------------------------------
+ * --rollback-test K: at every frame that is an odd multiple of K the state
+ * is saved; at the next even multiple it is restored, so the game runs the
+ * last K frames again; their hashes must equal the ones recorded the first
+ * time. A snapshot is only restored from the retrace site it was taken at. */
+static uint64_t* frame_hashes;
+static uint32_t frame_hashes_cap;
+static void* snapshot;
+static size_t snapshot_cap;
+static const void* snapshot_site;
+static uint32_t replay_until;
+static int replay_mismatches, replays, saves;
+static double save_ms;
+
+/// Returns 1 when the call resumed from a restore (the frame is now the
+/// snapshot's; nothing else must run for it).
+static int rollback_test(const void* site, uint64_t h)
 {
-    if (pc_config.state_hash == NULL && pc_config.state_dump == NULL && pc_config.state_diff == NULL) {
+    uint32_t k = (uint32_t) pc_config.rollback_test, f = pc_frame_count;
+    if (f >= frame_hashes_cap) {
+        uint32_t cap = f + 4096;
+        frame_hashes = (uint64_t*) realloc(frame_hashes, cap * sizeof(uint64_t));
+        memset(frame_hashes + frame_hashes_cap, 0, (cap - frame_hashes_cap) * sizeof(uint64_t));
+        frame_hashes_cap = cap;
+    }
+    if (replay_until != 0) {
+        if (frame_hashes[f] != h) {
+            fprintf(stderr, "[pc] rollback: frame %u differs after re-simulation (%016llx, was %016llx)\n", f,
+                    (unsigned long long) h, (unsigned long long) frame_hashes[f]);
+            replay_mismatches++;
+        }
+        if (f >= replay_until) {
+            replay_until = 0;
+            replays++;
+        }
+        return 0;
+    }
+    frame_hashes[f] = h;
+    if (f % (2 * k) == k) {
+        size_t need = pc_state_size();
+        int r;
+        if (need > snapshot_cap) {
+            free(snapshot);
+            snapshot = malloc(need);
+            snapshot_cap = snapshot != NULL ? need : 0;
+        }
+        if (snapshot == NULL) {
+            return 0;
+        }
+        {
+            LARGE_INTEGER t0, t1, fq;
+            QueryPerformanceFrequency(&fq);
+            QueryPerformanceCounter(&t0);
+            r = pc_state_save(snapshot, snapshot_cap);
+            QueryPerformanceCounter(&t1);
+            if (r == 1) {
+                save_ms += (double) (t1.QuadPart - t0.QuadPart) * 1000.0 / (double) fq.QuadPart;
+                saves++;
+            }
+        }
+        if (r == 2) {
+            if (getenv("MELEE_TRACE_ROLLBACK") != NULL) {
+                fprintf(stderr, "[pc] rollback: resumed at frame %u\n", pc_frame_count);
+            }
+            return 1; /* restored: frame f - k begins again */
+        }
+        if (getenv("MELEE_TRACE_ROLLBACK") != NULL) {
+            fprintf(stderr, "[pc] rollback: frame %u: snapshot %s (%u bytes)\n", f, r == 1 ? "taken" : "FAILED",
+                    (unsigned) need);
+        }
+        if (r == 1) {
+            snapshot_site = site;
+        }
+    } else if (f % (2 * k) == 0 && f > 0 && snapshot != NULL && pc_state_frame_of(snapshot) == f - k) {
+        if (snapshot_site != site) {
+            fprintf(stderr, "[pc] rollback: frame %u: retrace site differs from frame %u's, not restored\n", f, f - k);
+            return 0;
+        }
+        replay_until = f;
+        if (getenv("MELEE_TRACE_ROLLBACK") != NULL) {
+            fprintf(stderr, "[pc] rollback: frame %u: restoring frame %u\n", f, f - k);
+        }
+        pc_state_load(snapshot); /* resumes inside the save at frame f - k */
+        replay_until = 0;
+    }
+    return 0;
+}
+
+void pc_state_frame(const void* site)
+{
+    static int inited;
+    if (pc_config.state_hash == NULL && pc_config.state_dump == NULL && pc_config.state_diff == NULL &&
+        pc_config.rollback_test == 0)
+    {
         return;
     }
+    if (!inited) {
+        inited = 1;
+        pc_state_init();
+    }
     collect_regions();
+    if (pc_config.rollback_test > 0 && getenv("MELEE_TRACE_ROLLBACK") != NULL) {
+        extern int pc_gx_draws_this_frame(void);
+        fprintf(stderr, "[pc] rollback: retrace %u, %d draws since the last present%s" "%c", pc_frame_count,
+                pc_gx_draws_this_frame(), replay_until != 0 ? " (replay)" : "", 10);
+    }
+    if (pc_config.rollback_test > 0 && rollback_test(site, state_hash())) {
+        return; /* just restored: this frame's bookkeeping was done the first time */
+    }
     if (pc_config.state_hash != NULL) {
         if (hash_file == NULL) {
             hash_file = fopen(pc_config.state_hash, "w");
@@ -332,10 +435,15 @@ void pc_state_frame(void)
         }
         fprintf(hash_file, "%u %016llx\n", pc_frame_count, (unsigned long long) state_hash());
     }
-    if (pc_config.state_dump != NULL && pc_frame_count == (uint32_t) pc_config.state_dump_frame) {
+    /* with the rollback test, a dump is taken on the first pass over a
+     * frame and a diff on the re-simulation of it, so
+     * --state-dump N:F --state-diff N:F shows what a restore left different */
+    if (pc_config.state_dump != NULL && pc_frame_count == (uint32_t) pc_config.state_dump_frame && replay_until == 0) {
         state_dump(pc_config.state_dump);
     }
-    if (pc_config.state_diff != NULL && pc_frame_count == (uint32_t) pc_config.state_diff_frame) {
+    if (pc_config.state_diff != NULL && pc_frame_count == (uint32_t) pc_config.state_diff_frame &&
+        (pc_config.rollback_test == 0 || replay_until != 0))
+    {
         state_diff(pc_config.state_diff);
     }
 }
@@ -345,5 +453,12 @@ void pc_state_close(void)
     if (hash_file != NULL) {
         fclose(hash_file);
         hash_file = NULL;
+    }
+    if (pc_config.rollback_test > 0) {
+        fprintf(stderr,
+                "[pc] rollback: %d re-simulation(s) of %d frames, %d frame hash mismatch(es); %d snapshot(s) of %u KB, "
+                "%.1f ms each\n",
+                replays, pc_config.rollback_test, replay_mismatches, saves, (unsigned) (snapshot_cap / 1024),
+                saves != 0 ? save_ms / saves : 0.0);
     }
 }

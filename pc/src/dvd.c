@@ -527,6 +527,14 @@ typedef struct PendingRead {
 static PendingRead pending[MAX_PENDING];
 static int pending_head, pending_count;
 
+void pc_dvd_register_state(void)
+{
+    pc_state_register(pending, sizeof(pending), "dvd pending");
+    pc_state_register(&pending_head, sizeof(pending_head), "dvd pending head");
+    pc_state_register(&pending_count, sizeof(pending_count), "dvd pending count");
+    pc_state_register(&current_dir, sizeof(current_dir), "dvd current dir");
+}
+
 static s32 do_read(DVDFileInfo* fileInfo, void* addr, s32 length, s32 offset)
 {
     if (offset < 0 || (u32) offset > fileInfo->length) {

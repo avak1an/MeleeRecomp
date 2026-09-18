@@ -49,6 +49,19 @@ typedef void (*AuxCallback)(void*, void*);
 static AuxCallback aux_cb[2];
 static void* aux_ctx[2];
 static s32 aux_buf[2][3][AX_FRAME]; /* left, right, surround; consecutive */
+
+static double ax_pending;
+
+void pc_ax_register_state(void)
+{
+    pc_state_register(voices, sizeof(voices), "ax voices");
+    pc_state_register(voice_used, sizeof(voice_used), "ax voice used");
+    pc_state_register(aux_cb, sizeof(aux_cb), "ax aux callbacks");
+    pc_state_register(aux_ctx, sizeof(aux_ctx), "ax aux contexts");
+    pc_state_register(&ax_pending, sizeof(ax_pending), "ax pending samples");
+    pc_state_register(&ax_ready, sizeof(ax_ready), "ax ready");
+    pc_state_register(&frame_callback, sizeof(frame_callback), "ax frame callback");
+}
 static int aux_off = -1;             /* MELEE_AX_NOAUX=1: dry, as before */
 
 AXVPB* AXAcquireVoice(u32 priority, void (*callback)(void*), u32 userContext)
@@ -600,9 +613,12 @@ static void ax_step(void)
 }
 
 /// Called once per video frame: renders the 5 ms frames that fall into it.
+/* ax_pending: samples owed to the next 5 ms frame, declared above with the state registration */
+
 void pc_ax_frame(void)
 {
-    static double pending;
+    double* pending_p = &ax_pending;
+#define pending (*pending_p)
     if (!ax_ready) {
         return;
     }
@@ -611,6 +627,7 @@ void pc_ax_frame(void)
         ax_step();
         pending -= AX_FRAME;
     }
+#undef pending
 }
 
 void AXInit(void)

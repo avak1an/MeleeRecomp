@@ -121,6 +121,16 @@ u32 ARGetDMAStatus(void)
 static ARQRequest* arq_pending[MAX_ARQ];
 static int arq_head, arq_count;
 
+void pc_aram_register_state(void)
+{
+    pc_state_register(&stack_index, sizeof(stack_index), "aram stack index");
+    pc_state_register(&stack_pointer, sizeof(stack_pointer), "aram stack pointer");
+    pc_state_register(&stack_count, sizeof(stack_count), "aram stack count");
+    pc_state_register(arq_pending, sizeof(arq_pending), "arq pending");
+    pc_state_register(&arq_head, sizeof(arq_head), "arq head");
+    pc_state_register(&arq_count, sizeof(arq_count), "arq count");
+}
+
 void ARQInit(void) {}
 
 void ARQPostRequest(struct ARQRequest* request, u32 owner, u32 type, u32 priority, u32 source,

@@ -102,9 +102,15 @@ its attract demo), and the memory card stamps its times from the game's
 clock. `--state-hash` proves it: headless, windowed, paced, with
 anti-aliasing or screenshots, the game's memory hashes identically frame
 for frame through a whole match. The runtime's own globals now live in
-sections of their own so the check covers the game's state only. Next:
-saving and restoring the state for rollback, then input-delay lockstep
-over UDP, then rollback.
+sections of their own so the check covers the game's state only. Step 2,
+saving and restoring the whole state, is done too: a snapshot (`state.c`)
+holds main memory, the game's globals, the runtime state the game can
+observe, the memory card, and the frame loop's stack and registers, and
+`--rollback-test` proves it by restoring one every few frames and
+re-simulating: whole matches, the demo and Classic re-simulate with
+identical hashes for rollbacks of 8, 12, 20 and 30 frames. A snapshot is
+44 MB and takes about 3.5 ms. Next: input-delay lockstep over UDP, then
+rollback on top.
 
 Planned:
 
@@ -269,6 +275,18 @@ fresh save and has no route yet. A sweep of every stage is the VS route with
   prints every differing place with its symbol, so the first frame whose
   hash differs can be explained. `MELEE_STATE_ALL=1` includes the runtime's
   own variables, `MELEE_STATE_IGNORE=sym,sym+OFF:LEN,...` leaves more out.
+- `--rollback-test K`: the state save/restore check behind rollback
+  netplay. Every 2K frames the whole game state (see "Design decisions") is
+  snapshotted, and K frames later restored, so the game runs those K frames
+  a second time; every re-simulated frame must hash exactly as it did the
+  first time. The summary at exit gives the count of re-simulations, the
+  mismatches, and the snapshot size and time. With `--state-dump N:F
+  --state-diff N:F` the dump is taken on the first pass over frame N and
+  the diff on its re-simulation, which names whatever a restore left
+  different. `MELEE_TRACE_ROLLBACK=1` logs every snapshot, restore and
+  resume. A window in which the game's frame loop moved to another scene
+  is skipped ("retrace site differs"): the restore also puts the stack
+  back, so it only ever resumes the very loop the snapshot was taken in.
 - `MELEE_GX_PROFILE=1` (or `--profile`): every 300 frames, where the
   frame's wall time went (vertex processing, shader and texture lookups,
   EFB copies, the present, and the rest, which is the game logic and any
@@ -1012,6 +1030,23 @@ All guarded by `TARGET_PC` or token-identical on GameCube:
   it). The runtime's globals are placed in their own sections
   (`pc/include/pc_sections.h`, forced into every `pc/src` file) so the
   check can tell the game's state from the host's.
+- State snapshots (`state.c`): a snapshot holds the game's writable
+  sections and the arena, the runtime state the game can observe (each
+  module registers its own: the frame counter and clock, the OS arena
+  bounds and alarm list, the queued disc, ARAM and card completions, the
+  byte-swap registries, the audio voices the game holds pointers to, the
+  GX draw-done state, the card image), and the frame loop's stack from the
+  saving call up to the thread's stack base together with that call's
+  callee-saved registers and return address. The stack is needed because
+  the game's frame loop is nested in scene loops that keep locals on the
+  stack; a restore copies the stack back from a stack of its own and jumps
+  into the saved call, which then returns a second time (a coroutine
+  switch, in a few lines of inline assembly). Snapshots are taken and
+  restored only at `VIWaitForRetrace`, and only into the same retrace
+  call site. Not in a snapshot: ARAM's contents (16 MB of sound data the
+  game never reads back during a match), the renderer's caches (they
+  catch up), and the card file on disk, which is rewritten whole after a
+  restore that undid a write.
 
 ## Known gaps (deliberate, for later milestones)
 

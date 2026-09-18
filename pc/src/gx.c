@@ -27,6 +27,13 @@ static GXDrawDoneCallback draw_done_cb;
 static int draw_done_pending;
 static u16 draw_sync_token;
 
+void pc_gx_register_state(void)
+{
+    pc_state_register(&draw_done_cb, sizeof(draw_done_cb), "gx draw done cb");
+    pc_state_register(&draw_done_pending, sizeof(draw_done_pending), "gx draw done pending");
+    pc_state_register(&draw_sync_token, sizeof(draw_sync_token), "gx draw sync token");
+}
+
 GXFifoObj* GXInit(void* base, u32 size)
 {
     (void) base;

@@ -374,6 +374,7 @@ __declspec(noreturn) void pc_exit(int status)
     if (status != 0) {
         pc_print_backtrace();
     }
+    pc_state_close();
     fprintf(stderr, "[pc] exiting after %u frame(s), status %d\n", pc_frame_count, status);
     print_stub_summary();
     pc_ax_shutdown();
@@ -567,10 +568,11 @@ __declspec(noreturn) void OSPanic(char* file, int line, char* msg, ...)
 
 /* --- Time ---------------------------------------------------------------- */
 
+static OSTime virtual_calls; /* part of the game's state: see pc_runtime_register_state */
+
 static OSTime host_ticks(void)
 {
     LARGE_INTEGER now;
-    static OSTime virtual_calls;
     static int host_clock = -1;
     if (host_clock < 0) {
         host_clock = getenv("MELEE_HOST_CLOCK") != NULL;
@@ -681,6 +683,15 @@ unsigned long OSGetSoundMode(void)
 
 static OSAlarm* alarm_head;
 static OSContext alarm_context; /* handlers get a context pointer; unused */
+
+void pc_runtime_register_state(void)
+{
+    pc_state_register(&pc_frame_count, sizeof(pc_frame_count), "frame count");
+    pc_state_register(&arena_lo, sizeof(arena_lo), "arena lo");
+    pc_state_register(&arena_hi, sizeof(arena_hi), "arena hi");
+    pc_state_register(&alarm_head, sizeof(alarm_head), "alarm head");
+    pc_state_register(&virtual_calls, sizeof(virtual_calls), "clock calls");
+}
 
 /* There is one thread and its register image is never inspected for real;
  * the debug code only pokes fpscr in it. */

@@ -215,6 +215,12 @@ static u32 vertex_stream_size(u8 vat);
 static int rendering; /* GL context exists */
 static u32 frame_no;
 static int stats_draws, stats_verts;
+
+/// Draws issued since the last present (the rollback trace reads it).
+int pc_gx_draws_this_frame(void)
+{
+    return stats_draws;
+}
 static int debug_log;  /* MELEE_GX_DEBUG: log the first draws of a frame */
 static int debug_flat; /* MELEE_GX_FLAT: magenta fragments, no alpha test */
 int pc_debug_in_fighter;      /* set by the fighter draw routine: 1 + kind while its model is drawn */
@@ -4003,7 +4009,7 @@ static void save_screenshot(void)
     if (scene_fbo != 0) {
         pc_glBindFramebuffer(GL_FRAMEBUFFER, scene_fbo);
     }
-    snprintf(path, sizeof(path), "%s/frame%05u.bmp", pc_config.screenshot_dir, frame_no);
+    snprintf(path, sizeof(path), "%s/frame%05u.bmp", pc_config.screenshot_dir, pc_frame_count);
     f = fopen(path, "wb");
     if (f == NULL) {
         free(pixels);
@@ -4042,8 +4048,9 @@ void GXCopyDisp(void* dest, GXBool clear)
     if (debug_log_frame != 0 && pc_frame_count == debug_log_frame) {
         fprintf(stderr, "[gx] GXCopyDisp clear=%d (present)\n", (int) clear);
     }
-    if (pc_config.screenshot_dir != NULL && pc_config.screenshot_every > 0 && frame_no >= (u32) pc_config.screenshot_from &&
-        (frame_no - (u32) pc_config.screenshot_from) % (u32) pc_config.screenshot_every == 0)
+    /* by game frame, not by present: a rollback renders frames again */
+    if (pc_config.screenshot_dir != NULL && pc_config.screenshot_every > 0 && pc_frame_count >= (u32) pc_config.screenshot_from &&
+        (pc_frame_count - (u32) pc_config.screenshot_from) % (u32) pc_config.screenshot_every == 0)
     {
         save_screenshot();
     }

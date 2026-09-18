@@ -44,6 +44,8 @@ static void usage(void)
             "  --state-hash FILE   write a hash of the game's memory every frame (determinism check)\n"
             "  --state-dump N:FILE write the game's memory at frame N\n"
             "  --state-diff N:FILE at frame N, list where memory differs from that dump\n"
+            "  --rollback-test K   every 2K frames, restore the state from K frames back and\n"
+            "                      re-simulate; the re-simulated frames must hash the same\n"
             "  --quiet-stubs   do not log the first call of each SDK stub\n"
             "  --headless      no window; run the game logic only\n"
             "  --screenshots DIR  save a BMP of every 60th frame into DIR\n"
@@ -223,6 +225,11 @@ int main(int argc, char** argv)
             pc_config.save_dir = argv[++i];
         } else if (strcmp(argv[i], "--state-hash") == 0 && i + 1 < argc) {
             pc_config.state_hash = argv[++i];
+        } else if (strcmp(argv[i], "--rollback-test") == 0 && i + 1 < argc) {
+            pc_config.rollback_test = atoi(argv[++i]);
+            if (pc_config.rollback_test < 1) {
+                pc_config.rollback_test = 0;
+            }
         } else if ((strcmp(argv[i], "--state-dump") == 0 || strcmp(argv[i], "--state-diff") == 0) && i + 1 < argc) {
             /* N:FILE */
             const char* opt = argv[i];
